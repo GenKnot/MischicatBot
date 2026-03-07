@@ -10,6 +10,26 @@ def get_conn():
     return conn
 
 
+def _migrate(conn):
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(players)")}
+    migrations = [
+        ("rebirth_count",        "INTEGER NOT NULL DEFAULT 0"),
+        ("is_virgin",            "INTEGER NOT NULL DEFAULT 1"),
+        ("sect",                 "TEXT"),
+        ("sect_rank",            "TEXT"),
+        ("last_dual_cultivate",  "REAL"),
+        ("techniques",           "TEXT NOT NULL DEFAULT '[]'"),
+        ("cultivation_overflow", "INTEGER NOT NULL DEFAULT 0"),
+        ("current_city",         "TEXT NOT NULL DEFAULT '灵虚城'"),
+        ("explore_count",        "INTEGER NOT NULL DEFAULT 0"),
+        ("explore_reset_year",   "REAL NOT NULL DEFAULT 0"),
+    ]
+    for col, definition in migrations:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE players ADD COLUMN {col} {definition}")
+    conn.commit()
+
+
 def init_db():
     with get_conn() as conn:
         conn.execute("""
@@ -47,4 +67,5 @@ def init_db():
                 explore_reset_year    REAL NOT NULL DEFAULT 0
             )
         """)
+        _migrate(conn)
         conn.commit()

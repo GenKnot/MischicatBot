@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 
 from utils.db import get_conn
-from utils.events import EVENTS
+from utils.events import get_event_pool
 from utils.character import seconds_to_years
 
 EXPLORE_LIMIT = 8
@@ -224,7 +224,7 @@ class ExploreCog(commands.Cog, name="Explore"):
         _increment_explore(uid, player)
         player = _get_player(uid)
 
-        event = random.choice(EVENTS)
+        event = random.choice(get_event_pool(dict(player)))
         embed = discord.Embed(
             title=f"✦ {event['title']} ✦",
             description=event["desc"],
