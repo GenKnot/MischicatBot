@@ -23,10 +23,20 @@ def _migrate(conn):
         ("current_city",         "TEXT NOT NULL DEFAULT '灵虚城'"),
         ("explore_count",        "INTEGER NOT NULL DEFAULT 0"),
         ("explore_reset_year",   "REAL NOT NULL DEFAULT 0"),
+        ("cave",                 "TEXT"),
     ]
     for col, definition in migrations:
         if col not in existing:
             conn.execute(f"ALTER TABLE players ADD COLUMN {col} {definition}")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS residences (
+            discord_id  TEXT NOT NULL,
+            city        TEXT NOT NULL,
+            purchased_at REAL NOT NULL,
+            PRIMARY KEY (discord_id, city)
+        )
+    """)
     conn.commit()
 
 
@@ -69,3 +79,19 @@ def init_db():
         """)
         _migrate(conn)
         conn.commit()
+
+
+def get_residences(discord_id: str) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT city FROM residences WHERE discord_id = ?", (discord_id,)
+        ).fetchall()
+    return [r["city"] for r in rows]
+
+
+def has_residence(discord_id: str, city: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM residences WHERE discord_id = ? AND city = ?", (discord_id, city)
+        ).fetchone()
+    return row is not None

@@ -6,10 +6,17 @@ from discord.ext import commands
 
 from utils.db import get_conn
 from utils.events import get_event_pool
-from utils.character import seconds_to_years
+from utils.character import seconds_to_years, get_explore_limit_bonus
 
 EXPLORE_LIMIT = 8
 EXPLORE_RESET_YEARS = 5
+
+
+def _get_explore_limit(player) -> int:
+    bonus = get_explore_limit_bonus(
+        player["discord_id"], player["current_city"], player.get("cave")
+    )
+    return EXPLORE_LIMIT + bonus
 
 
 def _get_player(discord_id: str):
@@ -53,15 +60,16 @@ def _check_explore_limit(player) -> tuple[bool, str]:
     now_years = time.time() / (2 * 3600)
     reset_year = player["explore_reset_year"] or 0
     count = player["explore_count"] or 0
+    limit = _get_explore_limit(player)
 
     if now_years - reset_year >= EXPLORE_RESET_YEARS:
         return True, ""
 
-    if count < EXPLORE_LIMIT:
+    if count < limit:
         return True, ""
 
     years_left = EXPLORE_RESET_YEARS - (now_years - reset_year)
-    return False, f"探险次数已用尽（{EXPLORE_LIMIT}/{EXPLORE_LIMIT}），约 **{years_left:.1f} 游戏年**后刷新。"
+    return False, f"探险次数已用尽（{limit}/{limit}），约 **{years_left:.1f} 游戏年**后刷新。"
 
 
 def _increment_explore(discord_id: str, player):
@@ -137,6 +145,9 @@ class ExploreChoiceButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        for item in self.view.children:
+            item.disabled = True
+        self.view.stop()
         cog = self.view.cog
         player = self.view.player
         uid = str(interaction.user.id)
@@ -195,6 +206,9 @@ class ExploreNextButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        for item in self.view.children:
+            item.disabled = True
+        self.view.stop()
         uid = str(interaction.user.id)
         player = dict(self.view.player)
         choices = self.view.next_event["choices"]
@@ -232,14 +246,15 @@ class ExploreCog(commands.Cog, name="Explore"):
         _increment_explore(uid, player)
         player = _get_player(uid)
 
-        event = random.choice(get_event_pool(dict(player)))
+        event = get_event_pool(dict(player))
         embed = discord.Embed(
             title=f"✦ {event['title']} ✦",
             description=event["desc"],
             color=discord.Color.gold(),
         )
         count = player["explore_count"]
-        embed.set_footer(text=f"本轮探险次数：{count}/{EXPLORE_LIMIT}")
+        limit = _get_explore_limit(player)
+        embed.set_footer(text=f"本轮探险次数：{count}/{limit}")
         await ctx.send(
             ctx.author.mention,
             embed=embed,

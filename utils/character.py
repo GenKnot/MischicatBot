@@ -164,3 +164,36 @@ def years_to_seconds(years: float) -> float:
 
 def seconds_to_years(seconds: float) -> float:
     return seconds / (HOURS_PER_YEAR * 3600)
+
+
+RESIDENCE_BONUS = 0.10
+CAVE_BONUS = 0.25
+CAVE_EXPLORE_BONUS = 3
+RESIDENCE_EXPLORE_BONUS = 2
+
+RESIDENCE_PRICE_NORMAL = 5000
+RESIDENCE_PRICE_CENTRAL = 10000
+CAVE_PRICE = 20000
+
+REPUTATION_RESIDENCE = 300
+REPUTATION_CAVE = 600
+
+
+def get_cultivation_bonus(discord_id: str, current_city: str, cave: str) -> float:
+    from utils.db import has_residence
+    bonus = 0.0
+    if has_residence(discord_id, current_city):
+        bonus += RESIDENCE_BONUS
+    if cave:
+        bonus += CAVE_BONUS
+    return bonus
+
+
+def get_explore_limit_bonus(discord_id: str, current_city: str, cave: str) -> int:
+    from utils.db import has_residence
+    bonus = 0
+    if has_residence(discord_id, current_city):
+        bonus += RESIDENCE_EXPLORE_BONUS
+    if cave:
+        bonus += CAVE_EXPLORE_BONUS
+    return bonus

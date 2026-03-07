@@ -8,7 +8,9 @@ from discord.ext import commands
 from utils.character import (
     QUESTIONS, calc_stats, roll_spirit_root, SPIRIT_ROOT_SPEED, REALM_LIFESPAN,
     calc_cultivation_gain, years_to_seconds, seconds_to_years,
-    AUTO_CULTIVATE_THRESHOLD_YEARS,
+    AUTO_CULTIVATE_THRESHOLD_YEARS, get_cultivation_bonus,
+    RESIDENCE_PRICE_NORMAL, RESIDENCE_PRICE_CENTRAL, CAVE_PRICE,
+    REPUTATION_RESIDENCE, REPUTATION_CAVE,
 )
 from utils.realms import (
     cultivation_needed, lifespan_max_for_realm, next_realm,
@@ -37,9 +39,11 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         updates = {"lifespan": new_lifespan, "last_active": now, "cultivation": player["cultivation"]}
         cultivating = player["cultivating_until"] and now < player["cultivating_until"]
         if not cultivating and elapsed_years >= AUTO_CULTIVATE_THRESHOLD_YEARS:
+            bonus = get_cultivation_bonus(player["discord_id"], player["current_city"], player.get("cave"))
             gain = calc_cultivation_gain(
                 int(elapsed_years), player["comprehension"], player["spirit_root_type"]
             )
+            gain = int(gain * (1 + bonus))
             updates["cultivation"] = player["cultivation"] + gain
         return updates, elapsed_years
 
@@ -133,7 +137,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         if player["lifespan"] < years:
             return await interaction.followup.send(f"寿元不足，无法修炼。")
         cultivating_until = now + years_to_seconds(years)
-        gain = calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"])
+        bonus = get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
+        gain = int(calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"]) * (1 + bonus))
         new_cultivation = player["cultivation"] + gain
         new_lifespan = player["lifespan"] - years
         with get_conn() as conn:
@@ -260,6 +265,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 "· 天下共 30 座城市，分布于东域、南域、西域、北域、中州\n"
                 "· 点击「移动」按钮或使用 `cat!移动 [城市名]` 前往目的地\n"
                 "· 闭关期间无法移动\n\n"
+                "**居所与洞府**\n"
+                "· 声望 ≥ 300 可使用 `cat!买房` 在当前城市置业，提升修炼速度与探险次数\n"
+                "· 声望 ≥ 600 可使用 `cat!开辟洞府 [秘地名]` 开辟野外洞府，加成更强且全局生效\n"
+                "· 使用 `cat!我的居所` 查看已有居所与加成详情\n\n"
                 "**宗门系统**\n"
                 "· 满足条件后可加入宗门，获得专属事件与功法加成\n"
                 "· 使用 `cat!宗门` 查看天下宗门信息"
@@ -357,7 +366,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             )
 
         cultivating_until = now + years_to_seconds(years)
-        gain = calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"])
+        bonus = get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
+        gain = int(calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"]) * (1 + bonus))
         new_cultivation = player["cultivation"] + gain
         new_lifespan = player["lifespan"] - years
 
@@ -555,6 +565,47 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         for region, cities in region_map.items():
             embed.add_field(name=region, value="、".join(cities), inline=False)
         embed.set_footer(text="使用 cat!移动 [城市名] 前往目的地")
+        await ctx.send(embed=embed)
+
+    @commands.command(name="help")
+    async def help_cmd(self, ctx):
+        embed = discord.Embed(
+            title="✦ 命令一览 ✦",
+            color=discord.Color.teal(),
+        )
+        embed.add_field(name="基础", value=(
+            "`cat!c` — 主菜单\n"
+            "`cat!创建角色` — 创建角色\n"
+            "`cat!查看` — 查看角色面板\n"
+            "`cat!修炼 [年数]` — 开始闭关\n"
+            "`cat!停止` — 提前结束闭关\n"
+            "`cat!突破` — 尝试突破境界"
+        ), inline=False)
+        embed.add_field(name="探险", value=(
+            "`cat!探险` — 随机触发事件（每5游戏年8次）"
+        ), inline=False)
+        embed.add_field(name="移动", value=(
+            "`cat!移动 [城市名]` — 前往目标城市\n"
+            "`cat!世界` — 查看天下城市列表"
+        ), inline=False)
+        embed.add_field(name="宗门", value=(
+            "`cat!宗门列表` — 查看所有宗门\n"
+            "`cat!宗门详情 [宗门名]` — 查看入门要求与功法\n"
+            "`cat!加入宗门 [宗门名]` — 加入宗门\n"
+            "`cat!退出宗门` — 离开宗门\n"
+            "`cat!我的功法` — 查看已习得功法"
+        ), inline=False)
+        embed.add_field(name="居所", value=(
+            "`cat!买房` — 在当前城市置业（声望≥300）\n"
+            "`cat!开辟洞府 [秘地名]` — 开辟野外洞府（声望≥600）\n"
+            "`cat!我的居所` — 查看居所与加成"
+        ), inline=False)
+        embed.add_field(name="音乐", value=(
+            "`cat!play [歌曲/链接]` — 播放音乐\n"
+            "`cat!skip` — 跳过当前曲目\n"
+            "`cat!stop` — 停止播放"
+        ), inline=False)
+        embed.set_footer(text="现实 2 小时 = 游戏 1 年 · 寿元归零则坐化")
         await ctx.send(embed=embed)
 
     @commands.command(name="创建角色")

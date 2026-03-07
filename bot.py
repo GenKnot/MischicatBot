@@ -9,7 +9,7 @@ class MischicatBot(commands.Bot):
         prefix = os.getenv("COMMAND_PREFIX", "cat!")
         intents = discord.Intents.default()
         intents.message_content = True
-        super().__init__(command_prefix=prefix, intents=intents)
+        super().__init__(command_prefix=prefix, intents=intents, help_command=None)
 
     async def setup_hook(self):
         from utils.db import init_db
@@ -18,6 +18,7 @@ class MischicatBot(commands.Bot):
         await self.load_extension("cogs.cultivation")
         await self.load_extension("cogs.sect")
         await self.load_extension("cogs.explore")
+        await self.load_extension("cogs.property")
 
     async def on_ready(self):
         print(f"logged in as {self.user}")
