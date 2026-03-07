@@ -1,0 +1,50 @@
+import sqlite3
+import os
+
+DB_PATH = os.getenv("DB_PATH", "game.db")
+
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    with get_conn() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS players (
+                discord_id   TEXT PRIMARY KEY,
+                name         TEXT NOT NULL,
+                gender       TEXT NOT NULL,
+                spirit_root  TEXT NOT NULL,
+                spirit_root_type TEXT NOT NULL,
+                comprehension INTEGER NOT NULL,
+                physique      INTEGER NOT NULL,
+                fortune       INTEGER NOT NULL,
+                bone          INTEGER NOT NULL,
+                soul          INTEGER NOT NULL,
+                lifespan      INTEGER NOT NULL,
+                lifespan_max  INTEGER NOT NULL,
+                cultivation   INTEGER NOT NULL DEFAULT 0,
+                realm         TEXT NOT NULL DEFAULT '炼气期一层',
+                spirit_stones INTEGER NOT NULL DEFAULT 0,
+                reputation    INTEGER NOT NULL DEFAULT 0,
+                created_at    REAL NOT NULL,
+                last_active           REAL NOT NULL,
+                cultivating_until     REAL,
+                cultivating_years     INTEGER,
+                is_dead               INTEGER NOT NULL DEFAULT 0,
+                rebirth_count         INTEGER NOT NULL DEFAULT 0,
+                is_virgin             INTEGER NOT NULL DEFAULT 1,
+                sect                  TEXT,
+                sect_rank             TEXT,
+                last_dual_cultivate   REAL,
+                techniques            TEXT NOT NULL DEFAULT '[]',
+                cultivation_overflow  INTEGER NOT NULL DEFAULT 0,
+                current_city          TEXT NOT NULL DEFAULT '灵虚城',
+                explore_count         INTEGER NOT NULL DEFAULT 0,
+                explore_reset_year    REAL NOT NULL DEFAULT 0
+            )
+        """)
+        conn.commit()

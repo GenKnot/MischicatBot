@@ -7,4 +7,6 @@ __pycache__/
 *.log
 downloads/*
 !downloads/.gitkeep
+game.db
 /.idea
+PROGRESS.md

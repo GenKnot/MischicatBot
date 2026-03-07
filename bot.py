@@ -12,7 +12,12 @@ class MischicatBot(commands.Bot):
         super().__init__(command_prefix=prefix, intents=intents)
 
     async def setup_hook(self):
+        from utils.db import init_db
+        init_db()
         await self.load_extension("cogs.music")
+        await self.load_extension("cogs.cultivation")
+        await self.load_extension("cogs.sect")
+        await self.load_extension("cogs.explore")
 
     async def on_ready(self):
         print(f"logged in as {self.user}")
