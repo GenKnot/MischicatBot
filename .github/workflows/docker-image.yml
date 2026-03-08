@@ -30,25 +30,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/mischicat-bot" >> $GITHUB_ENV
+
+      - name: Get timestamp tag
+        id: get_tag
+        run: echo "tag=alpha$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository }}/mischicat-bot:latest
-          file: Dockerfile
-      - name: Get timestamp tag
-        id: get_tag
-        run: |
-          echo "::set-output name=tag::alpha$(date +'%Y%m%d%H%M%S')"
-      - name: Build and push Docker image with timestamp tag
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}/mischicat-bot:latest
-            ghcr.io/${{ github.repository }}/mischicat-bot:${{ steps.get_tag.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.get_tag.outputs.tag }}
           file: Dockerfile
