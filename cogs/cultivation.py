@@ -332,6 +332,12 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             f"修为进度：{new_cultivation}/{needed}　寿元剩余：{new_lifespan} 年"
         )
 
+    @commands.command(name="解散队伍")
+    async def disband_party(self, ctx):
+        from utils.views.party import disband_party
+        msg = await disband_party(str(ctx.author.id), self.bot)
+        await ctx.send(f"{ctx.author.mention} {msg}")
+
     @commands.command(name="c")
     async def menu(self, ctx):
         uid = str(ctx.author.id)

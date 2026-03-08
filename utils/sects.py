@@ -29,8 +29,14 @@ GRADE_COST_MULTIPLIER = {
 }
 
 STAGE_STAT_MULTIPLIER = {
-    "入门": 1, "熟练": 2, "精通": 3, "小成": 5, "大成": 8, "圆满": 12, "破限": 20,
+    "入门": 1, "熟练": 1.5, "精通": 2, "小成": 3, "大成": 4, "圆满": 5, "破限": 7,
 }
+
+STAGE_PCT_MULTIPLIER = {
+    "入门": 1, "熟练": 1.2, "精通": 1.4, "小成": 1.6, "大成": 1.8, "圆满": 2.0, "破限": 2.5,
+}
+
+PCT_STATS = {"escape_rate", "cultivation_speed", "lifespan_bonus"}
 
 TECHNIQUES = {
     "青云心法":   {"type": "修炼", "grade": "黄级上品", "stat_bonus": {"comprehension": 1, "cultivation_speed": 0.15}, "effect": {"cultivation_bonus": 0.15, "comprehension_bonus": 1}},
@@ -123,9 +129,12 @@ def calc_technique_stat_bonus(techniques_json: list) -> dict:
         stage = t.get("stage", "入门")
         info = TECHNIQUES.get(name, {})
         base_bonus = info.get("stat_bonus", {})
-        stage_mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
         for stat, val in base_bonus.items():
-            total[stat] = total.get(stat, 0) + val * stage_mult
+            if stat in PCT_STATS:
+                mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
+            else:
+                mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
+            total[stat] = total.get(stat, 0) + val * mult
     return total
 
 

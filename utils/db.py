@@ -27,6 +27,9 @@ def _migrate(conn):
         ("discovered_sects",     "TEXT NOT NULL DEFAULT '[]'"),
         ("escape_rate",          "INTEGER NOT NULL DEFAULT 0"),
         ("has_bahongchen",       "INTEGER NOT NULL DEFAULT 0"),
+        ("active_quest",         "TEXT"),
+        ("quest_due",            "REAL"),
+        ("party_id",             "TEXT"),
     ]
     for col, definition in migrations:
         if col not in existing:
@@ -38,6 +41,14 @@ def _migrate(conn):
             city        TEXT NOT NULL,
             purchased_at REAL NOT NULL,
             PRIMARY KEY (discord_id, city)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS parties (
+            party_id    TEXT PRIMARY KEY,
+            leader_id   TEXT NOT NULL,
+            city        TEXT NOT NULL,
+            created_at  REAL NOT NULL
         )
     """)
     conn.commit()
