@@ -37,12 +37,28 @@ def calc_power(player: dict) -> float:
     )
     speed_bonus = bonus.get("cultivation_speed", 0)
 
-    total = (base + stat_bonus) * realm_mult * (1 + speed_bonus)
+    from utils.db import get_equipped
+    from utils.equipment import equip_stat_bonus
+    equipped = get_equipped(player.get("discord_id", ""))
+    equip_bonus = equip_stat_bonus(equipped)
+    equip_stat = (
+        equip_bonus.get("comprehension", 0) +
+        equip_bonus.get("physique", 0) +
+        equip_bonus.get("bone", 0) +
+        equip_bonus.get("soul", 0) +
+        equip_bonus.get("fortune", 0)
+    )
+
+    total = (base + stat_bonus + equip_stat) * realm_mult * (1 + speed_bonus)
     return total
 
 
 def calc_escape_rate(player: dict) -> float:
-    soul = player.get("soul", 5)
+    from utils.db import get_equipped
+    from utils.equipment import equip_stat_bonus
+    equipped = get_equipped(player.get("discord_id", ""))
+    equip_bonus = equip_stat_bonus(equipped)
+    soul = player.get("soul", 5) + equip_bonus.get("soul", 0)
     realm_idx = get_realm_index(player.get("realm", "炼气期1层"))
     extra = player.get("escape_rate", 0)
     rate = 0.30 + soul * 0.01 + realm_idx * 0.005 + extra / 100

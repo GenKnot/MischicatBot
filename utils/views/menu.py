@@ -83,6 +83,10 @@ class MainMenuView(discord.ui.View):
             self.add_item(MenuButton("突破", discord.ButtonStyle.danger, "breakthrough"))
         self.add_item(MenuButton("探险", discord.ButtonStyle.secondary, "explore"))
         self.add_item(MenuButton("茶馆", discord.ButtonStyle.secondary, "tavern"))
+        if has_player:
+            self.add_item(MenuButton("背包", discord.ButtonStyle.secondary, "backpack"))
+            self.add_item(MenuButton("功法", discord.ButtonStyle.secondary, "techniques"))
+            self.add_item(MenuButton("装备", discord.ButtonStyle.secondary, "equipment"))
         if city_players:
             self.add_item(MenuButton("玩家", discord.ButtonStyle.secondary, "city_players"))
         if player and player.get("party_id"):
@@ -189,6 +193,30 @@ class MenuButton(discord.ui.Button):
                     await tavern_cog.tavern(ctx)
                 else:
                     await interaction.followup.send("茶馆暂时不可用。", ephemeral=True)
+            elif self.action == "backpack":
+                equip_cog = cog.bot.cogs.get("Equipment")
+                if equip_cog:
+                    ctx = await cog.bot.get_context(interaction.message)
+                    ctx.author = interaction.user
+                    await equip_cog.backpack(ctx)
+                else:
+                    await interaction.followup.send("背包系统暂时不可用。", ephemeral=True)
+            elif self.action == "techniques":
+                sect_cog = cog.bot.cogs.get("Sect")
+                if sect_cog:
+                    ctx = await cog.bot.get_context(interaction.message)
+                    ctx.author = interaction.user
+                    await sect_cog.my_techniques(ctx)
+                else:
+                    await interaction.followup.send("功法系统暂时不可用。", ephemeral=True)
+            elif self.action == "equipment":
+                equip_cog = cog.bot.cogs.get("Equipment")
+                if equip_cog:
+                    ctx = await cog.bot.get_context(interaction.message)
+                    ctx.author = interaction.user
+                    await equip_cog.equip_details(ctx)
+                else:
+                    await interaction.followup.send("装备系统暂时不可用。", ephemeral=True)
             elif self.action.startswith("join_sect:"):
                 sect_name = self.action[len("join_sect:"):]
                 sect_cog = cog.bot.cogs.get("Sect")

@@ -20,6 +20,8 @@ class MischicatBot(commands.Bot):
         await self.load_extension("cogs.explore")
         await self.load_extension("cogs.property")
         await self.load_extension("cogs.tavern")
+        await self.load_extension("cogs.public_events")
+        await self.load_extension("cogs.equipment")
 
     async def on_ready(self):
         print(f"logged in as {self.user}")

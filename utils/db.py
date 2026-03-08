@@ -51,6 +51,50 @@ def _migrate(conn):
             created_at  REAL NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS inventory (
+            discord_id  TEXT NOT NULL,
+            item_id     TEXT NOT NULL,
+            quantity    INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (discord_id, item_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS public_events (
+            event_id    TEXT PRIMARY KEY,
+            event_type  TEXT NOT NULL,
+            title       TEXT NOT NULL,
+            started_at  REAL NOT NULL,
+            ends_at     REAL NOT NULL,
+            channel_id  TEXT,
+            message_id  TEXT,
+            status      TEXT NOT NULL DEFAULT 'active',
+            data        TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS public_event_participants (
+            event_id    TEXT NOT NULL,
+            discord_id  TEXT NOT NULL,
+            joined_at   REAL NOT NULL,
+            contribution INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (event_id, discord_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipment (
+            equip_id    TEXT PRIMARY KEY,
+            discord_id  TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            slot        TEXT NOT NULL,
+            quality     TEXT NOT NULL,
+            tier        INTEGER NOT NULL DEFAULT 0,
+            tier_req    INTEGER NOT NULL DEFAULT 0,
+            stats       TEXT NOT NULL DEFAULT '{}',
+            flavor      TEXT NOT NULL DEFAULT '',
+            equipped    INTEGER NOT NULL DEFAULT 0
+        )
+    """)
     conn.commit()
 
 
@@ -111,3 +155,160 @@ def has_residence(discord_id: str, city: str) -> bool:
             "SELECT 1 FROM residences WHERE discord_id = ? AND city = ?", (discord_id, city)
         ).fetchone()
     return row is not None
+
+
+def get_inventory(discord_id: str) -> dict:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT item_id, quantity FROM inventory WHERE discord_id = ?", (discord_id,)
+        ).fetchall()
+    return {r["item_id"]: r["quantity"] for r in rows}
+
+
+def add_item(discord_id: str, item_id: str, quantity: int = 1):
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO inventory (discord_id, item_id, quantity)
+            VALUES (?, ?, ?)
+            ON CONFLICT(discord_id, item_id) DO UPDATE SET quantity = quantity + ?
+        """, (discord_id, item_id, quantity, quantity))
+        conn.commit()
+
+
+def remove_item(discord_id: str, item_id: str, quantity: int = 1) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT quantity FROM inventory WHERE discord_id = ? AND item_id = ?",
+            (discord_id, item_id)
+        ).fetchone()
+        if not row or row["quantity"] < quantity:
+            return False
+        new_qty = row["quantity"] - quantity
+        if new_qty <= 0:
+            conn.execute(
+                "DELETE FROM inventory WHERE discord_id = ? AND item_id = ?",
+                (discord_id, item_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE inventory SET quantity = ? WHERE discord_id = ? AND item_id = ?",
+                (new_qty, discord_id, item_id)
+            )
+        conn.commit()
+    return True
+
+
+def has_item(discord_id: str, item_id: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT quantity FROM inventory WHERE discord_id = ? AND item_id = ? AND quantity > 0",
+            (discord_id, item_id)
+        ).fetchone()
+    return row is not None
+
+
+def give_equipment(discord_id: str, eq: dict):
+    import json
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO equipment (equip_id, discord_id, name, slot, quality, tier, tier_req, stats, flavor, equipped)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (
+            eq["equip_id"], discord_id, eq["name"], eq["slot"],
+            eq["quality"], eq["tier"], eq["tier_req"],
+            json.dumps(eq["stats"], ensure_ascii=False), eq["flavor"]
+        ))
+        conn.commit()
+
+
+def get_equipment_list(discord_id: str) -> list[dict]:
+    import json
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM equipment WHERE discord_id = ? ORDER BY equipped DESC, tier DESC, quality DESC",
+            (discord_id,)
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["stats"] = json.loads(d["stats"])
+        result.append(d)
+    return result
+
+
+def get_equipped(discord_id: str) -> list[dict]:
+    import json
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM equipment WHERE discord_id = ? AND equipped = 1",
+            (discord_id,)
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["stats"] = json.loads(d["stats"])
+        result.append(d)
+    return result
+
+
+def equip_item(discord_id: str, equip_id: str, player_tier: int) -> tuple[bool, str]:
+    import json
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM equipment WHERE equip_id = ? AND discord_id = ?",
+            (equip_id, discord_id)
+        ).fetchone()
+        if not row:
+            return False, "装备不存在。"
+        eq = dict(row)
+        eq["stats"] = json.loads(eq["stats"])
+        if player_tier < eq["tier_req"]:
+            from utils.equipment import TIER_NAMES
+            req_name = TIER_NAMES[min(eq["tier_req"], len(TIER_NAMES) - 1)]
+            return False, f"需要达到 **{req_name}期** 才能装备此物。"
+        already_equipped = conn.execute(
+            "SELECT equip_id FROM equipment WHERE discord_id = ? AND slot = ? AND equipped = 1",
+            (discord_id, eq["slot"])
+        ).fetchone()
+        if already_equipped:
+            conn.execute(
+                "UPDATE equipment SET equipped = 0 WHERE equip_id = ?",
+                (already_equipped["equip_id"],)
+            )
+        conn.execute(
+            "UPDATE equipment SET equipped = 1 WHERE equip_id = ?",
+            (equip_id,)
+        )
+        conn.commit()
+    return True, f"已装备 **{eq['name']}**。"
+
+
+def unequip_item(discord_id: str, equip_id: str) -> tuple[bool, str]:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT name FROM equipment WHERE equip_id = ? AND discord_id = ? AND equipped = 1",
+            (equip_id, discord_id)
+        ).fetchone()
+        if not row:
+            return False, "该装备未装备或不存在。"
+        conn.execute(
+            "UPDATE equipment SET equipped = 0 WHERE equip_id = ?",
+            (equip_id,)
+        )
+        conn.commit()
+    return True, f"已卸下 **{row['name']}**。"
+
+
+def discard_equipment(discord_id: str, equip_id: str) -> tuple[bool, str]:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT name, equipped FROM equipment WHERE equip_id = ? AND discord_id = ?",
+            (equip_id, discord_id)
+        ).fetchone()
+        if not row:
+            return False, "装备不存在。"
+        if row["equipped"]:
+            return False, "请先卸下装备再丢弃。"
+        conn.execute("DELETE FROM equipment WHERE equip_id = ?", (equip_id,))
+        conn.commit()
+    return True, f"已丢弃 **{row['name']}**。"

@@ -251,6 +251,31 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             needed = cultivation_needed(player["realm"])
             return await interaction.followup.send(f"修为尚未圆满，还差 **{needed - player['cultivation']}** 点。")
 
+        if player["realm"] == "炼气期10层":
+            from utils.items import calc_zhuji_breakthrough_rate, can_skip_pill
+            from utils.db import has_item
+            from utils.views.cultivation import ZhujiBreakthroughView
+            has_pill = has_item(uid, "筑基丹")
+            skip = can_skip_pill(player)
+            rate_no_pill = calc_zhuji_breakthrough_rate(player, use_pill=False)
+            rate_with_pill = calc_zhuji_breakthrough_rate(player, use_pill=True)
+            embed = discord.Embed(
+                title="✦ 炼气化液 · 筑基之关 ✦",
+                description=(
+                    "炼气期圆满，天地大关横亘于前。\n"
+                    "筑基之关乃修仙路上第一道天堑，非有大机缘者难以跨越。\n\n"
+                    f"当前突破成功率：**{rate_no_pill}%**\n"
+                    + (f"服用筑基丹后：**{rate_with_pill}%**\n" if has_pill else "（背包中无筑基丹）\n")
+                    + ("\n✨ 悟性与机缘皆已大成，可直接冲关！" if skip else "")
+                ),
+                color=discord.Color.gold(),
+            )
+            await interaction.followup.send(
+                embed=embed,
+                view=ZhujiBreakthroughView(interaction.user, self, player, has_pill, uid)
+            )
+            return
+
         result = await self._do_breakthrough_chain(uid, player, now)
         await interaction.followup.send(result)
 
@@ -545,6 +570,32 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 f"{ctx.author.mention} 修为尚未圆满，还差 **{needed - player['cultivation']}** 点。"
             )
 
+        if player["realm"] == "炼气期10层":
+            from utils.items import calc_zhuji_breakthrough_rate, can_skip_pill
+            from utils.db import has_item
+            from utils.views.cultivation import ZhujiBreakthroughView
+            has_pill = has_item(uid, "筑基丹")
+            skip = can_skip_pill(player)
+            rate_no_pill = calc_zhuji_breakthrough_rate(player, use_pill=False)
+            rate_with_pill = calc_zhuji_breakthrough_rate(player, use_pill=True)
+            embed = discord.Embed(
+                title="✦ 炼气化液 · 筑基之关 ✦",
+                description=(
+                    "炼气期圆满，天地大关横亘于前。\n"
+                    "筑基之关乃修仙路上第一道天堑，非有大机缘者难以跨越。\n\n"
+                    f"当前突破成功率：**{rate_no_pill}%**\n"
+                    + (f"服用筑基丹后：**{rate_with_pill}%**\n" if has_pill else "（背包中无筑基丹）\n")
+                    + ("\n✨ 悟性与机缘皆已大成，可直接冲关！" if skip else "")
+                ),
+                color=discord.Color.gold(),
+            )
+            await ctx.send(
+                ctx.author.mention,
+                embed=embed,
+                view=ZhujiBreakthroughView(ctx.author, self, player, has_pill, uid)
+            )
+            return
+
         result = await self._do_breakthrough_chain(uid, player, now)
         await ctx.send(f"{ctx.author.mention} {result}")
 
@@ -823,22 +874,33 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             color=discord.Color.teal(),
         )
         embed.add_field(name="基础", value=(
-            "`cat!c` — 主菜单\n"
+            "`cat!c` — 主菜单（含背包/功法/装备快捷按钮）\n"
             "`cat!创建角色` — 创建角色\n"
             "`cat!查看` — 查看角色面板\n"
             "`cat!修炼 [年数]` — 开始闭关\n"
             "`cat!停止` — 提前结束闭关\n"
-            "`cat!突破` — 尝试突破境界"
+            "`cat!突破` — 尝试突破境界（炼气10层需筑基丹）"
         ), inline=False)
         embed.add_field(name="探险", value=(
             "`cat!探险` — 随机触发事件（每5游戏年8次）"
+        ), inline=False)
+        embed.add_field(name="茶馆任务", value=(
+            "`cat!茶馆` — 查看并接取任务（战斗类1年·采集类2年）\n"
+            "`cat!交任务` — 手动结算当前任务\n"
+            "· 任务到时间后自动结算并 DM 通知\n"
+            "· 组队接任务：战力叠加，奖励每人完整发放"
+        ), inline=False)
+        embed.add_field(name="组队", value=(
+            "· 点击城市玩家列表中的玩家名字 → 邀请组队 / 发起攻击\n"
+            "`cat!解散队伍` — 队长解散队伍（DM 通知所有成员）\n"
+            "· 主菜单有「查看队伍」和「退出队伍」按钮"
         ), inline=False)
         embed.add_field(name="双修", value=(
             "`cat!双修 @对方` — 邀请他人进行双修（需一方持有「双修功法」）\n"
             "· 双方皆为清白之身时修为暴涨，冷却 2 游戏年"
         ), inline=False)
         embed.add_field(name="移动", value=(
-            "`cat!移动 [城市名]` — 前往目标城市\n"
+            "`cat!移动 [城市名]` — 前往目标城市（队长移动队员跟随）\n"
             "`cat!世界` — 查看天下城市列表"
         ), inline=False)
         embed.add_field(name="宗门", value=(
@@ -855,10 +917,27 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             "　　阶段：入门→熟练→精通→小成→大成→圆满→破限\n"
             "`cat!功法属性` — 查看已装备功法的属性加成"
         ), inline=False)
+        embed.add_field(name="背包 / 道具", value=(
+            "`cat!背包` — 查看丹药、道具与装备列表\n"
+            "`cat!使用 [道具名]` — 使用丹药（如：续命丹、聚灵丹）"
+        ), inline=False)
+        embed.add_field(name="装备", value=(
+            "`cat!装备详情` — 查看当前装备及属性加成\n"
+            "`cat!装备 [装备ID]` — 装备指定物品（ID见背包）\n"
+            "`cat!卸下 [装备ID]` — 卸下装备\n"
+            "`cat!丢弃装备 [装备ID]` — 永久丢弃装备\n"
+            "· 装备分武器/防具/饰品三槽，有境界要求\n"
+            "· 品质：普通⬜ 精良🟩 稀有🟦 史诗🟪 传说🟨"
+        ), inline=False)
         embed.add_field(name="居所", value=(
             "`cat!买房` — 在当前城市置业（声望≥300）\n"
             "`cat!开辟洞府 [秘地名]` — 开辟野外洞府（声望≥600）\n"
             "`cat!我的居所` — 查看居所与加成"
+        ), inline=False)
+        embed.add_field(name="公共事件", value=(
+            "`cat!公共事件` — 查看当前全服事件状态\n"
+            "· 每10游戏年自动触发一次（拍卖会/试炼/妖兽潮等）\n"
+            "· 需在 .env 设置 PUBLIC_EVENT_CHANNEL_ID 指定广播频道"
         ), inline=False)
         embed.add_field(name="音乐", value=(
             "`cat!play [歌曲/链接]` — 播放音乐\n"
@@ -870,7 +949,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             "经历者将获得永久跨世加成，无论几度轮回皆不消散。\n"
             "至于是何奇遇……只有亲历者方知。"
         ), inline=False)
-        embed.set_footer(text="现实 2 小时 = 游戏 1 年 · 寿元归零则坐化")
+        embed.set_footer(text="现实 2 小时 = 游戏 1 年 · 寿元归零则坐化 · cat!c 打开主菜单")
         await ctx.send(embed=embed)
 
     @commands.command(name="创建角色")
