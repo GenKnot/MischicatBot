@@ -22,12 +22,69 @@ class TravelCog(commands.Cog, name="Travel"):
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
 
-        if not city_name:
-            city_list = "\n".join(
-                f"**{c['name']}**（{c['region']}）— {c['desc']}" for c in CITIES
+        # Main (menu) cog provides "返回主菜单" behaviors for views.
+        menu_cog = self.bot.cogs.get("Cultivation") or self
+
+        regions = ["东域", "南域", "西域", "北域", "中州"]
+        arg = (city_name or "").strip()
+
+        # No args: open travel menu and show all cities grouped by region.
+        if not arg:
+            from collections import defaultdict
+            from utils.views.travel import TravelRegionView
+
+            region_map: dict[str, list[dict]] = defaultdict(list)
+            for c in CITIES:
+                region_map[c["region"]].append(c)
+
+            embed = discord.Embed(
+                title="✦ 移动 · 目的地一览 ✦",
+                description="请选择大洲进入城市选择菜单，或直接使用指令前往目的地。",
+                color=discord.Color.teal(),
             )
+            for region in regions:
+                lines = "\n".join(f"**{c['name']}** — {c['desc']}" for c in region_map.get(region, []))
+                embed.add_field(name=f"【{region}】", value=lines or "暂无城市。", inline=False)
+            embed.set_footer(text=f"用法：{COMMAND_PREFIX}移动 [城市名] / {COMMAND_PREFIX}移动 [大洲名]")
+
             return await ctx.send(
-                f"{ctx.author.mention} 请指定目的地，用法：`{COMMAND_PREFIX}移动 [城市名]`\n\n{city_list}"
+                ctx.author.mention,
+                embed=embed,
+                view=TravelRegionView(ctx.author, menu_cog),
+            )
+
+        # If input is a region (大洲), open the city-selection submenu.
+        if arg in regions:
+            from utils.views.travel import TravelCityView
+            from utils.world import cities_by_region
+
+            cities = cities_by_region(arg)
+            embed = discord.Embed(title=f"✦ {arg} · 选择目的地 ✦", color=discord.Color.teal())
+            for c in cities:
+                embed.add_field(name=c["name"], value=c["desc"], inline=False)
+            return await ctx.send(
+                ctx.author.mention,
+                embed=embed,
+                view=TravelCityView(ctx.author, menu_cog, cities),
+            )
+
+        # Optional: allow opening the secret-region submenu directly.
+        if arg == "秘地":
+            from utils.realms import get_realm_index
+            from utils.world import SPECIAL_REGIONS
+            from utils.views.travel import TravelSecretView
+
+            player_idx = get_realm_index(player["realm"])
+            embed = discord.Embed(title="✦ 秘地 · 选择目的地 ✦", color=discord.Color.gold())
+            for r in SPECIAL_REGIONS:
+                req_idx = get_realm_index(r["min_realm"])
+                locked = player_idx < req_idx
+                tag = f"🔒 需 {r['min_realm']}" if locked else f"[{r['type']}]"
+                embed.add_field(name=f"{r['name']}  {tag}", value=r["desc"], inline=False)
+            return await ctx.send(
+                ctx.author.mention,
+                embed=embed,
+                view=TravelSecretView(ctx.author, menu_cog, player_idx),
             )
 
         import time
@@ -45,9 +102,9 @@ class TravelCog(commands.Cog, name="Travel"):
 
         from utils.world import get_city, get_region
         from utils.realms import get_realm_index as _get_realm_idx
-        target = get_city(city_name)
+        target = get_city(arg)
         if not target:
-            secret = get_region(city_name)
+            secret = get_region(arg)
             if secret:
                 player_idx = _get_realm_idx(player["realm"])
                 req_idx = _get_realm_idx(secret["min_realm"])
@@ -57,14 +114,14 @@ class TravelCog(commands.Cog, name="Travel"):
                     )
                 target = {"name": secret["name"], "desc": secret["desc"], "region": f"秘地 · {secret['type']}"}
             else:
-                matches = [c for c in CITIES if city_name in c["name"]]
+                matches = [c for c in CITIES if arg in c["name"]]
                 if len(matches) == 1:
                     target = matches[0]
                 elif len(matches) > 1:
                     names = "、".join(c["name"] for c in matches)
                     return await ctx.send(f"{ctx.author.mention} 找到多个匹配城市：{names}，请输入完整城市名。")
                 else:
-                    return await ctx.send(f"{ctx.author.mention} 未找到城市「{city_name}」，请检查名称是否正确。")
+                    return await ctx.send(f"{ctx.author.mention} 未找到城市「{arg}」，请检查名称是否正确。")
 
         if target["name"] == player["current_city"]:
             return await ctx.send(f"{ctx.author.mention} 道友已在 **{target['name']}**，无需移动。")
