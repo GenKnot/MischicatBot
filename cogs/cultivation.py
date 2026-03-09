@@ -582,8 +582,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             city_players = [dict(r) for r in rows]
         await ctx.send(embed=_build_menu_embed(has_dual), view=MainMenuView(ctx.author, has_player, can_bt, self, player, city_players))
 
-    @commands.hybrid_command(name="查看", aliases=["ck"], description="查看当前角色的修为、寿元与状态")
-    async def view(self, ctx):
+    async def _send_profile_ctx(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
         if not player:
@@ -637,8 +636,22 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 (player["current_city"], uid)
             ).fetchall()
         city_players = [dict(r) for r in city_rows]
-        await ctx.send(ctx.author.mention, embed=embed,
-                       view=ProfileView(ctx.author, can_bt, is_cultivating, self, player, city_players))
+        await ctx.send(
+            ctx.author.mention, embed=embed,
+            view=ProfileView(ctx.author, can_bt, is_cultivating, self, player, city_players)
+        )
+
+    @commands.hybrid_command(
+        name="我的角色",
+        aliases=["m", "me", "我"],
+        description="显示我的角色面板",
+    )
+    async def my_character(self, ctx):
+        await self._send_profile_ctx(ctx)
+
+    @commands.hybrid_command(name="查看", aliases=["ck"], description="查看当前角色的修为、寿元与状态")
+    async def view(self, ctx):
+        await self._send_profile_ctx(ctx)
 
     @commands.hybrid_command(name="修炼", aliases=["xl"], description="消耗寿元进行闭关修炼，提升修为")
     async def cultivate(self, ctx, years: int = 1):

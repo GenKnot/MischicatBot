@@ -1,17 +1,16 @@
 import asyncio
 import random
 import time
+from typing import Optional
 
 import discord
 from discord.ext import commands
 
-from utils.character import (
-    QUESTIONS, calc_stats, roll_spirit_root, REALM_LIFESPAN,
-    years_to_seconds, seconds_to_years,
-)
+from utils.character import QUESTIONS, calc_stats, roll_spirit_root, REALM_LIFESPAN
 from utils.db import get_conn
-from utils.world import CITIES
 from utils.player import get_player
+from utils.world import CITIES
+from utils.views.character_create import CharacterCreateView
 
 
 class CharacterCog(commands.Cog, name="Character"):
@@ -30,18 +29,10 @@ class CharacterCog(commands.Cog, name="Character"):
             "soul":          max(0, int((player.get("soul", 5) - 5) * 0.3 * mult)),
         }
 
-    @commands.hybrid_command(name="创建角色", aliases=["cjjs"], description="创建新的修仙角色，开辟修行之路")
-    async def create_character(self, ctx):
+    async def _create_character_text(self, ctx):
         uid = str(ctx.author.id)
-        existing = get_player(uid)
-        if existing and not existing["is_dead"]:
-            return await ctx.send(f"{ctx.author.mention} 道友已踏入修仙之路，无需重新创建。")
-        if uid in self._creating:
-            return await ctx.send(f"{ctx.author.mention} 正在创建中，请完成当前流程。")
 
-        self._creating.add(uid)
-
-        def check(m):
+        def check(m: discord.Message):
             return m.author == ctx.author and m.channel == ctx.channel
 
         try:
@@ -55,14 +46,14 @@ class CharacterCog(commands.Cog, name="Character"):
             answers = {}
             for i, q in enumerate(QUESTIONS):
                 options_text = "\n".join(f"{k}. {v[0]}" for k, v in q["options"].items())
-                await ctx.send(f"**第{i+1}问：{q['text']}**\n{options_text}")
+                await ctx.send(f"**第{i + 1}问：{q['text']}**\n{options_text}")
                 msg = await self.bot.wait_for("message", check=check, timeout=60)
                 choice = msg.content.strip().upper()
                 if choice not in q["options"]:
                     return await ctx.send("输入有误，创建已取消。")
                 answers[i] = choice
 
-            await ctx.send("请赐下你的道号：")
+            await ctx.send("请赐下你的道号（1-16字）：")
             msg = await self.bot.wait_for("message", check=check, timeout=60)
             name = msg.content.strip()
             if not name or len(name) > 16:
@@ -78,8 +69,11 @@ class CharacterCog(commands.Cog, name="Character"):
             rebirth_bonus = {}
             with get_conn() as conn:
                 if old and old["is_dead"]:
-                    rebirth_bonus = self._calc_rebirth_bonus(old) if (old.get("sect") == "仙葬谷" or old.get("has_bahongchen")) else {}
-                    conn.execute("""
+                    rebirth_bonus = self._calc_rebirth_bonus(old) if (
+                        old.get("sect") == "仙葬谷" or old.get("has_bahongchen")
+                    ) else {}
+                    conn.execute(
+                        """
                         UPDATE players SET
                             name=?, gender=?, spirit_root=?, spirit_root_type=?,
                             comprehension=?, physique=?, fortune=?, bone=?, soul=?,
@@ -96,37 +90,65 @@ class CharacterCog(commands.Cog, name="Character"):
                             gathering_until=NULL, gathering_type=NULL,
                             created_at=?, last_active=?
                         WHERE discord_id=?
-                    """, (
-                        name, gender, spirit_root, root_type,
-                        stats["comprehension"] + rebirth_bonus.get("comprehension", 0),
-                        stats["physique"] + rebirth_bonus.get("physique", 0),
-                        stats["fortune"] + rebirth_bonus.get("fortune", 0),
-                        stats["bone"] + rebirth_bonus.get("bone", 0),
-                        stats["soul"] + rebirth_bonus.get("soul", 0),
-                        lifespan, lifespan, stats["spirit_stones"],
-                        starting_city, now, now, uid,
-                    ))
+                        """,
+                        (
+                            name,
+                            gender,
+                            spirit_root,
+                            root_type,
+                            stats["comprehension"] + rebirth_bonus.get("comprehension", 0),
+                            stats["physique"] + rebirth_bonus.get("physique", 0),
+                            stats["fortune"] + rebirth_bonus.get("fortune", 0),
+                            stats["bone"] + rebirth_bonus.get("bone", 0),
+                            stats["soul"] + rebirth_bonus.get("soul", 0),
+                            lifespan,
+                            lifespan,
+                            stats["spirit_stones"],
+                            starting_city,
+                            now,
+                            now,
+                            uid,
+                        ),
+                    )
                 else:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT INTO players (
                             discord_id, name, gender, spirit_root, spirit_root_type,
                             comprehension, physique, fortune, bone, soul,
                             lifespan, lifespan_max, spirit_stones,
                             created_at, last_active, current_city
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        uid, name, gender, spirit_root, root_type,
-                        stats["comprehension"], stats["physique"],
-                        stats["fortune"], stats["bone"], stats["soul"],
-                        lifespan, lifespan, stats["spirit_stones"],
-                        now, now, starting_city,
-                    ))
+                        """,
+                        (
+                            uid,
+                            name,
+                            gender,
+                            spirit_root,
+                            root_type,
+                            stats["comprehension"],
+                            stats["physique"],
+                            stats["fortune"],
+                            stats["bone"],
+                            stats["soul"],
+                            lifespan,
+                            lifespan,
+                            stats["spirit_stones"],
+                            now,
+                            now,
+                            starting_city,
+                        ),
+                    )
                 conn.commit()
 
             speed_label = {
-                "单灵根": "极快", "双灵根": "较快", "三灵根": "普通",
-                "四灵根": "较慢", "五灵根": "迟缓", "变异灵根": "特殊",
-            }[root_type]
+                "单灵根": "极快",
+                "双灵根": "较快",
+                "三灵根": "普通",
+                "四灵根": "较慢",
+                "五灵根": "迟缓",
+                "变异灵根": "特殊",
+            }.get(root_type, "未知")
 
             embed = discord.Embed(
                 title=f"✦ {name} ✦",
@@ -149,8 +171,37 @@ class CharacterCog(commands.Cog, name="Character"):
 
         except asyncio.TimeoutError:
             await ctx.send(f"{ctx.author.mention} 响应超时，创建已取消。")
+
+    @commands.hybrid_command(name="创建角色", aliases=["cjjs"], description="创建新的修仙角色，开辟修行之路")
+    async def create_character(self, ctx, mode: Optional[str] = None):
+        uid = str(ctx.author.id)
+        existing = get_player(uid)
+        if existing and not existing["is_dead"]:
+            return await ctx.send(f"{ctx.author.mention} 道友已踏入修仙之路，无需重新创建。")
+        if uid in self._creating:
+            return await ctx.send(f"{ctx.author.mention} 正在创建中，请完成当前流程。")
+
+        self._creating.add(uid)
+        try:
+            m = (mode or "").strip().lower()
+            if m in ("文本", "text", "t", "msg"):
+                await self._create_character_text(ctx)
+                return
+
+            ui_started = False
+            view = CharacterCreateView(ctx.author, self)
+            msg = await ctx.send(
+                f"{ctx.author.mention}（如需文字输入：`创建角色 文本`）",
+                embed=view._build_step_embed(),
+                view=view,
+            )
+            view.attach_message(msg)
+            ui_started = True
         finally:
-            self._creating.discard(uid)
+            # UI 模式由 View 在完成/取消/超时里释放；这里只在“发送失败/文本流程结束”时兜底释放
+            # 文本流程：_create_character_text 内部结束后应释放
+            if (mode or "").strip().lower() in ("文本", "text", "t", "msg") or "ui_started" in locals() and not ui_started:
+                self._creating.discard(uid)
 
     @commands.hybrid_command(name="解散队伍", aliases=["jsdw"], description="解散当前所在队伍")
     async def disband_party(self, ctx):
