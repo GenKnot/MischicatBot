@@ -4,6 +4,8 @@
 
 贡献者：[@GenKnot](https://github.com/GenKnot) · [@AdoreJc](https://github.com/AdoreJc) · [@yulexun](https://github.com/yulexun)
 
+Web 管理面板：[https://catportal.prpr.one/](https://catportal.prpr.one/)
+
 ---
 
 ## 运行
