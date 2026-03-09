@@ -1,4 +1,3 @@
-# 在打 tag（如 v1.0.0）时构建 Release，并用 PyInstaller 生成多平台二进制
 name: Release
 
 on:
@@ -42,26 +41,36 @@ jobs:
         run: |
           pyinstaller --noconfirm mischicat_bot.spec
 
-      - name: Pack artifact (Linux)
+      - name: Prepare artifact (Linux)
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          cp .env.example dist/.env.example
-          cd dist
-          zip ../mischicat-bot-${{ matrix.name }}.zip mischicat-bot .env.example
-          cd ..
+          cp .env.example dist/.env
 
-      - name: Pack artifact (Windows)
+      - name: Prepare artifact (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Copy-Item .env.example dist\.env.example
-          Compress-Archive -Path dist\mischicat-bot.exe, dist\.env.example -DestinationPath mischicat-bot-${{ matrix.name }}.zip -Force
+          Copy-Item .env.example dist\.env
 
-      - name: Upload artifact
+      - name: Upload artifact (Linux)
+        if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: mischicat-bot-${{ matrix.name }}
-          path: mischicat-bot-${{ matrix.name }}.zip
+          path: |
+            dist/mischicat-bot
+            dist/.env
+          include-hidden-files: true
+
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mischicat-bot-${{ matrix.name }}
+          path: |
+            dist/mischicat-bot.exe
+            dist/.env
+          include-hidden-files: true
 
   release:
     needs: build
@@ -77,7 +86,15 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release
-          find artifacts -type f -name '*.zip' -exec cp {} release/ \;
+
+          cd artifacts/mischicat-bot-linux-amd64
+          zip ../../release/mischicat-bot-linux-amd64.zip mischicat-bot .env
+          cd ../..
+
+          cd artifacts/mischicat-bot-windows-amd64
+          zip ../../release/mischicat-bot-windows-amd64.zip mischicat-bot.exe .env
+          cd ../..
+
           ls -la release/
 
       - name: Create Release and upload assets
