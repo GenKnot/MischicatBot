@@ -88,11 +88,11 @@ jobs:
           mkdir -p release
 
           cd artifacts/mischicat-bot-linux-amd64
-          zip ../../release/mischicat-bot-linux-amd64.zip mischicat-bot .env
+          zip ../../release/mischicat-bot-linux-amd64-${{ github.ref_name }}.zip mischicat-bot .env
           cd ../..
 
           cd artifacts/mischicat-bot-windows-amd64
-          zip ../../release/mischicat-bot-windows-amd64.zip mischicat-bot.exe .env
+          zip ../../release/mischicat-bot-windows-amd64-${{ github.ref_name }}.zip mischicat-bot.exe .env
           cd ../..
 
           ls -la release/
