@@ -68,6 +68,79 @@ def _build_menu_embed(has_dual: bool = False, event_hint: str = "") -> discord.E
         ),
         color=discord.Color.teal(),
     )
+    # 命令速查（前缀缩写仅对消息命令生效；斜杠命令请用原名）
+    embed.add_field(
+        name="指令速查（前缀缩写）",
+        value=(
+            f"说明：缩写仅对 `{COMMAND_PREFIX}` 前缀命令生效，`/` 斜杠命令仍使用中文原名。\n"
+            f"主入口：`{COMMAND_PREFIX}c` / `{COMMAND_PREFIX}h`（无角色=创建；有角色=主菜单）"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="基础 / 修炼",
+        value="\n".join([
+            f"`{COMMAND_PREFIX}创建角色` / `{COMMAND_PREFIX}cjjs`：创建新角色",
+            f"`{COMMAND_PREFIX}查看` / `{COMMAND_PREFIX}ck`：查看角色状态",
+            f"`{COMMAND_PREFIX}修炼` / `{COMMAND_PREFIX}xl`：闭关修炼提升修为",
+            f"`{COMMAND_PREFIX}停止` / `{COMMAND_PREFIX}tz`：提前结束闭关",
+            f"`{COMMAND_PREFIX}突破` / `{COMMAND_PREFIX}tp`：尝试突破境界",
+            f"`{COMMAND_PREFIX}双修` / `{COMMAND_PREFIX}sx`：与他人双修（需功法）",
+        ]),
+        inline=False,
+    )
+    embed.add_field(
+        name="出行 / 探险 / 任务",
+        value="\n".join([
+            f"`{COMMAND_PREFIX}世界` / `{COMMAND_PREFIX}sj`：查看天下城市",
+            f"`{COMMAND_PREFIX}移动` / `{COMMAND_PREFIX}yd`：前往城市/秘地",
+            f"`{COMMAND_PREFIX}探险` / `{COMMAND_PREFIX}tx`：触发随机事件",
+            f"`{COMMAND_PREFIX}茶馆` / `{COMMAND_PREFIX}cg`：接取任务/委托",
+            f"`{COMMAND_PREFIX}交任务` / `{COMMAND_PREFIX}jrw`：结算当前任务",
+        ]),
+        inline=False,
+    )
+    embed.add_field(
+        name="背包 / 装备 / 物品",
+        value="\n".join([
+            f"`{COMMAND_PREFIX}背包` / `{COMMAND_PREFIX}bb`：查看背包与装备",
+            f"`{COMMAND_PREFIX}装备详情` / `{COMMAND_PREFIX}zbxq`：查看装备属性",
+            f"`{COMMAND_PREFIX}装备` / `{COMMAND_PREFIX}zb`：装备指定ID",
+            f"`{COMMAND_PREFIX}卸下` / `{COMMAND_PREFIX}xx`：卸下指定ID",
+            f"`{COMMAND_PREFIX}丢弃装备` / `{COMMAND_PREFIX}dqzb`：丢弃指定ID",
+            f"`{COMMAND_PREFIX}使用` / `{COMMAND_PREFIX}sy`：使用道具/丹药",
+            f"`{COMMAND_PREFIX}出售` / `{COMMAND_PREFIX}cs`：出售物品换灵石",
+        ]),
+        inline=False,
+    )
+    embed.add_field(
+        name="居所 / 宗门 / 功法",
+        value="\n".join([
+            f"`{COMMAND_PREFIX}买房` / `{COMMAND_PREFIX}mf`：当前城市置业",
+            f"`{COMMAND_PREFIX}开辟洞府` / `{COMMAND_PREFIX}kpdf`：开辟洞府",
+            f"`{COMMAND_PREFIX}我的居所` / `{COMMAND_PREFIX}wdjs`：查看居所加成",
+            f"`{COMMAND_PREFIX}宗门列表` / `{COMMAND_PREFIX}zmlb`：查看宗门",
+            f"`{COMMAND_PREFIX}宗门详情` / `{COMMAND_PREFIX}zmxq`：查看宗门要求",
+            f"`{COMMAND_PREFIX}加入宗门` / `{COMMAND_PREFIX}jrzm`：加入宗门",
+            f"`{COMMAND_PREFIX}退出宗门` / `{COMMAND_PREFIX}qtzm`：退出宗门",
+            f"`{COMMAND_PREFIX}门派功法` / `{COMMAND_PREFIX}mpgf`：查看/补领功法",
+            f"`{COMMAND_PREFIX}我的功法` / `{COMMAND_PREFIX}wdgf`：功法面板",
+            f"`{COMMAND_PREFIX}装备功法` / `{COMMAND_PREFIX}zbgf`：装备/卸下功法",
+            f"`{COMMAND_PREFIX}修炼功法` / `{COMMAND_PREFIX}xlgf`：提升功法阶段",
+            f"`{COMMAND_PREFIX}功法属性` / `{COMMAND_PREFIX}gfsx`：查看功法加成",
+        ]),
+        inline=False,
+    )
+    embed.add_field(
+        name="公共事件 / 其他",
+        value="\n".join([
+            f"`{COMMAND_PREFIX}公共事件` / `{COMMAND_PREFIX}ggsj`：查看当前事件",
+            f"`{COMMAND_PREFIX}预备灵雨` / `{COMMAND_PREFIX}ybly`：预备灵雨（管理员）",
+            f"`{COMMAND_PREFIX}解散队伍` / `{COMMAND_PREFIX}jsdw`：解散队伍",
+            f"`join/leave/play(p)/pause/resume/stop/skip/queue`：音乐指令",
+        ]),
+        inline=False,
+    )
     embed.set_footer(text="天道有常，长生路远，望道友珍重。")
     return embed
 
