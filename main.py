@@ -2,6 +2,10 @@ import asyncio
 import os
 import sys
 
+# PyInstaller onefile: 尽早设置 base 路径，供 web.main 在子进程中使用
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    os.environ.setdefault("MISCHICAT_BASE", sys._MEIPASS)
+
 import uvicorn
 from dotenv import load_dotenv
 

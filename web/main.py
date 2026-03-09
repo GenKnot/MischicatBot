@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import sys
 import time
 from datetime import datetime
 
@@ -11,9 +12,19 @@ from fastapi.templating import Jinja2Templates
 
 DB_PATH = os.getenv("DB_PATH", "game.db")
 
+# PyInstaller onefile: 资源在 sys._MEIPASS；main.py 会设置 MISCHICAT_BASE 供子进程
+_base = os.environ.get("MISCHICAT_BASE")
+if not _base:
+    try:
+        _base = sys._MEIPASS
+    except AttributeError:
+        _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_static_dir = os.path.normpath(os.path.join(_base, "web", "static"))
+_templates_dir = os.path.normpath(os.path.join(_base, "web", "templates"))
+
 app = FastAPI(title="Mischicat Admin")
-app.mount("/static", StaticFiles(directory="web/static"), name="static")
-templates = Jinja2Templates(directory="web/templates")
+app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+templates = Jinja2Templates(directory=_templates_dir)
 
 
 def get_conn():

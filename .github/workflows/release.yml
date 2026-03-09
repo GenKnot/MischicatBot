@@ -45,17 +45,17 @@ jobs:
       - name: Pack artifact (Linux)
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          cd dist/mischicat-bot
-          zip -r ../../mischicat-bot-${{ matrix.name }}.zip .
-          cd ../..
+          cp .env.example dist/.env.example
+          cd dist
+          zip ../mischicat-bot-${{ matrix.name }}.zip mischicat-bot .env.example
+          cd ..
 
       - name: Pack artifact (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Push-Location dist\mischicat-bot
-          Compress-Archive -Path * -DestinationPath ..\..\mischicat-bot-${{ matrix.name }}.zip -Force
-          Pop-Location
+          Copy-Item .env.example dist\.env.example
+          Compress-Archive -Path dist\mischicat-bot.exe, dist\.env.example -DestinationPath mischicat-bot-${{ matrix.name }}.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
