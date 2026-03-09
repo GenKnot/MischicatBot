@@ -336,6 +336,9 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
         lots = _get_lots(auction_id)
         sold = [l for l in lots if l["status"] == "sold"]
         unsold = [l for l in lots if l["status"] == "unsold"]
+        with get_conn() as conn:
+            conn.execute("DELETE FROM wanbao_frozen WHERE auction_id = ?", (auction_id,))
+            conn.commit()
         embed = discord.Embed(
             title="✦ 万宝楼拍卖会圆满结束 ✦",
             description=(

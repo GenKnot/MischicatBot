@@ -275,9 +275,8 @@ def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool, str]
             (discord_id, auction_id)
         ).fetchone()
         frozen = frozen_row["amount"] if frozen_row else 0
-        available = player["spirit_stones"] - frozen
-        if available < amount:
-            return False, f"可用灵石不足（当前 {player['spirit_stones']}，已冻结 {frozen}，可用 {available}）。"
+        if player["spirit_stones"] < amount:
+            return False, f"可用灵石不足（当前 {player['spirit_stones']}，出价需 {amount}）。"
 
         prev_bidder = lot["bidder_id"]
         if prev_bidder and prev_bidder != discord_id:
@@ -294,8 +293,8 @@ def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool, str]
                 )
 
         conn.execute(
-            "INSERT INTO wanbao_frozen (discord_id, auction_id, amount) VALUES (?,?,?) ON CONFLICT(discord_id, auction_id) DO UPDATE SET amount = amount - ? + ?",
-            (discord_id, auction_id, amount, frozen, amount)
+            "INSERT INTO wanbao_frozen (discord_id, auction_id, amount) VALUES (?,?,?) ON CONFLICT(discord_id, auction_id) DO UPDATE SET amount = ?",
+            (discord_id, auction_id, amount, amount)
         )
         conn.execute(
             "UPDATE wanbao_lots SET current_bid = ?, bidder_id = ? WHERE lot_id = ?",
@@ -323,8 +322,10 @@ def settle_lot(lot: dict) -> dict:
         commission = int(final_price * AUCTION_COMMISSION)
         seller_income = final_price - commission
 
+        player_row = conn.execute("SELECT spirit_stones FROM players WHERE discord_id = ?", (winner_id,)).fetchone()
+        actual_deduct = min(final_price, player_row["spirit_stones"]) if player_row else final_price
         conn.execute(
-            "UPDATE players SET spirit_stones = spirit_stones - ? WHERE discord_id = ?",
+            "UPDATE players SET spirit_stones = MAX(0, spirit_stones - ?) WHERE discord_id = ?",
             (final_price, winner_id)
         )
         frozen_row = conn.execute(
@@ -339,18 +340,29 @@ def settle_lot(lot: dict) -> dict:
             )
 
         if lot["item_type"] == "technique":
-            from utils.db import add_item
-            add_item(winner_id, lot["item_name"], 1)
+            conn.execute(
+                "INSERT INTO inventory (discord_id, item_id, quantity) VALUES (?,?,1) ON CONFLICT(discord_id, item_id) DO UPDATE SET quantity = quantity + 1",
+                (winner_id, lot["item_name"])
+            )
         elif lot["item_type"] == "equipment":
             import json as _json
             eq_raw = lot.get("eq_data")
             eq_data = _json.loads(eq_raw) if eq_raw else None
             if eq_data:
-                from utils.db import give_equipment
-                give_equipment(winner_id, eq_data)
+                import json as _json2
+                conn.execute("""
+                    INSERT INTO equipment (equip_id, discord_id, name, slot, quality, tier, tier_req, stats, flavor, equipped)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                """, (
+                    eq_data["equip_id"], winner_id, eq_data["name"], eq_data["slot"],
+                    eq_data["quality"], eq_data["tier"], eq_data["tier_req"],
+                    _json2.dumps(eq_data["stats"], ensure_ascii=False), eq_data["flavor"]
+                ))
         else:
-            from utils.db import add_item
-            add_item(winner_id, lot["item_name"], lot["quantity"])
+            conn.execute(
+                "INSERT INTO inventory (discord_id, item_id, quantity) VALUES (?,?,?) ON CONFLICT(discord_id, item_id) DO UPDATE SET quantity = quantity + ?",
+                (winner_id, lot["item_name"], lot["quantity"], lot["quantity"])
+            )
 
         if lot["seller_id"]:
             conn.execute(
