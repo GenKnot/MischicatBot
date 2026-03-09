@@ -1,3 +1,4 @@
+from utils.config import COMMAND_PREFIX
 from utils.events._base import _e, _c, _cond
 
 EVENTS = []
@@ -187,7 +188,7 @@ HIDDEN_SECT_EVENTS.append(_e(
     [
         _c("以神识深入探查", condition=_cond("soul", 7),
            rewards={"discover_sect": "太虚阁", "soul": 1},
-           flavor="你的神识穿透石壁，感应到了一处隐秘的空间入口，隐约可见其中有人修炼。太虚阁的位置已铭记于心。神识 +1\n\n**【太虚阁已解锁】** 可前往太虚城使用 `cat!加入宗门 太虚阁`"),
+           flavor=f"你的神识穿透石壁，感应到了一处隐秘的空间入口，隐约可见其中有人修炼。太虚阁的位置已铭记于心。神识 +1\n\n**【太虚阁已解锁】** 可前往太虚城使用 `{COMMAND_PREFIX}加入宗门 太虚阁`"),
         _c("以神识深入探查",
            rewards={"cultivation": 80},
            flavor="你感应到了地脉中蕴含的灵气，修为略有提升，但未能探查到更深处。修为 +80"),
@@ -207,7 +208,7 @@ HIDDEN_SECT_EVENTS.append(_e(
     [
         _c("顺着共鸣深入裂缝", condition=_cond("soul", 8),
            rewards={"discover_sect": "混沌宗", "soul": 1, "cultivation": 100},
-           flavor="你深入裂缝，在混沌之气中感应到了一处隐秘宗门的气息——混沌宗。其位置已铭记于心。神识 +1，修为 +100\n\n**【混沌宗已解锁】** 可使用 `cat!加入宗门 混沌宗`"),
+           flavor=f"你深入裂缝，在混沌之气中感应到了一处隐秘宗门的气息——混沌宗。其位置已铭记于心。神识 +1，修为 +100\n\n**【混沌宗已解锁】** 可使用 `{COMMAND_PREFIX}加入宗门 混沌宗`"),
         _c("顺着共鸣深入裂缝",
            rewards={"lifespan": -10, "cultivation": 60},
            flavor="你深入裂缝，混沌之气侵体，受了不轻的伤，但修为也有所提升。寿元 -10，修为 +60"),
@@ -231,7 +232,7 @@ HIDDEN_SECT_EVENTS.append(_e(
     [
         _c("仔细观察，尝试找到规律", condition=_cond("fortune", 8),
            rewards={"discover_sect": "天机门", "fortune": 1},
-           flavor="你以超凡的机缘感应到了墙壁后的隐秘入口，天机门的位置已铭记于心。机缘 +1\n\n**【天机门已解锁】** 可在望月楼使用 `cat!加入宗门 天机门`"),
+           flavor=f"你以超凡的机缘感应到了墙壁后的隐秘入口，天机门的位置已铭记于心。机缘 +1\n\n**【天机门已解锁】** 可在望月楼使用 `{COMMAND_PREFIX}加入宗门 天机门`"),
         _c("仔细观察，尝试找到规律",
            rewards={"fortune": 1, "cultivation": 60},
            flavor="你感应到了一丝异常，但未能找到规律，机缘略有提升。机缘 +1，修为 +60"),
@@ -254,11 +255,11 @@ HIDDEN_SECT_EVENTS.append(_e(
             "choices": [
                 _c("以意志力抵御幻象", condition=_cond("soul", 7),
                    rewards={"discover_sect": "无极道", "soul": 1, "bone": 1},
-                   flavor="你以坚定的意志撑过了三日，苍老的声音再度响起：「有些意思。」无极道的位置已铭记于心。神识 +1，根骨 +1\n\n**【无极道已解锁】** 可在古战场使用 `cat!加入宗门 无极道`"),
+                   flavor=f"你以坚定的意志撑过了三日，苍老的声音再度响起：「有些意思。」无极道的位置已铭记于心。神识 +1，根骨 +1\n\n**【无极道已解锁】** 可在古战场使用 `{COMMAND_PREFIX}加入宗门 无极道`"),
                 _c("以意志力抵御幻象",
                    condition=_cond("physique", 7),
                    rewards={"discover_sect": "无极道", "physique": 1},
-                   flavor="你以强横体魄硬撑过了三日，苍老的声音传来：「不错。」无极道的位置已铭记于心。体魄 +1\n\n**【无极道已解锁】** 可在古战场使用 `cat!加入宗门 无极道`"),
+                   flavor=f"你以强横体魄硬撑过了三日，苍老的声音传来：「不错。」无极道的位置已铭记于心。体魄 +1\n\n**【无极道已解锁】** 可在古战场使用 `{COMMAND_PREFIX}加入宗门 无极道`"),
                 _c("以意志力抵御幻象",
                    rewards={"lifespan": -20, "cultivation": 100},
                    flavor="你没能撑过三日，被古战场的亡灵之气重创，但修为也有所提升。寿元 -20，修为 +100"),
@@ -277,7 +278,7 @@ HIDDEN_SECT_EVENTS.append(_e(
     [
         _c("踏入幽光之门", condition=_cond("soul", 6),
            rewards={"discover_sect": "仙葬谷", "soul": 1, "cultivation": 150},
-           flavor="你踏入幽光之门，感受到了无数轮回的气息，仙葬谷的位置已铭记于心。神识 +1，修为 +150\n\n**【仙葬谷已解锁】** 可在昆仑秘境使用 `cat!加入宗门 仙葬谷`"),
+           flavor=f"你踏入幽光之门，感受到了无数轮回的气息，仙葬谷的位置已铭记于心。神识 +1，修为 +150\n\n**【仙葬谷已解锁】** 可在昆仑秘境使用 `{COMMAND_PREFIX}加入宗门 仙葬谷`"),
         _c("踏入幽光之门",
            rewards={"lifespan": -15, "cultivation": 100},
            flavor="你踏入幽光之门，轮回之气侵体，受了重伤，但修为大幅提升。寿元 -15，修为 +100"),

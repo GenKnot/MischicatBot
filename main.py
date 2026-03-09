@@ -4,9 +4,9 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 
-from bot import MischicatBot
-
 load_dotenv()
+
+from bot import MischicatBot
 
 
 async def main():

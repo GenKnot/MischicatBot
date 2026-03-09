@@ -5,6 +5,7 @@ import random
 import discord
 from discord.ext import commands, tasks
 
+from utils.config import COMMAND_PREFIX
 from utils.db import get_conn
 from utils.quests import get_tavern_quests, get_quest
 from utils.combat import roll_combat, calc_power, roll_escape
@@ -237,7 +238,7 @@ class TavernCog(commands.Cog, name="Tavern"):
                         conn.execute("UPDATE players SET is_dead = 1, lifespan = 0 WHERE discord_id = ?", (uid,))
                         conn.commit()
                     embed.color = discord.Color.dark_red()
-                    embed.add_field(name="☠️ 魂归天道", value=f"逃跑失败（成功率仅 {escape_pct}%），**{enemy['name']}** 给予致命一击。\n**{player['name']}** 就此陨落，魂归天道。\n可使用 `cat!创建角色` 重入修仙之路。", inline=False)
+                    embed.add_field(name="☠️ 魂归天道", value=f"逃跑失败（成功率仅 {escape_pct}%），**{enemy['name']}** 给予致命一击。\n**{player['name']}** 就此陨落，魂归天道。\n可使用 `{COMMAND_PREFIX}创建角色` 重入修仙之路。", inline=False)
                 else:
                     heavy_loss = random.randint(10, 30)
                     with get_conn() as conn:
@@ -334,7 +335,7 @@ class TavernCog(commands.Cog, name="Tavern"):
             return await ctx.send(
                 f"{ctx.author.mention} 你正在执行任务「**{q_data['title']}**」，"
                 f"还需约 **{remaining:.1f} 游戏年**（现实 {remaining*2:.1f} 小时）。\n"
-                f"任务完成后使用 `cat!交任务` 领取奖励。"
+                f"任务完成后使用 `{COMMAND_PREFIX}交任务` 领取奖励。"
             )
 
         quests = get_tavern_quests(player)
@@ -467,7 +468,7 @@ class QuestButton(discord.ui.Button):
             embed.add_field(name="目标", value=f"前往 **{q['location']}** 完成采集", inline=False)
         embed.add_field(name="耗时", value=f"**{duration} 游戏年**（现实 {duration*2} 小时）", inline=True)
         embed.add_field(name="奖励预览", value="\n".join(reward_lines), inline=False)
-        embed.set_footer(text="接取后使用 cat!交任务 领取奖励")
+        embed.set_footer(text=f"接取后使用 {COMMAND_PREFIX}交任务 领取奖励")
 
         await interaction.followup.send(
             embed=embed,

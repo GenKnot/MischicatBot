@@ -1,4 +1,5 @@
 import discord
+from utils.config import COMMAND_PREFIX
 from utils.sects import SECTS, check_requirements
 
 
@@ -22,7 +23,7 @@ def _build_menu_embed(has_dual: bool = False, event_hint: str = "") -> discord.E
         event_hint = _get_event_hint()
     dual_section = (
         "\n\n**双修系统**\n"
-        "· 使用 `cat!双修 @对方` 邀请他人进行双修（需双修功法）\n"
+        f"· 使用 `{COMMAND_PREFIX}双修 @对方` 邀请他人进行双修（需双修功法）\n"
         "· 双方皆为清白之身时修为暴涨（10-20倍），一方清白5倍，否则1.2倍\n"
         "· 双修冷却 2 游戏年，闭关中无法双修"
     ) if has_dual else ""
@@ -38,31 +39,31 @@ def _build_menu_embed(has_dual: bool = False, event_hint: str = "") -> discord.E
             "· 寿元归零，角色坐化，需重新创建\n"
             "· 超过 2 年未行动，自动进入修炼状态\n\n"
             "**探险系统**\n"
-            "· `cat!探险` 随机触发事件，每 5 游戏年可探险 8 次\n"
+            f"· `{COMMAND_PREFIX}探险` 随机触发事件，每 5 游戏年可探险 8 次\n"
             "· 12% 概率触发稀有事件，奖励丰厚\n"
             "· 所在城市与地区影响事件池，加入宗门后有专属事件\n\n"
             "**移动与世界**\n"
             "· 天下共 30 座城市，分布于东域、南域、西域、北域、中州\n"
-            "· 点击「移动」按钮或使用 `cat!移动 [城市名]` 前往目的地\n"
+            f"· 点击「移动」按钮或使用 `{COMMAND_PREFIX}移动 [城市名]` 前往目的地\n"
             "· 闭关期间无法移动\n\n"
             "**居所与洞府**\n"
-            "· 声望 ≥ 300 可使用 `cat!买房` 在当前城市置业，提升修炼速度与探险次数\n"
-            "· 声望 ≥ 600 可使用 `cat!开辟洞府 [秘地名]` 开辟野外洞府，加成更强且全局生效\n"
-            "· 使用 `cat!我的居所` 查看已有居所与加成详情\n\n"
+            f"· 声望 ≥ 300 可使用 `{COMMAND_PREFIX}买房` 在当前城市置业，提升修炼速度与探险次数\n"
+            f"· 声望 ≥ 600 可使用 `{COMMAND_PREFIX}开辟洞府 [秘地名]` 开辟野外洞府，加成更强且全局生效\n"
+            f"· 使用 `{COMMAND_PREFIX}我的居所` 查看已有居所与加成详情\n\n"
             "**宗门系统**\n"
             "· 满足条件后可加入宗门，获得专属事件与功法加成\n"
-            "· 使用 `cat!宗门列表` 查看天下宗门，`cat!加入宗门 [名]` 加入\n"
-            "· 加入后自动获得全部3本功法，`cat!门派功法` 可补领遗漏\n\n"
+            f"· 使用 `{COMMAND_PREFIX}宗门列表` 查看天下宗门，`{COMMAND_PREFIX}加入宗门 [名]` 加入\n"
+            f"· 加入后自动获得全部3本功法，`{COMMAND_PREFIX}门派功法` 可补领遗漏\n\n"
             "**功法系统**\n"
             "· 最多装备5本功法，装备后获得属性加成\n"
-            "· `cat!我的功法` 查看功法　`cat!装备功法 [名]` 装备/卸下\n"
-            "· `cat!修炼功法 [名]` 消耗灵石与寿元提升功法阶段（入门→破限）\n"
-            "· `cat!功法属性` 查看当前装备功法的总属性加成"
+            f"· `{COMMAND_PREFIX}我的功法` 查看功法　`{COMMAND_PREFIX}装备功法 [名]` 装备/卸下\n"
+            f"· `{COMMAND_PREFIX}修炼功法 [名]` 消耗灵石与寿元提升功法阶段（入门→破限）\n"
+            f"· `{COMMAND_PREFIX}功法属性` 查看当前装备功法的总属性加成"
             + dual_section
             + (
                 "\n\n**公共事件**\n"
                 f"· {event_hint}\n"
-                "· 点击「公共事件」按钮或使用 `cat!公共事件` 查看详情"
+                f"· 点击「公共事件」按钮或使用 `{COMMAND_PREFIX}公共事件` 查看详情"
             )
         ),
         color=discord.Color.teal(),

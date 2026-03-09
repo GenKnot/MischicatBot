@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 
+from utils.config import COMMAND_PREFIX
 from utils.db import get_conn
 from utils.world import CITIES
 from utils.character import seconds_to_years
@@ -17,7 +18,7 @@ class TravelCog(commands.Cog, name="Travel"):
         player = get_player(uid)
 
         if not player:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
 
@@ -26,7 +27,7 @@ class TravelCog(commands.Cog, name="Travel"):
                 f"**{c['name']}**（{c['region']}）— {c['desc']}" for c in CITIES
             )
             return await ctx.send(
-                f"{ctx.author.mention} 请指定目的地，用法：`cat!移动 [城市名]`\n\n{city_list}"
+                f"{ctx.author.mention} 请指定目的地，用法：`{COMMAND_PREFIX}移动 [城市名]`\n\n{city_list}"
             )
 
         import time
@@ -34,7 +35,7 @@ class TravelCog(commands.Cog, name="Travel"):
         if player["cultivating_until"] and now < player["cultivating_until"]:
             remaining = seconds_to_years(player["cultivating_until"] - now)
             return await ctx.send(
-                f"{ctx.author.mention} 道友正在闭关，无法移动。还剩约 **{remaining:.1f} 年**，可使用 `cat!停止` 提前结束。"
+                f"{ctx.author.mention} 道友正在闭关，无法移动。还剩约 **{remaining:.1f} 年**，可使用 `{COMMAND_PREFIX}停止` 提前结束。"
             )
         if player["gathering_until"] and now < player["gathering_until"]:
             remaining = seconds_to_years(player["gathering_until"] - now)
@@ -93,7 +94,7 @@ class TravelCog(commands.Cog, name="Travel"):
         embed = discord.Embed(title="✦ 天下城市 ✦", color=discord.Color.teal())
         for region, cities in region_map.items():
             embed.add_field(name=region, value="、".join(cities), inline=False)
-        embed.set_footer(text="使用 cat!移动 [城市名] 前往目的地")
+        embed.set_footer(text=f"使用 {COMMAND_PREFIX}移动 [城市名] 前往目的地")
         await ctx.send(embed=embed)
 
 

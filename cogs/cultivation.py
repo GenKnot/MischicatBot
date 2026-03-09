@@ -12,6 +12,7 @@ from utils.realms import (
     cultivation_needed, lifespan_max_for_realm, next_realm,
     roll_breakthrough, apply_failure,
 )
+from utils.config import COMMAND_PREFIX
 from utils.views import MainMenuView, ProfileView, CultivateView, ClaimCultivationView, DualCultivateInviteView, YinYangView, _build_menu_embed
 from utils.db import get_conn
 from utils.world import CITIES
@@ -104,7 +105,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 f"{ctx.author.mention} **{player['name']}** 寿元已尽，魂归天道。\n"
                 f"然而——**{reason}**，道友得以轮回重生！\n"
                 f"第 **{new_rebirth}** 次轮回，携带前世感悟：{bonus_str}\n"
-                f"可使用 `cat!查看` 查看新角色。"
+                f"可使用 `{COMMAND_PREFIX}查看` 查看新角色。"
             )
         else:
             with get_conn() as conn:
@@ -112,7 +113,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 conn.commit()
             await ctx.send(
                 f"{ctx.author.mention} 道友 **{player['name']}** 寿元已尽，魂归天道。\n"
-                "尘归尘，土归土，可使用 `cat!创建角色` 重入修仙之路。"
+                f"尘归尘，土归土，可使用 `{COMMAND_PREFIX}创建角色` 重入修仙之路。"
             )
 
     async def _try_yinyang(self, ctx, player, uid: str) -> bool:
@@ -135,7 +136,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         uid = str(interaction.user.id)
         player = self._get_player(uid)
         if not player:
-            return await interaction.followup.send("尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await interaction.followup.send(f"尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         updates, _ = self._settle_time(player)
         self._apply_updates(uid, updates)
         player = self._get_player(uid)
@@ -144,7 +145,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 conn.execute("UPDATE players SET is_dead = 1 WHERE discord_id = ?", (uid,))
                 conn.commit()
             return await interaction.followup.send(
-                f"道友 **{player['name']}** 寿元已尽，魂归天道。\n可使用 `cat!创建角色` 重入修仙之路。"
+                f"道友 **{player['name']}** 寿元已尽，魂归天道。\n可使用 `{COMMAND_PREFIX}创建角色` 重入修仙之路。"
             )
         now = time.time()
         needed = cultivation_needed(player["realm"])
@@ -208,7 +209,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         now = time.time()
         if player["cultivating_until"] and now < player["cultivating_until"]:
             remaining = seconds_to_years(player["cultivating_until"] - now)
-            return await interaction.followup.send(f"道友正在闭关，还剩约 **{remaining:.1f} 年**，可使用 `cat!停止` 提前结束。")
+            return await interaction.followup.send(f"道友正在闭关，还剩约 **{remaining:.1f} 年**，可使用 `{COMMAND_PREFIX}停止` 提前结束。")
         if player["gathering_until"] and now < player["gathering_until"]:
             remaining = seconds_to_years(player["gathering_until"] - now)
             return await interaction.followup.send(f"道友正在采集中，无法修炼。还剩约 **{remaining:.1f} 年**。")
@@ -515,7 +516,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
         if not player:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         updates, _ = self._settle_time(player)
         self._apply_updates(uid, updates)
         player = self._get_player(uid)
@@ -573,7 +574,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
         if not player:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         updates, _ = self._settle_time(player)
         self._apply_updates(uid, updates)
         player = self._get_player(uid)
@@ -582,7 +583,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         now = time.time()
         if player["cultivating_until"] and now < player["cultivating_until"]:
             remaining = seconds_to_years(player["cultivating_until"] - now)
-            return await ctx.send(f"{ctx.author.mention} 道友正在闭关修炼，还剩约 **{remaining:.1f} 年**，可使用 `cat!停止` 提前结束。")
+            return await ctx.send(f"{ctx.author.mention} 道友正在闭关修炼，还剩约 **{remaining:.1f} 年**，可使用 `{COMMAND_PREFIX}停止` 提前结束。")
         if player["gathering_until"] and now < player["gathering_until"]:
             remaining = seconds_to_years(player["gathering_until"] - now)
             return await ctx.send(f"{ctx.author.mention} 道友正在采集中，无法修炼。还剩约 **{remaining:.1f} 年**。")
@@ -655,7 +656,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
         if not player:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         updates, _ = self._settle_time(player)
         self._apply_updates(uid, updates)
         player = self._get_player(uid)
@@ -697,7 +698,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         import json
         uid = str(ctx.author.id)
         if not target:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!双修 @对方`")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}双修 @对方`")
         if target == ctx.author:
             return await ctx.send(f"{ctx.author.mention} 无法与自己双修。")
         if target.bot:
@@ -943,7 +944,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                     embed.add_field(name="获得材料", value="一无所获…", inline=False)
                 total_value = sum(ITEMS.get(n, {}).get("sell_price", 0) * q for n, q in rewards)
                 if total_value > 0:
-                    embed.set_footer(text=f"材料总价值约 {total_value} 灵石（可使用 cat!出售 [材料名] 出售）")
+                    embed.set_footer(text=f"材料总价值约 {total_value} 灵石（可使用 {COMMAND_PREFIX}出售 [材料名] 出售）")
                 user = await self.bot.fetch_user(int(uid))
                 await user.send(embed=embed)
             except Exception:

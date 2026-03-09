@@ -4,6 +4,7 @@ import time
 import discord
 from discord.ext import commands
 
+from utils.config import COMMAND_PREFIX
 from utils.db import get_conn
 from utils.events import get_event_pool
 from utils.character import seconds_to_years, get_explore_limit_bonus
@@ -369,7 +370,7 @@ class ExploreCog(commands.Cog, name="Explore"):
         player = _get_player(uid)
 
         if not player:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
+            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `{COMMAND_PREFIX}创建角色`。")
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
 

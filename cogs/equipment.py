@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 
+from utils.config import COMMAND_PREFIX
 from utils.db import get_conn, get_equipment_list, get_equipped, equip_item, unequip_item, discard_equipment
 from utils.equipment import format_equipment, equip_stat_bonus, get_player_tier, QUALITY_COLOR, STAT_NAMES, SLOTS
 
@@ -56,7 +57,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
     async def equip(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!装备 [装备ID]`，可在 `cat!背包` 中查看ID。")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}装备 [装备ID]`，可在 `{COMMAND_PREFIX}背包` 中查看ID。")
         player = self._get_player(uid)
         if not player or player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路。")
@@ -69,7 +70,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
     async def unequip(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!卸下 [装备ID]`")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}卸下 [装备ID]`")
         ok, msg = unequip_item(uid, equip_id)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
@@ -77,7 +78,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
     async def discard(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!丢弃装备 [装备ID]`")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}丢弃装备 [装备ID]`")
         ok, msg = discard_equipment(uid, equip_id)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
@@ -85,7 +86,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
     async def use_item(self, ctx, *, item_name: str = None):
         uid = str(ctx.author.id)
         if not item_name:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!使用 [道具名]`")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}使用 [道具名]`")
         player = self._get_player(uid)
         if not player or player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路。")
@@ -148,7 +149,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             remove_item(uid, item_name)
             return await ctx.send(
                 f"{ctx.author.mention} 服用「{item_name}」，下次突破成功率 **+{effect['breakthrough_bonus']}%**。\n"
-                "（提示：请立即使用 `cat!突破` 以享受加成）"
+                f"（提示：请立即使用 `{COMMAND_PREFIX}突破` 以享受加成）"
             )
 
         await ctx.send(f"{ctx.author.mention} 「{item_name}」暂时无法直接使用。")
@@ -158,7 +159,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
     async def sell_item(self, ctx, *, args: str = None):
         uid = str(ctx.author.id)
         if not args:
-            return await ctx.send(f"{ctx.author.mention} 用法：`cat!出售 [物品名] [数量]`，例如 `cat!出售 铜矿石 5`")
+            return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}出售 [物品名] [数量]`，例如 `{COMMAND_PREFIX}出售 铜矿石 5`")
         player = self._get_player(uid)
         if not player or player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路。")
@@ -210,7 +211,7 @@ def _build_backpack_pages(player: dict, items: dict, equips: list) -> list[disco
     from utils.items import ITEMS
     pages = []
     title = f"✦ {player['name']} 的背包 ✦"
-    footer = "使用 cat!装备 [ID] 装备物品 · cat!卸下 [ID] 卸下 · cat!装备详情 查看属性加成"
+    footer = f"使用 {COMMAND_PREFIX}装备 [ID] 装备物品 · {COMMAND_PREFIX}卸下 [ID] 卸下 · {COMMAND_PREFIX}装备详情 查看属性加成"
 
     item_lines = []
     if items:

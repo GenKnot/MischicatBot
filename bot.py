@@ -1,12 +1,12 @@
-import os
-
 import discord
 from discord.ext import commands
+
+from utils.config import COMMAND_PREFIX
 
 
 class MischicatBot(commands.Bot):
     def __init__(self):
-        prefix = os.getenv("COMMAND_PREFIX", "cat!")
+        prefix = COMMAND_PREFIX
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix=prefix, intents=intents, help_command=None)
