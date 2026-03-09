@@ -2,6 +2,7 @@
 FROM python:3-alpine
 
 # Set working directory
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
 # Copy requirements and install dependencies
