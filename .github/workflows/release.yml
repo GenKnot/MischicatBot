@@ -17,8 +17,16 @@ jobs:
         include:
           - os: ubuntu-22.04
             name: linux-amd64
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
           - os: windows-latest
             name: windows-amd64
+          - os: windows-11-arm
+            name: windows-arm64
+          - os: macos-latest
+            name: macos-arm64
+          - os: macos-14-large
+            name: macos-amd64
 
     runs-on: ${{ matrix.os }}
 
@@ -41,19 +49,19 @@ jobs:
         run: |
           pyinstaller --noconfirm mischicat_bot.spec
 
-      - name: Prepare artifact (Linux)
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Prepare artifact (Linux / macOS)
+        if: matrix.os == 'ubuntu-22.04' || matrix.os == 'ubuntu-24.04-arm' || matrix.os == 'macos-latest' || matrix.os == 'macos-14-large'
         run: |
           cp .env.example dist/.env
 
       - name: Prepare artifact (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' || matrix.os == 'windows-11-arm'
         shell: pwsh
         run: |
           Copy-Item .env.example dist\.env
 
-      - name: Upload artifact (Linux)
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Upload artifact (Linux / macOS)
+        if: matrix.os == 'ubuntu-22.04' || matrix.os == 'ubuntu-24.04-arm' || matrix.os == 'macos-latest' || matrix.os == 'macos-14-large'
         uses: actions/upload-artifact@v4
         with:
           name: mischicat-bot-${{ matrix.name }}
@@ -63,7 +71,7 @@ jobs:
           include-hidden-files: true
 
       - name: Upload artifact (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' || matrix.os == 'windows-11-arm'
         uses: actions/upload-artifact@v4
         with:
           name: mischicat-bot-${{ matrix.name }}
@@ -86,15 +94,16 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release
-
-          cd artifacts/mischicat-bot-linux-amd64
-          zip ../../release/mischicat-bot-linux-amd64-${{ github.ref_name }}.zip mischicat-bot .env
-          cd ../..
-
-          cd artifacts/mischicat-bot-windows-amd64
-          zip ../../release/mischicat-bot-windows-amd64-${{ github.ref_name }}.zip mischicat-bot.exe .env
-          cd ../..
-
+          for dir in artifacts/mischicat-bot-*/; do
+            [ -d "$dir" ] || continue
+            name=$(basename "$dir")
+            out="release/${name}-${{ github.ref_name }}.zip"
+            if [ -f "$dir/mischicat-bot.exe" ]; then
+              (cd "$dir" && zip "../../$out" mischicat-bot.exe .env)
+            else
+              (cd "$dir" && zip "../../$out" mischicat-bot .env)
+            fi
+          done
           ls -la release/
 
       - name: Create Release and upload assets
