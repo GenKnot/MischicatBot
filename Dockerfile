@@ -1,5 +1,5 @@
 # Use official Python image
-FROM python:3.11-slim
+FROM python:3-alpine
 
 # Set working directory
 WORKDIR /app
@@ -14,5 +14,7 @@ COPY . .
 # Set environment variables (optional)
 # ENV DISCORD_TOKEN=your_token_here
 
+# Expose port 8080
+EXPOSE 8080
 # Command to run the bot
 CMD ["python", "main.py"]
