@@ -59,7 +59,9 @@ class TravelCityView(discord.ui.View):
         self.cog = cog
         for c in cities:
             self.add_item(TravelCityButton(c["name"]))
-        self.add_item(_BackToMenuButton(row=1))
+        self.add_item(_BackToTravelRegionButton())
+        # Keep a direct escape hatch to main menu as well.
+        self.add_item(_BackToMenuButton())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -91,7 +93,8 @@ class TravelSecretView(discord.ui.View):
             req_idx = get_realm_index(r["min_realm"])
             disabled = player_realm_idx < req_idx
             self.add_item(TravelSecretButton(r["name"], r["type"], disabled))
-        self.add_item(_BackToMenuButton(row=1))
+        self.add_item(_BackToTravelRegionButton())
+        self.add_item(_BackToMenuButton())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -162,7 +165,7 @@ class _BackToWorldButton(discord.ui.Button):
 
 
 class _BackToMenuButton(discord.ui.Button):
-    def __init__(self, row: int = 0):
+    def __init__(self, row: int | None = None):
         super().__init__(label="返回主菜单", style=discord.ButtonStyle.secondary, row=row)
 
     async def callback(self, interaction: discord.Interaction):
@@ -173,3 +176,19 @@ class _BackToMenuButton(discord.ui.Button):
             return
         await interaction.response.defer()
         await _send_main_menu(interaction, cog)
+
+
+class _BackToTravelRegionButton(discord.ui.Button):
+    def __init__(self, row: int | None = None):
+        super().__init__(label="返回地区选择", style=discord.ButtonStyle.secondary, row=row)
+
+    async def callback(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="✦ 移动 · 选择地区 ✦",
+            description="请选择目标地区：",
+            color=discord.Color.teal(),
+        )
+        await interaction.response.edit_message(
+            embed=embed,
+            view=TravelRegionView(self.view.author, self.view.cog),
+        )
