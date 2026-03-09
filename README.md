@@ -8,15 +8,25 @@ Web 管理面板：[https://catportal.prpr.one/](https://catportal.prpr.one/)
 
 ---
 
+## 申请Discord App
+1. 访问 [Discord Developer Portal](https://discord.com/developers/applications)，点击 `New Application/新 APP` 新建一个应用。
+2. 进入应用页面，左侧选择 `Bot/机器人`。如 Bot Token 未显示，点击 `Reset Token/重置令牌` 获取 Token（用于 `.env` 里的 `DISCORD_TOKEN`）。
+3. 在 `Privileged Gateway Intents/特权网关意图`区，勾选 `PRESENCE INTEN/在线状态意图`、`SERVER MEMBERS INTENT/服务器成员意图`、`MESSAGE CONTENT INTENT/消息内容意图`。
+4. 推荐将机器人权限设为 `Administrator/管理员`。
+5. 左侧导航选择 `OAuth2` → `OAuth2 URL Generator/生成器`，Scopes/范围 选择 `bot` 和 `applications.commands`（可选）。
+6. 下方 `Bot Permissions/机器人权限` 勾选 `Administrator/管理员`。
+7. 复制下方生成的 OAuth2 授权链接，用浏览器打开，选择你的服务器，点击授权即可将 Bot 添加进服务器。
+
+
 ## 运行
 
-复制 `.env.example` 改名为 `.env`，填入对应的值：
+复制 `.env.example` 改名为 `.env` 或使用 `copy .env.example .env` 命令，填入对应的值：
 
 - `DISCORD_TOKEN` — Bot Token，从 [Discord Developer Portal](https://discord.com/developers/applications) 获取
 - `DISCORD_GUILD_ID` — 服务器 ID，开发者模式下右键服务器复制
 - `PUBLIC_EVENT_CHANNEL_ID` — 公共事件广播的频道 ID
-- `DB_PATH` — 本地用 `game.db`，Docker 用 `/app/sqlite-data/game.db`
-- `COMMAND_PREFIX` — 默认 `cat!`，根据需求自己改
+- `DB_PATH` — 本地用 `sqlite-data/game.db`，Docker 用 `/app/sqlite-data/game.db`
+- `COMMAND_PREFIX` — 机器人前缀，默认 `cat!`，根据需求自己改
 
 填好后启动：Mac / Linux 运行 `./run.sh`，Windows 双击 `run.bat`。
 
