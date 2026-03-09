@@ -25,32 +25,10 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         items = get_inventory(uid)
         equips = get_equipment_list(uid)
 
-        embed = discord.Embed(title=f"✦ {player['name']} 的背包 ✦", color=discord.Color.teal())
-
-        if items:
-            lines = []
-            from utils.items import ITEMS
-            for item_id, qty in items.items():
-                info = ITEMS.get(item_id, {})
-                lines.append(f"· **{item_id}** ×{qty}　{info.get('desc', '')}")
-            embed.add_field(name="丹药 / 道具", value="\n".join(lines), inline=False)
-        else:
-            embed.add_field(name="丹药 / 道具", value="空空如也", inline=False)
-
-        if equips:
-            equipped = [e for e in equips if e["equipped"]]
-            unequipped = [e for e in equips if not e["equipped"]]
-            if equipped:
-                lines = [f"{QUALITY_COLOR.get(e['quality'], '⬜')} **{e['name']}**（已装备）" for e in equipped]
-                embed.add_field(name="装备栏", value="\n".join(lines), inline=False)
-            if unequipped:
-                lines = [f"{QUALITY_COLOR.get(e['quality'], '⬜')} **{e['name']}**　`{e['equip_id']}`" for e in unequipped]
-                embed.add_field(name="未装备", value="\n".join(lines[:10]), inline=False)
-        else:
-            embed.add_field(name="装备", value="无装备", inline=False)
-
-        embed.set_footer(text="使用 cat!装备 [ID] 装备物品 · cat!卸下 [ID] 卸下 · cat!装备详情 查看属性加成")
-        await ctx.send(ctx.author.mention, embed=embed)
+        pages = _build_backpack_pages(player, items, equips)
+        cog = self.bot.cogs.get("Cultivation")
+        view = BackpackPageView(ctx.author, pages, cog)
+        await ctx.send(ctx.author.mention, embed=pages[0], view=view)
 
     @commands.command(name="装备详情")
     async def equip_details(self, ctx):
@@ -152,10 +130,18 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             return await ctx.send(f"{ctx.author.mention} 服用「{item_name}」，寿元 **+{gain}年**（当前 {new_lifespan}/{player['lifespan_max']} 年）{over}")
 
         if "cultivation_speed_bonus" in effect:
+            import time as _t
+            buff_years = 2
+            buff_until = _t.time() + buff_years * 2 * 3600
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE players SET pill_buff_until = ? WHERE discord_id = ?",
+                    (buff_until, uid)
+                )
+                conn.commit()
             remove_item(uid, item_name)
             return await ctx.send(
-                f"{ctx.author.mention} 服用「{item_name}」，下次修炼速度提升 **+{effect['cultivation_speed_bonus']}%**。\n"
-                "（提示：聚灵丹效果将在下次 `cat!修炼` 时自动生效，当前版本为提示功能）"
+                f"{ctx.author.mention} 服用「{item_name}」，修炼速度提升 **+{effect['cultivation_speed_bonus']}%**，持续 **2 游戏年**（现实 4 小时）。"
             )
 
         if "breakthrough_bonus" in effect:
@@ -218,6 +204,106 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             f"{ctx.author.mention} 出售 **{item_name}** ×{quantity}，获得 **{total} 灵石**"
             f"（单价 {sell_price}）。"
         )
+
+
+def _build_backpack_pages(player: dict, items: dict, equips: list) -> list[discord.Embed]:
+    from utils.items import ITEMS
+    pages = []
+    title = f"✦ {player['name']} 的背包 ✦"
+    footer = "使用 cat!装备 [ID] 装备物品 · cat!卸下 [ID] 卸下 · cat!装备详情 查看属性加成"
+
+    item_lines = []
+    if items:
+        for item_id, qty in items.items():
+            info = ITEMS.get(item_id, {})
+            item_lines.append(f"· **{item_id}** ×{qty}　{info.get('desc', '')}")
+    else:
+        item_lines = ["空空如也"]
+
+    equipped = [e for e in equips if e["equipped"]] if equips else []
+    unequipped = [e for e in equips if not e["equipped"]] if equips else []
+    equip_lines = [f"{QUALITY_COLOR.get(e['quality'], '⬜')} **{e['name']}**（已装备）" for e in equipped]
+    unequip_lines = [f"{QUALITY_COLOR.get(e['quality'], '⬜')} **{e['name']}**　`{e['equip_id']}`" for e in unequipped]
+
+    def _chunk(lines: list[str], limit: int = 900) -> list[list[str]]:
+        chunks, cur, cur_len = [], [], 0
+        for line in lines:
+            if cur_len + len(line) + 1 > limit and cur:
+                chunks.append(cur)
+                cur, cur_len = [], 0
+            cur.append(line)
+            cur_len += len(line) + 1
+        if cur:
+            chunks.append(cur)
+        return chunks or [[]]
+
+    item_chunks = _chunk(item_lines)
+    equip_chunks = _chunk(equip_lines + (["---未装备---"] if unequip_lines and equip_lines else []) + unequip_lines)
+
+    all_sections = []
+    for i, chunk in enumerate(item_chunks):
+        label = "丹药 / 道具" if i == 0 else f"丹药 / 道具（续{i}）"
+        all_sections.append((label, "\n".join(chunk)))
+    for i, chunk in enumerate(equip_chunks):
+        label = "装备" if i == 0 else f"装备（续{i}）"
+        all_sections.append((label, "\n".join(chunk)))
+    if not equips:
+        all_sections.append(("装备", "无装备"))
+
+    FIELDS_PER_PAGE = 4
+    for i in range(0, max(len(all_sections), 1), FIELDS_PER_PAGE):
+        embed = discord.Embed(title=title, color=discord.Color.teal())
+        for name, value in all_sections[i:i + FIELDS_PER_PAGE]:
+            embed.add_field(name=name, value=value or "空", inline=False)
+        embed.set_footer(text=footer)
+        pages.append(embed)
+
+    total = len(pages)
+    for idx, embed in enumerate(pages):
+        if total > 1:
+            embed.set_footer(text=f"第 {idx+1} / {total} 页　|　{footer}")
+    return pages
+
+
+class BackpackPageView(discord.ui.View):
+    def __init__(self, author, pages: list[discord.Embed], cog=None):
+        super().__init__(timeout=120)
+        self.author = author
+        self.pages = pages
+        self.page = 0
+        self.cog = cog
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_btn.disabled = self.page == 0
+        self.next_btn.disabled = self.page >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.author:
+            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page -= 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.page], view=self)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.page], view=self)
+
+    @discord.ui.button(label="返回主菜单", style=discord.ButtonStyle.secondary)
+    async def back_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from utils.views.world import _send_main_menu
+        if not self.cog:
+            await interaction.response.send_message("无法返回。", ephemeral=True)
+            return
+        await interaction.response.defer()
+        await _send_main_menu(interaction, self.cog)
 
 
 async def setup(bot: commands.Bot):

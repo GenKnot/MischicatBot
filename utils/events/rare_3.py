@@ -66,7 +66,7 @@ EVENTS.append(_e(
         _c("冒险靠近裂缝取玄晶", next_event={
             "desc": "鬼气侵体，你需以体魄或神识抵御，方能取到玄晶并全身而退。",
             "choices": [
-                _c("以体魄硬抗鬼气", condition=_cond("physique", 8), rewards={"physique": 1, "spirit_stones": 600, "bone": 1}, flavor="你强取玄晶，体魄与根骨在鬼气淬炼下有所提升，玄晶售得高价。体魄 +1，灵石 +600，根骨 +1"),
+                _c("以体魄硬抗鬼气", condition=_cond("physique", 8), rewards={"physique": 1, "spirit_stones": 600, "bone": 1, "equipment": {"quality_pool": ["精良", "稀有"], "quality_weights": [65, 35], "chance": 0.2}}, flavor="你强取玄晶，体魄与根骨在鬼气淬炼下有所提升，玄晶售得高价。体魄 +1，灵石 +600，根骨 +1"),
                 _c("以体魄硬抗鬼气", rewards={"lifespan": -20, "spirit_stones": 350}, flavor="鬼气伤身，你带伤取到部分玄晶。寿元 -20，灵石 +350"),
                 _c("以神识隔绝鬼气再取", condition=_cond("soul", 8), rewards={"soul": 1, "spirit_stones": 550, "cultivation": 200}, flavor="你以神识护体取回玄晶，神识与修为皆有收获。神识 +1，灵石 +550，修为 +200"),
                 _c("以神识隔绝鬼气再取", rewards={"spirit_stones": 300, "lifespan": -10}, flavor="你取到少量玄晶，鬼气略伤神魂。灵石 +300，寿元 -10"),
@@ -164,7 +164,7 @@ EVENTS.append(_e(
                 _c("先取经架玉简", rewards={"comprehension": 1, "cultivation": 260}, flavor="你获得部分心得，悟性与修为皆有大幅提升。悟性 +1，修为 +260"),
                 _c("先探灵池", condition=_cond("physique", 7), rewards={"lifespan": 90, "bone": 1, "cultivation": 200}, flavor="灵池中灵液尚存，你浸泡炼化，寿元大涨，根骨与修为皆进。寿元 +90，根骨 +1，修为 +200"),
                 _c("先探灵池", rewards={"lifespan": 50, "cultivation": 120}, flavor="灵液稀薄，你仍得不少好处。寿元 +50，修为 +120"),
-                _c("循剑鸣入偏殿", condition=_cond("fortune", 7), rewards={"fortune": 2, "spirit_stones": 550}, flavor="偏殿有一柄无主飞剑与储物袋，你收获颇丰。机缘 +2，灵石 +550"),
+                _c("循剑鸣入偏殿", condition=_cond("fortune", 7), rewards={"fortune": 2, "spirit_stones": 550, "equipment": {"quality_pool": ["精良", "稀有"], "quality_weights": [60, 40], "chance": 0.25}}, flavor="偏殿有一柄无主飞剑与储物袋，你收获颇丰。机缘 +2，灵石 +550"),
                 _c("循剑鸣入偏殿", rewards={"lifespan": -15, "spirit_stones": 280}, flavor="偏殿有剑灵残念，你受伤后取走部分遗物。寿元 -15，灵石 +280"),
             ]
         }),
@@ -230,7 +230,7 @@ EVENTS.append(_e(
         _c("取兽元晶炼化", next_event={
             "desc": "兽元晶中凶煞之气与灵气并存，炼化时需以体魄或神识压制煞气。",
             "choices": [
-                _c("以体魄压制煞气炼化", condition=_cond("physique", 8), rewards={"physique": 2, "bone": 1, "cultivation": 400}, flavor="你以体魄镇压煞气，炼化兽元晶，体魄与根骨皆得淬炼，修为暴涨。体魄 +2，根骨 +1，修为 +400"),
+                _c("以体魄压制煞气炼化", condition=_cond("physique", 8), rewards={"physique": 2, "bone": 1, "cultivation": 400, "equipment": {"quality_pool": ["精良", "稀有"], "quality_weights": [55, 45], "chance": 0.25}}, flavor="你以体魄镇压煞气，炼化兽元晶，体魄与根骨皆得淬炼，修为暴涨。体魄 +2，根骨 +1，修为 +400"),
                 _c("以体魄压制煞气炼化", rewards={"physique": 1, "cultivation": 250, "lifespan": -15}, flavor="煞气反噬，你体魄与修为皆进但损了寿元。体魄 +1，修为 +250，寿元 -15"),
                 _c("以神识净化煞气再炼化", condition=_cond("soul", 8), rewards={"soul": 2, "cultivation": 350, "lifespan": 30}, flavor="你以神识净化煞气后炼化，神识大涨，修为与寿元皆进。神识 +2，修为 +350，寿元 +30"),
                 _c("以神识净化煞气再炼化", rewards={"soul": 1, "cultivation": 220}, flavor="你勉强炼化，神识与修为皆有提升。神识 +1，修为 +220"),
@@ -305,7 +305,7 @@ EVENTS.append(_e(
         _c("尝试炼化残片中的仙道法则", next_event={
             "desc": "残片中的剑意与法则极为霸道，需以悟性化解、或以体魄硬抗，方能炼化。",
             "choices": [
-                _c("以悟性参悟法则再炼化", condition=_cond("comprehension", 8), rewards={"comprehension": 2, "cultivation": 400, "soul": 1}, flavor="你参透残片中的一丝仙道法则，悟性与神识大涨，修为猛进。悟性 +2，修为 +400，神识 +1"),
+                _c("以悟性参悟法则再炼化", condition=_cond("comprehension", 8), rewards={"comprehension": 2, "cultivation": 400, "soul": 1, "equipment": {"quality_pool": ["精良", "稀有"], "quality_weights": [50, 50], "chance": 0.3}}, flavor="你参透残片中的一丝仙道法则，悟性与神识大涨，修为猛进。悟性 +2，修为 +400，神识 +1"),
                 _c("以悟性参悟法则再炼化", rewards={"comprehension": 1, "cultivation": 260}, flavor="你炼化部分法则，悟性与修为皆有大幅提升。悟性 +1，修为 +260"),
                 _c("以体魄承受剑意淬体", condition=_cond("physique", 8), rewards={"physique": 2, "bone": 1, "cultivation": 350}, flavor="你以体魄承受剑意，体魄与根骨皆得淬炼，修为大涨。体魄 +2，根骨 +1，修为 +350"),
                 _c("以体魄承受剑意淬体", rewards={"physique": 1, "cultivation": 200, "lifespan": -15}, flavor="剑意伤身，你体魄与修为皆进但损了寿元。体魄 +1，修为 +200，寿元 -15"),

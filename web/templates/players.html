@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}修士列表 · Mischicat{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>修士列表（{{ players | length }} 人）</h2>
+  <form method="get" class="filters">
+    <input name="q" placeholder="搜索道号 / ID" value="{{ q }}">
+    <select name="city">
+      <option value="">全部城市</option>
+      {% for c in cities %}
+      <option value="{{ c }}" {% if c == city %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <input name="realm" placeholder="境界（如 元婴）" value="{{ realm }}">
+    <select name="sort">
+      <option value="cultivation" {% if sort=="cultivation" %}selected{% endif %}>修为排序</option>
+      <option value="lifespan" {% if sort=="lifespan" %}selected{% endif %}>寿元排序</option>
+      <option value="spirit_stones" {% if sort=="spirit_stones" %}selected{% endif %}>灵石排序</option>
+      <option value="last_active" {% if sort=="last_active" %}selected{% endif %}>最近活跃</option>
+      <option value="name" {% if sort=="name" %}selected{% endif %}>道号排序</option>
+    </select>
+    <button type="submit">筛选</button>
+    <a href="/players" style="padding:6px 12px;color:var(--muted);font-size:13px">重置</a>
+  </form>
+
+  {% if players %}
+  <table>
+    <thead>
+      <tr>
+        <th>道号</th><th>性别</th><th>境界</th><th>修为</th>
+        <th>寿元</th><th>灵石</th><th>所在城市</th><th>状态</th><th>最近活跃</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in players %}
+    {% set now_ts = now() %}
+    <tr>
+      <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+      <td>{{ p.gender }}</td>
+      <td><span class="badge badge-purple">{{ p.realm }}</span></td>
+      <td>{{ p.cultivation }}</td>
+      <td>
+        {{ p.lifespan }} / {{ p.lifespan_max }}
+        <div class="progress-bar">
+          <div class="fill" style="width:{{ [[(p.lifespan / p.lifespan_max * 100) | int, 0] | max, 100] | min }}%"></div>
+        </div>
+      </td>
+      <td>{{ p.spirit_stones }}</td>
+      <td>{{ p.current_city }}</td>
+      <td>
+        {% if p.cultivating_until and p.cultivating_until > now_ts %}
+          <span class="badge badge-teal">闭关中</span>
+        {% elif p.gathering_until and p.gathering_until > now_ts %}
+          <span class="badge badge-yellow">采集中</span>
+        {% else %}
+          <span class="badge badge-gray">空闲</span>
+        {% endif %}
+      </td>
+      <td>{{ ts(p.last_active) }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">没有符合条件的修士</p>
+  {% endif %}
+</div>
+{% endblock %}

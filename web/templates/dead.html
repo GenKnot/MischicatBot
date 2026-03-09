@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}已坐化 · Mischicat{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>已坐化修士（{{ players | length }} 人）</h2>
+  {% if players %}
+  <table>
+    <thead>
+      <tr><th>道号</th><th>性别</th><th>最终境界</th><th>轮回次数</th><th>所在城市</th><th>坐化时间</th></tr>
+    </thead>
+    <tbody>
+    {% for p in players %}
+    <tr>
+      <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+      <td>{{ p.gender }}</td>
+      <td><span class="badge badge-gray">{{ p.realm }}</span></td>
+      <td>{{ p.rebirth_count }}</td>
+      <td>{{ p.current_city }}</td>
+      <td>{{ ts(p.last_active) }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">暂无坐化记录</p>
+  {% endif %}
+</div>
+{% endblock %}

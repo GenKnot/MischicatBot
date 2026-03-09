@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}总览 · Mischicat{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="num">{{ total }}</div>
+    <div class="label">在世修士</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:var(--accent2)">{{ cultivating }}</div>
+    <div class="label">闭关中</div>
+  </div>
+  <div class="stat-card">
+    <div class="num" style="color:var(--muted)">{{ dead }}</div>
+    <div class="label">已坐化</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>最近公共事件</h2>
+  {% if events %}
+  <table>
+    <thead>
+      <tr>
+        <th>事件</th><th>类型</th><th>状态</th><th>开始时间</th><th>结束时间</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for e in events %}
+    <tr>
+      <td><a href="/events">{{ e.title }}</a></td>
+      <td><span class="badge badge-purple">{{ e.event_type }}</span></td>
+      <td>
+        {% if e.status == "active" %}
+          <span class="badge badge-green">进行中</span>
+        {% elif e.status == "ended" %}
+          <span class="badge badge-gray">已结束</span>
+        {% else %}
+          <span class="badge badge-yellow">{{ e.status }}</span>
+        {% endif %}
+      </td>
+      <td>{{ ts(e.started_at) }}</td>
+      <td>{{ ts(e.ends_at) }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">暂无事件记录</p>
+  {% endif %}
+</div>
+{% endblock %}

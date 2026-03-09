@@ -2,7 +2,24 @@ import discord
 from utils.sects import SECTS, check_requirements
 
 
-def _build_menu_embed(has_dual: bool = False) -> discord.Embed:
+def _get_event_hint() -> str:
+    import json, time as _time
+    from utils.db import get_conn
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT title, status, ends_at FROM public_events WHERE status IN ('active', 'pending') ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return "每日 22:00（北美东部时间）触发，天下修士皆可参与"
+    if row["status"] == "active":
+        remaining = max(0, row["ends_at"] - _time.time())
+        return f"「{row['title']}」进行中，还剩 {remaining/60:.0f} 分钟"
+    return f"「{row['title']}」即将开始，敬请关注公告频道"
+
+
+def _build_menu_embed(has_dual: bool = False, event_hint: str = "") -> discord.Embed:
+    if not event_hint:
+        event_hint = _get_event_hint()
     dual_section = (
         "\n\n**双修系统**\n"
         "· 使用 `cat!双修 @对方` 邀请他人进行双修（需双修功法）\n"
@@ -42,6 +59,11 @@ def _build_menu_embed(has_dual: bool = False) -> discord.Embed:
             "· `cat!修炼功法 [名]` 消耗灵石与寿元提升功法阶段（入门→破限）\n"
             "· `cat!功法属性` 查看当前装备功法的总属性加成"
             + dual_section
+            + (
+                "\n\n**公共事件**\n"
+                f"· {event_hint}\n"
+                "· 点击「公共事件」按钮或使用 `cat!公共事件` 查看详情"
+            )
         ),
         color=discord.Color.teal(),
     )
@@ -91,7 +113,7 @@ class MainMenuView(discord.ui.View):
                 emoji_map = {"采矿": "⛏️", "采药": "🌿", "伐木": "🪓", "钓鱼": "🎣"}
                 rtype = region.get("type", "")
                 if rtype in emoji_map:
-                    self.add_item(MenuButton(f"{emoji_map[rtype]} {rtype}", discord.ButtonStyle.success, f"gather:{rtype}"))
+                    self.add_item(MenuButton(rtype, discord.ButtonStyle.success, f"gather:{rtype}"))
             self.add_item(MenuButton("背包", discord.ButtonStyle.secondary, "backpack"))
             self.add_item(MenuButton("功法", discord.ButtonStyle.secondary, "techniques"))
             self.add_item(MenuButton("装备", discord.ButtonStyle.secondary, "equipment"))
@@ -103,6 +125,7 @@ class MainMenuView(discord.ui.View):
         if player:
             for sect_name in _get_joinable_sects(player):
                 self.add_item(MenuButton(f"加入{sect_name}", discord.ButtonStyle.success, f"join_sect:{sect_name}"))
+        self.add_item(MenuButton("公共事件", discord.ButtonStyle.secondary, "public_event"))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -123,7 +146,7 @@ class MenuButton(discord.ui.Button):
         cog = self.view.cog
 
         if self.action == "world":
-            await interaction.response.send_message(embed=_world_overview_embed(), view=WorldMenuView(interaction.user))
+            await interaction.response.send_message(embed=_world_overview_embed(), view=WorldMenuView(interaction.user, cog))
             return
 
         if self.action == "travel":
@@ -141,7 +164,7 @@ class MenuButton(discord.ui.Button):
                 return
             await interaction.response.send_message(
                 embed=_city_players_embed(city_players, player),
-                view=CityPlayersView(interaction.user, city_players, player),
+                view=CityPlayersView(interaction.user, city_players, player, cog),
                 ephemeral=True,
             )
             return
@@ -237,7 +260,16 @@ class MenuButton(discord.ui.Button):
                 with get_conn() as conn:
                     player = dict(conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone())
                 now = _time.time()
-                if player["cultivating_until"] and now < player["cultivating_until"]:
+                with get_conn() as conn:
+                    defense_row = conn.execute(
+                        "SELECT 1 FROM public_event_participants ep "
+                        "JOIN public_events e ON ep.event_id = e.event_id "
+                        "WHERE ep.discord_id = ? AND ep.activity = 'defense' AND e.status = 'active'",
+                        (uid,)
+                    ).fetchone()
+                if defense_row:
+                    await interaction.followup.send("守城期间无法采集，专心守城！", ephemeral=True)
+                elif player["cultivating_until"] and now < player["cultivating_until"]:
                     remaining = seconds_to_years(player["cultivating_until"] - now)
                     await interaction.followup.send(f"道友正在闭关，无法采集。还剩约 **{remaining:.1f} 年**。", ephemeral=True)
                 elif player["gathering_until"] and now < player["gathering_until"]:
@@ -264,20 +296,59 @@ class MenuButton(discord.ui.Button):
                     await sect_cog.join_sect(ctx, name=sect_name)
                 else:
                     await interaction.followup.send("宗门系统暂时不可用。", ephemeral=True)
+            elif self.action == "public_event":
+                pe_cog = cog.bot.cogs.get("PublicEvents")
+                if pe_cog:
+                    ctx = await cog.bot.get_context(interaction.message)
+                    ctx.author = interaction.user
+                    await pe_cog.show_active_event(ctx)
+                else:
+                    await interaction.followup.send("公共事件系统暂时不可用。", ephemeral=True)
+            elif self.action == "back_to_menu":
+                import json
+                uid = str(interaction.user.id)
+                player = cog._get_player(uid)
+                if player and not player["is_dead"]:
+                    updates, _ = cog._settle_time(player)
+                    cog._apply_updates(uid, updates)
+                    player = cog._get_player(uid)
+                has_player = player is not None and not player["is_dead"]
+                can_bt = has_player and cog._can_breakthrough(player)
+                has_dual = has_player and any(
+                    (t if isinstance(t, str) else t.get("name", "")) == "双修功法"
+                    for t in json.loads(player["techniques"] or "[]")
+                )
+                city_players = []
+                if has_player:
+                    from utils.db import get_conn as _gc
+                    with _gc() as conn:
+                        rows = conn.execute(
+                            "SELECT discord_id, name, realm, cultivation FROM players "
+                            "WHERE current_city = ? AND is_dead = 0 AND discord_id != ?",
+                            (player["current_city"], uid)
+                        ).fetchall()
+                    city_players = [dict(r) for r in rows]
+                await interaction.followup.send(
+                    embed=_build_menu_embed(has_dual),
+                    view=MainMenuView(interaction.user, has_player, can_bt, cog, player, city_players)
+                )
         except Exception as e:
             await interaction.followup.send(f"出错了：{e}", ephemeral=True)
 
 
 class ProfileView(discord.ui.View):
-    def __init__(self, author, can_breakthrough: bool, is_cultivating: bool, cog):
+    def __init__(self, author, can_breakthrough: bool, is_cultivating: bool, cog, player=None, city_players=None):
         super().__init__(timeout=120)
         self.author = author
         self.cog = cog
+        self.player = player
+        self.city_players = city_players or []
         self.add_item(MenuButton("修炼", discord.ButtonStyle.success, "cultivate"))
         if is_cultivating:
             self.add_item(MenuButton("停止闭关", discord.ButtonStyle.danger, "stop"))
         if can_breakthrough:
             self.add_item(MenuButton("突破", discord.ButtonStyle.danger, "breakthrough"))
+        self.add_item(MenuButton("返回主菜单", discord.ButtonStyle.secondary, "back_to_menu"))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:

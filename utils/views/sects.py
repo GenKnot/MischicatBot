@@ -32,9 +32,10 @@ def _sects_embed(alignment: str) -> discord.Embed:
 
 
 class SectAlignmentView(discord.ui.View):
-    def __init__(self, author):
+    def __init__(self, author, cog=None):
         super().__init__(timeout=120)
         self.author = author
+        self.cog = cog
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -65,3 +66,17 @@ class SectAlignmentView(discord.ui.View):
             color=discord.Color.dark_purple(),
         )
         await interaction.response.send_message(embed=embed)
+
+    @discord.ui.button(label="返回世界", style=discord.ButtonStyle.secondary, row=1)
+    async def back_world(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from utils.views.world import WorldMenuView, _world_overview_embed
+        await interaction.response.send_message(embed=_world_overview_embed(), view=WorldMenuView(interaction.user, self.cog))
+
+    @discord.ui.button(label="返回主菜单", style=discord.ButtonStyle.secondary, row=1)
+    async def back_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from utils.views.world import _send_main_menu
+        if not self.cog:
+            await interaction.response.send_message("无法返回。", ephemeral=True)
+            return
+        await interaction.response.defer()
+        await _send_main_menu(interaction, self.cog)

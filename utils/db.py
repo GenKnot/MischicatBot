@@ -32,6 +32,7 @@ def _migrate(conn):
         ("party_id",             "TEXT"),
         ("gathering_until",      "REAL"),
         ("gathering_type",       "TEXT"),
+        ("pill_buff_until",      "REAL"),
     ]
     for col, definition in migrations:
         if col not in existing:
@@ -80,9 +81,28 @@ def _migrate(conn):
             discord_id  TEXT NOT NULL,
             joined_at   REAL NOT NULL,
             contribution INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY (event_id, discord_id)
+            activity    TEXT,
+            PRIMARY KEY (event_id, discord_id, activity)
         )
     """)
+    existing_ep = {row[1] for row in conn.execute("PRAGMA table_info(public_event_participants)")}
+    if "activity" not in existing_ep:
+        conn.execute("ALTER TABLE public_event_participants ADD COLUMN activity TEXT")
+    pk_info = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='public_event_participants'").fetchone()
+    if pk_info and "activity" not in (pk_info["sql"] or "").split("PRIMARY KEY")[1]:
+        conn.execute("ALTER TABLE public_event_participants RENAME TO public_event_participants_old")
+        conn.execute("""
+            CREATE TABLE public_event_participants (
+                event_id     TEXT NOT NULL,
+                discord_id   TEXT NOT NULL,
+                joined_at    REAL NOT NULL,
+                contribution INTEGER NOT NULL DEFAULT 0,
+                activity     TEXT,
+                PRIMARY KEY (event_id, discord_id, activity)
+            )
+        """)
+        conn.execute("INSERT INTO public_event_participants SELECT event_id, discord_id, joined_at, contribution, activity FROM public_event_participants_old")
+        conn.execute("DROP TABLE public_event_participants_old")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipment (
             equip_id    TEXT PRIMARY KEY,

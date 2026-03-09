@@ -15,6 +15,8 @@ class MischicatBot(commands.Bot):
         from utils.db import init_db
         init_db()
         await self.load_extension("cogs.music")
+        await self.load_extension("cogs.character")
+        await self.load_extension("cogs.travel")
         await self.load_extension("cogs.cultivation")
         await self.load_extension("cogs.sect")
         await self.load_extension("cogs.explore")

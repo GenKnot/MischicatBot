@@ -19,3 +19,21 @@ def calc_zhuji_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
 
 def can_skip_pill(player: dict) -> bool:
     return player.get("comprehension", 0) + player.get("fortune", 0) >= 20
+
+
+def calc_ningdan_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
+    base = SPIRIT_ROOT_BASE_RATE.get(player.get("spirit_root_type", "五灵根"), 30)
+    bonus = player.get("comprehension", 5) * 2 + player.get("bone", 5) * 2
+    rate = int(base * 0.8) + bonus
+    if use_pill:
+        rate += 35
+    return min(95, rate)
+
+
+def calc_huaying_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
+    base = SPIRIT_ROOT_BASE_RATE.get(player.get("spirit_root_type", "五灵根"), 30)
+    bonus = player.get("comprehension", 5) * 2 + player.get("soul", 5) * 2
+    rate = int(base * 0.6) + bonus
+    if use_pill:
+        rate += 30
+    return min(95, rate)

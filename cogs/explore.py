@@ -59,6 +59,26 @@ def _apply_rewards(discord_id: str, rewards: dict):
                     )
                     conn.commit()
             continue
+        if key == "equipment":
+            import random as _r
+            from utils.equipment import generate_equipment, get_player_tier
+            from utils.db import give_equipment
+            eq_spec = val
+            chance = eq_spec.get("chance", 1.0)
+            if _r.random() < chance:
+                with get_conn() as conn:
+                    p_row = conn.execute("SELECT realm FROM players WHERE discord_id = ?", (discord_id,)).fetchone()
+                tier = get_player_tier(p_row["realm"]) if p_row else 0
+                quality_pool = eq_spec.get("quality_pool")
+                quality_weights = eq_spec.get("quality_weights")
+                if quality_pool and quality_weights:
+                    quality = _r.choices(quality_pool, weights=quality_weights, k=1)[0]
+                else:
+                    quality = eq_spec.get("quality")
+                eq = generate_equipment(tier=tier, quality=quality)
+                give_equipment(discord_id, eq)
+                rewards["_generated_equipment"] = eq
+            continue
         col = stat_map.get(key)
         if col:
             fields.append(f"{col} = MAX(0, {col} + ?)")
@@ -150,6 +170,15 @@ class ExploreResultView(discord.ui.View):
         ok, msg = _check_explore_limit(player)
         if not ok:
             return await interaction.followup.send(f"{msg}", ephemeral=True)
+        now = time.time()
+        if player.get("active_quest"):
+            import json as _json
+            q_data = _json.loads(player["active_quest"])
+            return await interaction.followup.send(f"道友正在执行任务「**{q_data['title']}**」，无法探险。", ephemeral=True)
+        if player.get("cultivating_until") and now < player["cultivating_until"]:
+            return await interaction.followup.send("道友正在闭关，无法探险。", ephemeral=True)
+        if player.get("gathering_until") and now < player["gathering_until"]:
+            return await interaction.followup.send("道友正在采集中，无法探险。", ephemeral=True)
         _increment_explore(uid, player)
         player = _get_player(uid)
         event = get_event_pool(dict(player))
@@ -265,9 +294,13 @@ class ExploreChoiceButton(discord.ui.Button):
                 dict(player)
             )
             _apply_rewards(uid, result["rewards"])
+            desc = result["flavor"] or "平安无事。"
+            eq = result["rewards"].get("_generated_equipment")
+            if eq:
+                desc += f"\n\n🎁 获得装备：**{eq['name']}**（{eq['quality']}·{eq['slot']}）`{eq['equip_id']}`"
             embed = discord.Embed(
                 title=f"✦ {self.view.event['title']} · 结果 ✦",
-                description=result["flavor"] or "平安无事。",
+                description=desc,
                 color=discord.Color.teal(),
             )
             await interaction.followup.send(embed=embed, view=ExploreResultView(interaction.user, cog))
@@ -314,9 +347,13 @@ class ExploreNextButton(discord.ui.Button):
         result = _pick_choice_result(same_label, player)
 
         _apply_rewards(uid, result["rewards"])
+        desc = result["flavor"] or "平安无事。"
+        eq = result["rewards"].get("_generated_equipment")
+        if eq:
+            desc += f"\n\n🎁 获得装备：**{eq['name']}**（{eq['quality']}·{eq['slot']}）`{eq['equip_id']}`"
         embed = discord.Embed(
             title=f"✦ {self.view.original_event['title']} · 结果 ✦",
-            description=result["flavor"] or "平安无事。",
+            description=desc,
             color=discord.Color.teal(),
         )
         await interaction.followup.send(embed=embed, view=ExploreResultView(interaction.user, self.view.cog))
@@ -335,6 +372,20 @@ class ExploreCog(commands.Cog, name="Explore"):
             return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路，请先使用 `cat!创建角色`。")
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
+
+        now = time.time()
+        if player.get("cultivating_until") and now < player["cultivating_until"]:
+            from utils.character import seconds_to_years
+            remaining = seconds_to_years(player["cultivating_until"] - now)
+            return await ctx.send(f"{ctx.author.mention} 道友正在闭关，无法探险。还剩约 **{remaining:.1f} 年**。")
+        if player.get("gathering_until") and now < player["gathering_until"]:
+            from utils.character import seconds_to_years
+            remaining = seconds_to_years(player["gathering_until"] - now)
+            return await ctx.send(f"{ctx.author.mention} 道友正在采集中，无法探险。还剩约 **{remaining:.1f} 年**。")
+        if player.get("active_quest"):
+            import json
+            q_data = json.loads(player["active_quest"])
+            return await ctx.send(f"{ctx.author.mention} 道友正在执行任务「**{q_data['title']}**」，无法探险。")
 
         ok, msg = _check_explore_limit(player)
         if not ok:

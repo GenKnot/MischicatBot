@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Mischicat Admin{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav>
+  <span class="brand">🐱 Mischicat</span>
+  <a href="/" {% if request.url.path == "/" %}class="active"{% endif %}>总览</a>
+  <a href="/players" {% if request.url.path.startswith("/players") %}class="active"{% endif %}>修士</a>
+  <a href="/events" {% if request.url.path == "/events" %}class="active"{% endif %}>公共事件</a>
+  <a href="/dead" {% if request.url.path == "/dead" %}class="active"{% endif %}>已坐化</a>
+</nav>
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

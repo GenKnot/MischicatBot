@@ -11,6 +11,7 @@ class TravelRegionView(discord.ui.View):
         for region in ["东域", "南域", "西域", "北域", "中州"]:
             self.add_item(TravelRegionButton(region))
         self.add_item(TravelRegionButton("秘地", style=discord.ButtonStyle.danger))
+        self.add_item(_BackToMenuButton(row=1))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -58,6 +59,7 @@ class TravelCityView(discord.ui.View):
         self.cog = cog
         for c in cities:
             self.add_item(TravelCityButton(c["name"]))
+        self.add_item(_BackToMenuButton(row=1))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -73,9 +75,11 @@ class TravelCityButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        ctx = await self.view.cog.bot.get_context(interaction.message)
+        bot = self.view.cog.bot
+        travel_cog = bot.cogs.get("Travel") or self.view.cog
+        ctx = await bot.get_context(interaction.message)
         ctx.author = interaction.user
-        await self.view.cog.travel(ctx, city_name=self.city_name)
+        await travel_cog.travel(ctx, city_name=self.city_name)
 
 
 class TravelSecretView(discord.ui.View):
@@ -87,6 +91,7 @@ class TravelSecretView(discord.ui.View):
             req_idx = get_realm_index(r["min_realm"])
             disabled = player_realm_idx < req_idx
             self.add_item(TravelSecretButton(r["name"], r["type"], disabled))
+        self.add_item(_BackToMenuButton(row=1))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -107,17 +112,22 @@ class TravelSecretButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        ctx = await self.view.cog.bot.get_context(interaction.message)
+        bot = self.view.cog.bot
+        travel_cog = bot.cogs.get("Travel") or self.view.cog
+        ctx = await bot.get_context(interaction.message)
         ctx.author = interaction.user
-        await self.view.cog.travel(ctx, city_name=self.secret_name)
+        await travel_cog.travel(ctx, city_name=self.secret_name)
 
 
 class CityRegionView(discord.ui.View):
-    def __init__(self, author):
+    def __init__(self, author, cog=None):
         super().__init__(timeout=120)
         self.author = author
+        self.cog = cog
         for region in ["东域", "南域", "西域", "北域", "中州"]:
             self.add_item(CityRegionButton(region))
+        self.add_item(_BackToWorldButton(row=1))
+        self.add_item(_BackToMenuButton(row=1))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -137,3 +147,29 @@ class CityRegionButton(discord.ui.Button):
         for c in cities:
             embed.add_field(name=c["name"], value=c["desc"], inline=False)
         await interaction.response.send_message(embed=embed)
+
+
+class _BackToWorldButton(discord.ui.Button):
+    def __init__(self, row: int = 0):
+        super().__init__(label="返回世界", style=discord.ButtonStyle.secondary, row=row)
+
+    async def callback(self, interaction: discord.Interaction):
+        from utils.views.world import WorldMenuView, _world_overview_embed
+        await interaction.response.send_message(
+            embed=_world_overview_embed(),
+            view=WorldMenuView(interaction.user, self.view.cog)
+        )
+
+
+class _BackToMenuButton(discord.ui.Button):
+    def __init__(self, row: int = 0):
+        super().__init__(label="返回主菜单", style=discord.ButtonStyle.secondary, row=row)
+
+    async def callback(self, interaction: discord.Interaction):
+        from utils.views.world import _send_main_menu
+        cog = self.view.cog
+        if not cog:
+            await interaction.response.send_message("无法返回。", ephemeral=True)
+            return
+        await interaction.response.defer()
+        await _send_main_menu(interaction, cog)

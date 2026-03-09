@@ -338,7 +338,7 @@ class TavernCog(commands.Cog, name="Tavern"):
             )
 
         quests = get_tavern_quests(player)
-        if not quests:
+        if not quests or (len(quests) == 1 and "_locked" in quests):
             return await ctx.send(f"{ctx.author.mention} 当前没有适合你境界的任务。")
 
         embed = discord.Embed(
@@ -347,6 +347,9 @@ class TavernCog(commands.Cog, name="Tavern"):
             color=discord.Color.teal(),
         )
         for tier, quest_list in quests.items():
+            if tier == "_locked":
+                embed.add_field(name="🔒 未解锁", value="\n".join(quest_list), inline=False)
+                continue
             dur = GATHER_DURATION[tier]
             lines = []
             for q in quest_list:
@@ -405,6 +408,8 @@ class TavernView(discord.ui.View):
         self.author = author
         self.cog = cog
         for tier, quest_list in quests.items():
+            if tier == "_locked":
+                continue
             for q in quest_list:
                 self.add_item(QuestButton(q, tier))
 
@@ -495,6 +500,15 @@ class QuestConfirmView(discord.ui.View):
             return await interaction.followup.send("闭关中无法接取任务，请先结束闭关。", ephemeral=True)
         if player.get("active_quest"):
             return await interaction.followup.send("已有进行中的任务，请先完成。", ephemeral=True)
+        with get_conn() as conn:
+            defense_row = conn.execute(
+                "SELECT 1 FROM public_event_participants ep "
+                "JOIN public_events e ON ep.event_id = e.event_id "
+                "WHERE ep.discord_id = ? AND ep.activity = 'defense' AND e.status = 'active'",
+                (uid,)
+            ).fetchone()
+        if defense_row:
+            return await interaction.followup.send("守城期间无法接取任务，专心守城！", ephemeral=True)
 
         q = self.quest
         duration = GATHER_DURATION[self.tier] if q["type"] == "gather" else QUEST_DURATION[self.tier]

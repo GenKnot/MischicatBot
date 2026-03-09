@@ -6,6 +6,20 @@ PILLS = {
         "rarity": "稀有",
         "effect": {"breakthrough_bonus": 40},
     },
+    "凝丹丹": {
+        "name": "凝丹丹",
+        "desc": "筑基期圆满修士凝结金丹所用，服用后大幅提升结丹成功率。",
+        "type": "pill",
+        "rarity": "珍贵",
+        "effect": {"breakthrough_bonus": 35},
+    },
+    "化婴丹": {
+        "name": "化婴丹",
+        "desc": "结丹期后期修士化婴所用，服用后提升元婴突破成功率。",
+        "type": "pill",
+        "rarity": "绝世",
+        "effect": {"breakthrough_bonus": 30},
+    },
     "聚灵丹": {
         "name": "聚灵丹",
         "desc": "服用后修炼速度提升50%，持续效果在下次修炼时生效。",

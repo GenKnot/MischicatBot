@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}公共事件 · Mischicat{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>公共事件记录（{{ events | length }}）</h2>
+  {% if not events %}
+  <p class="empty">暂无事件记录</p>
+  {% endif %}
+</div>
+
+{% for e in events %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <span style="font-size:15px;font-weight:600">{{ e.title }}</span>
+    <span class="badge badge-purple">{{ e.event_type }}</span>
+    {% if e.status == "active" %}
+      <span class="badge badge-green">进行中</span>
+    {% elif e.status == "ended" %}
+      <span class="badge badge-gray">已结束</span>
+    {% else %}
+      <span class="badge badge-yellow">{{ e.status }}</span>
+    {% endif %}
+  </div>
+
+  <div style="display:flex;gap:24px;color:var(--muted);font-size:12px;margin-bottom:14px">
+    <span>开始：{{ ts(e.started_at) }}</span>
+    <span>结束：{{ ts(e.ends_at) }}</span>
+    {% if e.status == "active" %}
+    <span style="color:var(--warning)">剩余：{{ duration_left(e.ends_at) }}</span>
+    {% endif %}
+  </div>
+
+  {% if e.participants %}
+  <table>
+    <thead>
+      <tr><th>道号</th><th>Discord ID</th><th>活动</th><th>贡献</th></tr>
+    </thead>
+    <tbody>
+    {% for p in e.participants %}
+    <tr>
+      <td>
+        {% if p.name %}
+        <a href="/players/{{ p.discord_id }}">{{ p.name }}</a>
+        {% else %}{{ p.discord_id }}{% endif %}
+      </td>
+      <td style="color:var(--muted);font-size:12px">{{ p.discord_id }}</td>
+      <td>
+        {% if p.activity == "defense" %}
+          <span class="badge badge-teal">守城</span>
+        {% elif p.activity == "gather" %}
+          <span class="badge badge-yellow">采集</span>
+        {% else %}
+          <span class="badge badge-gray">{{ p.activity or "—" }}</span>
+        {% endif %}
+      </td>
+      <td>{{ p.contribution }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">无参与者</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

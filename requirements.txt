@@ -3,3 +3,7 @@ yt-dlp
 PyNaCl
 python-dotenv
 bgutil-ytdlp-pot-provider
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart

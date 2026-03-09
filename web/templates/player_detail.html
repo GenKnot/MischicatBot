@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}{{ player.name }} · Mischicat{% endblock %}
+{% block content %}
+<a href="/players" class="back-link">← 返回修士列表</a>
+
+<div class="card">
+  <h2>{{ player.name }}
+    <span class="badge badge-purple" style="margin-left:8px">{{ player.realm }}</span>
+    {% if player.is_dead %}<span class="badge badge-red" style="margin-left:4px">已坐化</span>{% endif %}
+    {% if player.sect %}<span class="badge badge-teal" style="margin-left:4px">{{ player.sect }} · {{ player.sect_rank }}</span>{% endif %}
+  </h2>
+
+  <div class="detail-grid">
+    <div class="detail-item">
+      <div class="key">性别</div>
+      <div class="val">{{ player.gender }}修</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">灵根</div>
+      <div class="val">{{ player.spirit_root_type }} · {{ player.spirit_root }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">修为</div>
+      <div class="val">{{ player.cultivation }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">寿元</div>
+      <div class="val">{{ player.lifespan }} / {{ player.lifespan_max }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">灵石</div>
+      <div class="val">{{ player.spirit_stones }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">声望</div>
+      <div class="val">{{ player.reputation }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">悟性</div>
+      <div class="val">{{ player.comprehension }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">体魄</div>
+      <div class="val">{{ player.physique }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">机缘</div>
+      <div class="val">{{ player.fortune }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">根骨</div>
+      <div class="val">{{ player.bone }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">神识</div>
+      <div class="val">{{ player.soul }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">所在城市</div>
+      <div class="val">{{ player.current_city }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">轮回次数</div>
+      <div class="val">{{ player.rebirth_count }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">Discord ID</div>
+      <div class="val" style="font-size:12px;color:var(--muted)">{{ player.discord_id }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">创建时间</div>
+      <div class="val" style="font-size:13px">{{ ts(player.created_at) }}</div>
+    </div>
+    <div class="detail-item">
+      <div class="key">最近活跃</div>
+      <div class="val" style="font-size:13px">{{ ts(player.last_active) }}</div>
+    </div>
+  </div>
+
+  {% set now_ts = now() %}
+  {% if player.cultivating_until and player.cultivating_until > now_ts %}
+  <div style="background:rgba(78,205,196,.08);border:1px solid rgba(78,205,196,.2);border-radius:8px;padding:12px;margin-bottom:12px">
+    🧘 闭关中，剩余 <strong>{{ duration_left(player.cultivating_until) }}</strong>
+  </div>
+  {% endif %}
+  {% if player.gathering_until and player.gathering_until > now_ts %}
+  <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px;margin-bottom:12px">
+    ⛏️ {{ player.gathering_type or "采集" }}中，剩余 <strong>{{ duration_left(player.gathering_until) }}</strong>
+  </div>
+  {% endif %}
+</div>
+
+{% if player.techniques %}
+<div class="section-title">功法</div>
+<div class="card">
+  <div class="tag-list">
+    {% for t in player.techniques %}
+    <span class="badge badge-purple">{{ t if t is string else t.name }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if quest %}
+<div class="section-title">当前任务</div>
+<div class="card">
+  <table>
+    <tr><td style="color:var(--muted);width:100px">任务名</td><td>{{ quest.name or "—" }}</td></tr>
+    <tr><td style="color:var(--muted)">到期时间</td><td>{{ ts(player.quest_due) }}</td></tr>
+    <tr><td style="color:var(--muted)">剩余时间</td><td>{{ duration_left(player.quest_due) or "—" }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+{% if inventory %}
+<div class="section-title">背包（{{ inventory | length }} 种）</div>
+<div class="card">
+  <table>
+    <thead><tr><th>物品</th><th>数量</th></tr></thead>
+    <tbody>
+    {% for item in inventory %}
+    <tr>
+      <td>{{ item.item_id }}</td>
+      <td>{{ item.quantity }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if equipment %}
+<div class="section-title">装备（{{ equipment | length }} 件）</div>
+<div class="card">
+  <table>
+    <thead><tr><th>名称</th><th>部位</th><th>品质</th><th>阶</th><th>属性</th><th>已装备</th></tr></thead>
+    <tbody>
+    {% for eq in equipment %}
+    <tr>
+      <td>{{ eq.name }}</td>
+      <td>{{ eq.slot }}</td>
+      <td><span class="badge badge-yellow">{{ eq.quality }}</span></td>
+      <td>{{ eq.tier }}</td>
+      <td style="font-size:12px;color:var(--muted)">
+        {% for k, v in eq.stats.items() %}{{ k }}+{{ v }} {% endfor %}
+      </td>
+      <td>{% if eq.equipped %}<span class="badge badge-green">✓</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if residences %}
+<div class="section-title">洞府</div>
+<div class="card">
+  <div class="tag-list">
+    {% for city in residences %}
+    <span class="badge badge-teal">{{ city }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
