@@ -364,7 +364,7 @@ class ExploreCog(commands.Cog, name="Explore"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="探险", description="在当前城市附近探险，触发机缘或风险事件")
+    @commands.hybrid_command(name="探险", aliases=["tx"], description="在当前城市附近探险，触发机缘或风险事件")
     async def explore(self, ctx):
         uid = str(ctx.author.id)
         player = _get_player(uid)

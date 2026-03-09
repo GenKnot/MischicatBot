@@ -15,7 +15,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (discord_id,)).fetchone()
             return dict(row) if row else None
 
-    @commands.hybrid_command(name="背包", description="查看当前角色的背包与装备")
+    @commands.hybrid_command(name="背包", aliases=["bb"], description="查看当前角色的背包与装备")
     async def backpack(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -31,7 +31,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         view = BackpackPageView(ctx.author, pages, cog)
         await ctx.send(ctx.author.mention, embed=pages[0], view=view)
 
-    @commands.hybrid_command(name="装备详情", description="查看已装备装备的详细属性与总加成")
+    @commands.hybrid_command(name="装备详情", aliases=["zbxq"], description="查看已装备装备的详细属性与总加成")
     async def equip_details(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -53,7 +53,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
 
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="装备", description="根据装备ID穿上指定装备")
+    @commands.hybrid_command(name="装备", aliases=["zb"], description="根据装备ID穿上指定装备")
     async def equip(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
@@ -66,7 +66,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         ok, msg = equip_item(uid, equip_id, tier)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
-    @commands.hybrid_command(name="卸下", description="根据装备ID卸下指定装备")
+    @commands.hybrid_command(name="卸下", aliases=["xx"], description="根据装备ID卸下指定装备")
     async def unequip(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
@@ -74,7 +74,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         ok, msg = unequip_item(uid, equip_id)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
-    @commands.hybrid_command(name="丢弃装备", description="根据装备ID永久丢弃一件装备")
+    @commands.hybrid_command(name="丢弃装备", aliases=["dqzb"], description="根据装备ID永久丢弃一件装备")
     async def discard(self, ctx, equip_id: str = None):
         uid = str(ctx.author.id)
         if not equip_id:
@@ -82,7 +82,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         ok, msg = discard_equipment(uid, equip_id)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
-    @commands.hybrid_command(name="使用", description="使用背包中的丹药或道具")
+    @commands.hybrid_command(name="使用", aliases=["sy"], description="使用背包中的丹药或道具")
     async def use_item(self, ctx, *, item_name: str = None):
         uid = str(ctx.author.id)
         if not item_name:
@@ -155,7 +155,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         await ctx.send(f"{ctx.author.mention} 「{item_name}」暂时无法直接使用。")
 
 
-    @commands.hybrid_command(name="出售", description="出售背包中的指定物品换取灵石")
+    @commands.hybrid_command(name="出售", aliases=["cs"], description="出售背包中的指定物品换取灵石")
     async def sell_item(self, ctx, *, args: str = None):
         uid = str(ctx.author.id)
         if not args:

@@ -485,11 +485,16 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             f"修为进度：{new_cultivation}/{needed}　寿元剩余：{new_lifespan} 年"
         )
 
-    @commands.hybrid_command(name="c", description="打开修仙系统主菜单")
+    @commands.hybrid_command(name="c", aliases=["h"], description="主菜单/创建角色：有角色则打开主菜单，无角色则进入创建流程")
     async def menu(self, ctx):
         import json
         uid = str(ctx.author.id)
         player = self._get_player(uid)
+        if not player or player.get("is_dead"):
+            char_cog = self.bot.cogs.get("Character")
+            if not char_cog:
+                return await ctx.send(f"{ctx.author.mention} 角色系统暂时不可用。")
+            return await char_cog.create_character(ctx)
         if player and not player["is_dead"]:
             updates, _ = self._settle_time(player)
             self._apply_updates(uid, updates)
@@ -511,7 +516,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             city_players = [dict(r) for r in rows]
         await ctx.send(embed=_build_menu_embed(has_dual), view=MainMenuView(ctx.author, has_player, can_bt, self, player, city_players))
 
-    @commands.hybrid_command(name="查看", description="查看当前角色的修为、寿元与状态")
+    @commands.hybrid_command(name="查看", aliases=["ck"], description="查看当前角色的修为、寿元与状态")
     async def view(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -569,7 +574,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         await ctx.send(ctx.author.mention, embed=embed,
                        view=ProfileView(ctx.author, can_bt, is_cultivating, self, player, city_players))
 
-    @commands.hybrid_command(name="修炼", description="消耗寿元进行闭关修炼，提升修为")
+    @commands.hybrid_command(name="修炼", aliases=["xl"], description="消耗寿元进行闭关修炼，提升修为")
     async def cultivate(self, ctx, years: int = 1):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -613,7 +618,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             f"修为进度：{player['cultivation']}/{needed}，出关后将获得约 +{gain}"
         )
 
-    @commands.hybrid_command(name="停止", description="提前结束当前的闭关修炼")
+    @commands.hybrid_command(name="停止", aliases=["tz"], description="提前结束当前的闭关修炼")
     async def stop_cultivate(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -651,7 +656,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             f"修为进度：{new_cultivation}/{needed}　寿元剩余：{new_lifespan} 年"
         )
 
-    @commands.hybrid_command(name="突破", description="尝试突破当前境界，成功可提升大境界与寿元")
+    @commands.hybrid_command(name="突破", aliases=["tp"], description="尝试突破当前境界，成功可提升大境界与寿元")
     async def breakthrough(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -693,7 +698,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         result = await self._do_breakthrough_chain(uid, player, now)
         await ctx.send(f"{ctx.author.mention} {result}")
 
-    @commands.hybrid_command(name="双修", description="与一名指定修士进行双修，共享修炼收益")
+    @commands.hybrid_command(name="双修", aliases=["sx"], description="与一名指定修士进行双修，共享修炼收益")
     async def dual_cultivate(self, ctx, target: discord.Member = None):
         import json
         uid = str(ctx.author.id)

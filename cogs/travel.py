@@ -12,7 +12,7 @@ class TravelCog(commands.Cog, name="Travel"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="移动", description="前往指定城市或秘地")
+    @commands.hybrid_command(name="移动", aliases=["yd"], description="前往指定城市或秘地")
     async def travel(self, ctx, *, city_name: str = None):
         uid = str(ctx.author.id)
         player = get_player(uid)
@@ -84,7 +84,7 @@ class TravelCog(commands.Cog, name="Travel"):
         embed.set_footer(text=f"{target['region']} · 原驻地：{player['current_city']}")
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="世界", description="查看天下城市与区域分布")
+    @commands.hybrid_command(name="世界", aliases=["sj"], description="查看天下城市与区域分布")
     async def world_map(self, ctx):
         from collections import defaultdict
         region_map = defaultdict(list)

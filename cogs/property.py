@@ -32,7 +32,7 @@ class PropertyCog(commands.Cog, name="Property"):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="买房", description="在当前城市购买一处居所")
+    @commands.hybrid_command(name="买房", aliases=["mf"], description="在当前城市购买一处居所")
     async def buy_residence(self, ctx):
         uid = str(ctx.author.id)
         player = _get_player(uid)
@@ -83,7 +83,7 @@ class PropertyCog(commands.Cog, name="Property"):
         embed.set_footer(text=f"花费 {price} 灵石")
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="开辟洞府", description="在秘地开辟洞府，获得全局修炼与探险加成")
+    @commands.hybrid_command(name="开辟洞府", aliases=["kpdf"], description="在秘地开辟洞府，获得全局修炼与探险加成")
     async def open_cave(self, ctx, *, region_name: str = None):
         uid = str(ctx.author.id)
         player = _get_player(uid)
@@ -140,7 +140,7 @@ class PropertyCog(commands.Cog, name="Property"):
         embed.set_footer(text=f"花费 {CAVE_PRICE} 灵石")
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="我的居所", description="查看自己在各城市的居所与洞府加成")
+    @commands.hybrid_command(name="我的居所", aliases=["wdjs"], description="查看自己在各城市的居所与洞府加成")
     async def my_properties(self, ctx):
         uid = str(ctx.author.id)
         player = _get_player(uid)

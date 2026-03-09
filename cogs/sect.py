@@ -38,7 +38,7 @@ class SectCog(commands.Cog, name="Sect"):
             ).fetchone()
             return dict(row) if row else None
 
-    @commands.hybrid_command(name="宗门列表", description="查看当前可见的正道与邪道宗门")
+    @commands.hybrid_command(name="宗门列表", aliases=["zmlb"], description="查看当前可见的正道与邪道宗门")
     async def sect_list(self, ctx):
         normal = {k: v for k, v in SECTS.items() if v["alignment"] != "隐世"}
         embed = discord.Embed(title="✦ 天下宗门 ✦", color=discord.Color.teal())
@@ -53,7 +53,7 @@ class SectCog(commands.Cog, name="Sect"):
         embed.set_footer(text="隐世宗门不在此列，需缘分方可得见。")
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="宗门详情", description="查看指定宗门的介绍与入门条件")
+    @commands.hybrid_command(name="宗门详情", aliases=["zmxq"], description="查看指定宗门的介绍与入门条件")
     async def sect_detail(self, ctx, *, name: str):
         sect = SECTS.get(name)
         if not sect:
@@ -95,7 +95,7 @@ class SectCog(commands.Cog, name="Sect"):
         embed.add_field(name="传承功法", value="\n".join(tech_lines), inline=False)
         await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="加入宗门", description="尝试加入指定宗门")
+    @commands.hybrid_command(name="加入宗门", aliases=["jrzm"], description="尝试加入指定宗门")
     async def join_sect(self, ctx, *, name: str):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -141,7 +141,7 @@ class SectCog(commands.Cog, name="Sect"):
             f"获得功法：{tech_str}"
         )
 
-    @commands.hybrid_command(name="退出宗门", description="离开当前所在宗门")
+    @commands.hybrid_command(name="退出宗门", aliases=["qtzm"], description="离开当前所在宗门")
     async def leave_sect(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -160,7 +160,7 @@ class SectCog(commands.Cog, name="Sect"):
 
         await ctx.send(f"{ctx.author.mention} 道友已离开 **{sect_name}**，功法仍在，但宗门资源不再可用。")
 
-    @commands.hybrid_command(name="门派功法", description="从宗门处查看或领取门派传承功法")
+    @commands.hybrid_command(name="门派功法", aliases=["mpgf"], description="从宗门处查看或领取门派传承功法")
     async def sect_techniques(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -204,7 +204,7 @@ class SectCog(commands.Cog, name="Sect"):
             embed.set_footer(text="已全部习得。")
             await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="我的功法", description="查看并管理自己已习得的功法")
+    @commands.hybrid_command(name="我的功法", aliases=["wdgf"], description="查看并管理自己已习得的功法")
     async def my_techniques(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -222,7 +222,7 @@ class SectCog(commands.Cog, name="Sect"):
         view = TechniquesView(ctx.author, cultivation_cog or self)
         await ctx.send(ctx.author.mention, embed=embed, view=view)
 
-    @commands.hybrid_command(name="装备功法", description="装备或卸下一门已习得的功法")
+    @commands.hybrid_command(name="装备功法", aliases=["zbgf"], description="装备或卸下一门已习得的功法")
     async def equip_technique(self, ctx, *, name: str):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -248,7 +248,7 @@ class SectCog(commands.Cog, name="Sect"):
         _save_techniques(uid, techniques)
         await ctx.send(f"{ctx.author.mention} 已装备功法「**{name}**」。")
 
-    @commands.hybrid_command(name="修炼功法", description="消耗时间提升指定功法的境界")
+    @commands.hybrid_command(name="修炼功法", aliases=["xlgf"], description="消耗时间提升指定功法的境界")
     async def train_technique(self, ctx, *, name: str):
         uid = str(ctx.author.id)
         player = self._get_player(uid)
@@ -317,7 +317,7 @@ class SectCog(commands.Cog, name="Sect"):
         )
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.hybrid_command(name="功法属性")
+    @commands.hybrid_command(name="功法属性", aliases=["gfsx"], description="查看功法带来的属性加成与修炼进度")
     async def technique_stats(self, ctx):
         uid = str(ctx.author.id)
         player = self._get_player(uid)

@@ -216,7 +216,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             await module.on_settle(self.bot, channel, event)
         self._preview_sent.clear()
 
-    @commands.hybrid_command(name="公共事件", description="查看当前或即将发生的世界公共事件")
+    @commands.hybrid_command(name="公共事件", aliases=["ggsj"], description="查看当前或即将发生的世界公共事件")
     async def show_active_event(self, ctx):
         active = _get_active_event()
         pending = _get_pending_event() if not active else None
@@ -255,7 +255,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
         view = PublicEventOverviewView(active, pending, self)
         await ctx.send(ctx.author.mention, embed=embed, view=view)
 
-    @commands.hybrid_command(name="预备灵雨", description="手动预备一场天降灵雨事件（管理员）")
+    @commands.hybrid_command(name="预备灵雨", aliases=["ybly"], description="手动预备一场天降灵雨事件（管理员）")
     @commands.has_permissions(administrator=True)
     async def prepare_spirit_rain(self, ctx, city: str = None):
         from utils.world import CITIES

@@ -317,7 +317,7 @@ class TavernCog(commands.Cog, name="Tavern"):
         self._quest_notifier.cancel()
 
 
-    @commands.hybrid_command(name="茶馆", description="前往茶馆接取任务或采集委托")
+    @commands.hybrid_command(name="茶馆", aliases=["cg"], description="前往茶馆接取任务或采集委托")
     async def tavern(self, ctx):
         uid = str(ctx.author.id)
         player = _get_player(uid)
@@ -366,7 +366,7 @@ class TavernCog(commands.Cog, name="Tavern"):
         embed.set_footer(text="战斗任务耗时1年 · 采集任务耗时2年 · 任务期间无法闭关")
         await ctx.send(embed=embed, view=TavernView(ctx.author, quests, self))
 
-    @commands.hybrid_command(name="交任务", description="在茶馆结算当前进行中的任务")
+    @commands.hybrid_command(name="交任务", aliases=["jrw"], description="在茶馆结算当前进行中的任务")
     async def submit_quest(self, ctx):
         uid = str(ctx.author.id)
         player = _get_player(uid)

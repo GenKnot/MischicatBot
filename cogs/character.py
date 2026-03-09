@@ -30,7 +30,7 @@ class CharacterCog(commands.Cog, name="Character"):
             "soul":          max(0, int((player.get("soul", 5) - 5) * 0.3 * mult)),
         }
 
-    @commands.hybrid_command(name="创建角色", description="创建新的修仙角色，开辟修行之路")
+    @commands.hybrid_command(name="创建角色", aliases=["cjjs"], description="创建新的修仙角色，开辟修行之路")
     async def create_character(self, ctx):
         uid = str(ctx.author.id)
         existing = get_player(uid)
@@ -151,7 +151,7 @@ class CharacterCog(commands.Cog, name="Character"):
         finally:
             self._creating.discard(uid)
 
-    @commands.hybrid_command(name="解散队伍", description="解散当前所在队伍")
+    @commands.hybrid_command(name="解散队伍", aliases=["jsdw"], description="解散当前所在队伍")
     async def disband_party(self, ctx):
         from utils.views.party import disband_party
         msg = await disband_party(str(ctx.author.id), self.bot)
