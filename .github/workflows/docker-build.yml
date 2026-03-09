@@ -47,3 +47,27 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ steps.get_tag.outputs.tag }}
           file: Dockerfile
+
+
+      - name: Update image tags in GitOps repo
+        if: github.event_name == 'push'
+        run: |
+          # Clone the GitOps repository
+          git clone https://x-access-token:${{ secrets.GITOPS_PAT }}@github.com/yulexun/flux.git gitops
+          cd gitops
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Install yq for YAML manipulation
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+          # Update the Mischicat-Bot image tag in the correct deployment file
+          yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE }}:${{ steps.get_tag.outputs.tag }}\"" -i clusters/home/mischicat/deployment.yaml
+
+          # Commit and push changes
+          git add clusters/home/mischicat/deployment.yaml
+          git commit -m "Update Mischicat-Bot image tag to ${{ steps.get_tag.outputs.tag }}" || exit 0
+          git push

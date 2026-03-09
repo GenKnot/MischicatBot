@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mischicat-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mischicat-bot
+  template:
+    metadata:
+      labels:
+        app: mischicat-bot
+    spec:
+      containers:
+        - name: mischicat-bot
+          image: mischicat-bot:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: mischicat-bot-config
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /app/sqlite-data
+      volumes:
+        - name: sqlite-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mischicat-bot
+spec:
+  selector:
+    app: mischicat-bot
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+            - --token
+            - $(CLOUDFLARED_TOKEN)
+          env:
+            - name: CLOUDFLARED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflared-secret
+                  key: token
