@@ -28,8 +28,10 @@ def _item_display(lot: dict) -> str:
 STAT_CN = {
     "comprehension": "悟性", "physique": "体魄", "bone": "根骨",
     "soul": "神识", "fortune": "气运", "cultivation_speed": "修炼速度",
-    "lifespan_bonus": "寿元上限", "lifespan_restore": "寿元回复",
-    "breakthrough_bonus": "突破加成",
+    "cultivation_speed_bonus": "修炼速度", "lifespan_bonus": "寿元上限",
+    "lifespan_restore": "寿元回复", "lifespan_extend": "延寿",
+    "lifespan": "寿元回复", "breakthrough_bonus": "突破加成",
+    "escape_rate": "逃跑成功率",
 }
 
 SLOT_CN = {
@@ -213,6 +215,70 @@ class WanbaoMainView(discord.ui.View):
         await _send_main_menu(interaction, cog)
 
 
+class PublicBidView(discord.ui.View):
+    def __init__(self, auction_id: str, lot_index: int, total: int):
+        super().__init__(timeout=LOT_DURATION + 10)
+        self.auction_id = auction_id
+        self.lot_index = lot_index
+        self.total = total
+
+    async def _do_bid(self, interaction: discord.Interaction, increment: int):
+        uid = str(interaction.user.id)
+        player = _get_player(uid)
+        if not player:
+            return await interaction.response.send_message("尚未创建角色。", ephemeral=True)
+        if player["current_city"] != WANBAO_CITY:
+            return await interaction.response.send_message("需在万宝楼城内方可参与竞拍。", ephemeral=True)
+
+        with get_conn() as conn:
+            lot_row = conn.execute(
+                "SELECT * FROM wanbao_lots WHERE auction_id = ? AND lot_index = ? AND status = 'active'",
+                (self.auction_id, self.lot_index)
+            ).fetchone()
+        if not lot_row:
+            return await interaction.response.send_message("此拍品已结束。", ephemeral=True)
+
+        lot = dict(lot_row)
+        current = lot["current_bid"] if lot["current_bid"] > 0 else lot["start_price"]
+        new_bid = current + increment
+
+        ok, msg = place_bid(self.auction_id, uid, new_bid)
+        if not ok:
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        with get_conn() as conn:
+            auction = conn.execute("SELECT * FROM wanbao_auctions WHERE auction_id = ?", (self.auction_id,)).fetchone()
+            lot_row = conn.execute(
+                "SELECT * FROM wanbao_lots WHERE auction_id = ? AND lot_index = ?",
+                (self.auction_id, self.lot_index)
+            ).fetchone()
+        lot = dict(lot_row)
+        embed = build_lot_embed(lot, auction["ends_at"], self.lot_index, self.total)
+        name = player["name"] if player else str(interaction.user)
+        embed.add_field(name="最新出价", value=f"**{name}** 出价 **{new_bid} 灵石**", inline=False)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="+10", style=discord.ButtonStyle.secondary)
+    async def bid_10(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._do_bid(interaction, 10)
+
+    @discord.ui.button(label="+100", style=discord.ButtonStyle.secondary)
+    async def bid_100(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._do_bid(interaction, 100)
+
+    @discord.ui.button(label="+200", style=discord.ButtonStyle.secondary)
+    async def bid_200(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._do_bid(interaction, 200)
+
+    @discord.ui.button(label="+500", style=discord.ButtonStyle.primary)
+    async def bid_500(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._do_bid(interaction, 500)
+
+    @discord.ui.button(label="+1000", style=discord.ButtonStyle.primary)
+    async def bid_1000(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._do_bid(interaction, 1000)
+
+
 class BidView(discord.ui.View):
     def __init__(self, author, auction_id: str, lot: dict, ends_at: float, lot_index: int, total: int, pe_cog=None):
         super().__init__(timeout=LOT_DURATION + 10)
@@ -255,18 +321,6 @@ class BidView(discord.ui.View):
         lot = dict(lot_row)
         embed = build_lot_embed(lot, auction["ends_at"], self.lot_index, self.total)
         await interaction.response.edit_message(embed=embed, view=self)
-
-        channel = interaction.channel
-        if channel:
-            player = _get_player(uid)
-            name = player["name"] if player else str(interaction.user)
-            import os
-            announce_id = os.getenv("PUBLIC_EVENT_CHANNEL_ID")
-            if announce_id:
-                announce_ch = interaction.client.get_channel(int(announce_id))
-                if announce_ch:
-                    channel = announce_ch
-            await channel.send(f"**{name}** 出价 **{new_bid} 灵石**！")
 
     @discord.ui.button(label="+10", style=discord.ButtonStyle.secondary)
     async def bid_10(self, interaction: discord.Interaction, button: discord.ui.Button):

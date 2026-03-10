@@ -47,6 +47,7 @@ STAT_NAMES = {
     "soul": "神识",
     "comprehension": "悟性",
     "fortune": "机缘",
+    "escape_rate": "逃跑成功率",
 }
 
 EQUIP_TEMPLATES = {

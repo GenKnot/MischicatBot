@@ -28,6 +28,7 @@ BASE_OPTIONS = {
             "player-client": ["default", "mweb"],
         },
     },
+    "js_runtimes": {"node": {}},
 }
 
 _BROWSER_PATHS = {

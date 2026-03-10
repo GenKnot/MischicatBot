@@ -427,6 +427,14 @@ def start_auction(auction_id: str) -> dict | None:
     return dict(first_lot)
 
 
+def get_last_ended_auction() -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM wanbao_auctions WHERE status = 'ended' ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def is_in_wanbao(discord_id: str) -> bool:
     with get_conn() as conn:
         row = conn.execute(
