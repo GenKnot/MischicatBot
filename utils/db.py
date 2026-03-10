@@ -37,6 +37,12 @@ def _migrate(conn):
         ("gathering_until",      "REAL"),
         ("gathering_type",       "TEXT"),
         ("pill_buff_until",      "REAL"),
+        ("alchemy_level",        "INTEGER NOT NULL DEFAULT 0"),
+        ("alchemy_exp",          "INTEGER NOT NULL DEFAULT 0"),
+        ("alchemy_daily_count",  "INTEGER NOT NULL DEFAULT 0"),
+        ("alchemy_daily_reset",  "REAL NOT NULL DEFAULT 0"),
+        ("active_buffs",         "TEXT NOT NULL DEFAULT '{}'"),
+        ("gathering_bonus",      "REAL NOT NULL DEFAULT 0"),
     ]
     for col, definition in migrations:
         if col not in existing:
@@ -160,6 +166,21 @@ def _migrate(conn):
     existing_wl = {row[1] for row in conn.execute("PRAGMA table_info(wanbao_lots)")}
     if "eq_data" not in existing_wl:
         conn.execute("ALTER TABLE wanbao_lots ADD COLUMN eq_data TEXT")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alchemy_mastery (
+            discord_id  TEXT NOT NULL,
+            pill_name   TEXT NOT NULL,
+            count       INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (discord_id, pill_name)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS known_recipes (
+            discord_id  TEXT NOT NULL,
+            recipe_id   TEXT NOT NULL,
+            PRIMARY KEY (discord_id, recipe_id)
+        )
+    """)
     conn.commit()
 
 

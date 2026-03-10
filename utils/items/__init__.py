@@ -9,5 +9,10 @@ from utils.items.breakthrough import (
     calc_zhuji_breakthrough_rate,
     can_skip_pill,
 )
+from utils.alchemy import PILLS as ALCHEMY_PILLS
 
-ITEMS = {**PILLS, **MATERIALS, **TOOLS, **WOOD, **FISH, **HERBS}
+_PILLS_MERGED = {**PILLS}
+for _k, _v in ALCHEMY_PILLS.items():
+    _PILLS_MERGED[_k] = {**_v, "type": "pill"}
+
+ITEMS = {**_PILLS_MERGED, **MATERIALS, **TOOLS, **WOOD, **FISH, **HERBS}

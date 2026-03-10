@@ -64,10 +64,13 @@ def _ore_pool(region_name: str | None, gather_type: str = "采矿") -> list[dict
     return pool if pool else list(MATERIALS.values())
 
 
-def roll_gathering_rewards(years: float, realm_idx: int, region_name: str, gather_type: str = "采矿") -> list[tuple[str, int]]:
+def roll_gathering_rewards(years: float, realm_idx: int, region_name: str, gather_type: str = "采矿", gather_bonus: float = 0.0) -> list[tuple[str, int]]:
     base_count = max(1, int(years * 2))
     realm_extra = realm_idx // 5
     total_rolls = base_count + realm_extra + random.randint(0, max(1, int(years)))
+
+    if gather_bonus > 0:
+        total_rolls = int(total_rolls * (1 + gather_bonus))
 
     pool = _ore_pool(region_name, gather_type)
     if not pool:
@@ -146,24 +149,49 @@ class GatherButton(discord.ui.Button):
             view.stop()
             return
 
-        gathering_until = now + years_to_seconds(self.years)
-        lifespan_cost = max(1, int(self.years)) if self.years >= 1 else 0
+        from utils.buffs import get_gather_bonus, get_buff_value, consume_once_buff, buffs_to_json
+        gather_bonus = get_gather_bonus(player)
+        cooldown_reduction = get_buff_value(player, "gather_cooldown_reduction", 0) / 100.0
+
+        actual_years = self.years * (1 - cooldown_reduction)
+        actual_years = max(0.25, actual_years)
+
+        gathering_until = now + years_to_seconds(actual_years)
+        lifespan_cost = max(1, int(actual_years)) if actual_years >= 1 else 0
         new_lifespan = player["lifespan"] - lifespan_cost
 
+        active_buffs_raw = player.get("active_buffs") or "{}"
+        buffs_changed = False
+        if gather_bonus > 0:
+            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_bonus_once")
+            buffs_changed = True
+        if cooldown_reduction > 0:
+            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_cooldown_reduction")
+            buffs_changed = True
+
         with get_conn() as conn:
-            conn.execute(
-                "UPDATE players SET gathering_until = ?, gathering_type = ?, lifespan = ?, last_active = ? WHERE discord_id = ?",
-                (gathering_until, view.gather_type, new_lifespan, now, uid)
-            )
+            if buffs_changed:
+                conn.execute(
+                    "UPDATE players SET gathering_until = ?, gathering_type = ?, lifespan = ?, last_active = ?, active_buffs = ?, gathering_bonus = ? WHERE discord_id = ?",
+                    (gathering_until, view.gather_type, new_lifespan, now, active_buffs_raw, gather_bonus, uid)
+                )
+            else:
+                conn.execute(
+                    "UPDATE players SET gathering_until = ?, gathering_type = ?, lifespan = ?, last_active = ?, gathering_bonus = ? WHERE discord_id = ?",
+                    (gathering_until, view.gather_type, new_lifespan, now, gather_bonus, uid)
+                )
             conn.commit()
 
-        real_time = self.years * 2
+        real_time = actual_years * 2
         unit = "小时" if real_time >= 1 else "分钟"
         real_display = f"{real_time:.0f}" if real_time >= 1 else f"{real_time * 60:.0f}"
 
+        bonus_note = f"（采集量 +{int(gather_bonus * 100)}%）" if gather_bonus > 0 else ""
+        reduction_note = f"（时间缩短 {int(cooldown_reduction * 100)}%）" if cooldown_reduction > 0 else ""
+
         await interaction.followup.send(
             f"{interaction.user.mention} **{player['name']}** 开始在 **{view.region_name}** {view.gather_type}，"
-            f"预计 **{real_display} {unit}**后完成。\n"
+            f"预计 **{real_display} {unit}**后完成。{bonus_note}{reduction_note}\n"
             f"采集结束后将收到通知。"
         )
         view.stop()

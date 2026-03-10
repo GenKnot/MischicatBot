@@ -128,6 +128,39 @@ def _increment_explore(discord_id: str, player):
         conn.commit()
 
 
+def _consume_explore_buffs(discord_id: str, player: dict, rewards: dict):
+    from utils.buffs import consume_once_buff, get_spirit_stones_bonus
+    raw = player.get("active_buffs") or "{}"
+    changed = False
+
+    from utils.buffs import get_explore_rare_bonus
+    if get_explore_rare_bonus(player) > 0:
+        consumed, raw = consume_once_buff(raw, "explore_rare_bonus_once")
+        if consumed:
+            changed = True
+
+    stones_bonus = get_spirit_stones_bonus(player)
+    if stones_bonus > 0 and rewards.get("spirit_stones", 0) > 0:
+        extra = int(rewards["spirit_stones"] * stones_bonus)
+        if extra > 0:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE players SET spirit_stones = spirit_stones + ? WHERE discord_id = ?",
+                    (extra, discord_id)
+                )
+                conn.commit()
+        _, raw = consume_once_buff(raw, "spirit_stones_bonus_once")
+        changed = True
+
+    if changed:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE players SET active_buffs = ? WHERE discord_id = ?",
+                (raw, discord_id)
+            )
+            conn.commit()
+
+
 def _check_condition(player, condition) -> bool:
     if not condition:
         return True
@@ -298,6 +331,7 @@ class ExploreChoiceButton(discord.ui.Button):
                 dict(player)
             )
             _apply_rewards(uid, result["rewards"])
+            _consume_explore_buffs(uid, dict(player), result["rewards"])
             desc = result["flavor"] or "平安无事。"
             eq = result["rewards"].get("_generated_equipment")
             if eq:
@@ -351,6 +385,7 @@ class ExploreNextButton(discord.ui.Button):
         result = _pick_choice_result(same_label, player)
 
         _apply_rewards(uid, result["rewards"])
+        _consume_explore_buffs(uid, player, result["rewards"])
         desc = result["flavor"] or "平安无事。"
         eq = result["rewards"].get("_generated_equipment")
         if eq:

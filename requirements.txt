@@ -9,3 +9,5 @@ uvicorn[standard]
 jinja2
 python-multipart
 davey
+sqlalchemy[asyncio]
+aiosqlite

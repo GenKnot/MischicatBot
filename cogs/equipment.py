@@ -87,74 +87,217 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         uid = str(ctx.author.id)
         if not item_name:
             return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}使用 [道具名]`")
-        player = self._get_player(uid)
-        if not player or player["is_dead"]:
-            return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路。")
 
-        from utils.db import has_item, remove_item
         from utils.items import ITEMS
+        from utils.db_async import AsyncSessionLocal, Player, Inventory
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
         import time
 
-        item_info = ITEMS.get(item_name)
+        item_name_clean = item_name.strip()
+        item_info = ITEMS.get(item_name_clean)
         if not item_info:
-            return await ctx.send(f"{ctx.author.mention} 未知道具「{item_name}」。")
-        if not has_item(uid, item_name):
-            return await ctx.send(f"{ctx.author.mention} 背包中没有「{item_name}」。")
+            from utils.alchemy import QUALITY_NAMES
+            for q in QUALITY_NAMES[1:]:
+                if item_name_clean.startswith(q):
+                    base_name = item_name_clean[len(q):]
+                    item_info = ITEMS.get(base_name)
+                    if item_info:
+                        item_info = dict(item_info)
+                        break
+        if not item_info:
+            return await ctx.send(f"{ctx.author.mention} 未知道具「{item_name_clean}」。")
 
-        effect = item_info.get("effect", {})
+        async with AsyncSessionLocal() as session:
+            player = await session.get(Player, uid)
+            if not player or player.is_dead:
+                return await ctx.send(f"{ctx.author.mention} 尚未踏入修仙之路。")
+            inv = await session.get(Inventory, (uid, item_name_clean))
+            if not inv or inv.quantity < 1:
+                return await ctx.send(f"{ctx.author.mention} 背包中没有「{item_name_clean}」。")
 
-        if "lifespan" in effect:
-            gain = effect["lifespan"]
-            from utils.character import get_effective_lifespan_max
-            eff_max = get_effective_lifespan_max(player)
-            if player["lifespan"] >= eff_max:
-                return await ctx.send(
-                    f"{ctx.author.mention} 当前寿元 **{player['lifespan']}年** 已达上限（{eff_max}年），"
-                    f"「{item_name}」无法生效。"
+            effect = item_info.get("effect", {})
+            stackable = item_info.get("stackable", True)
+            now = time.time()
+            msg_parts = []
+
+            if "cultivation_gain" in effect:
+                gain = effect["cultivation_gain"]
+                player.cultivation += gain
+                msg_parts.append(f"修为 **+{gain}**")
+
+            if "lifespan" in effect:
+                gain = effect["lifespan"]
+                from utils.character import get_effective_lifespan_max
+                p_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}
+                eff_max = get_effective_lifespan_max(p_dict)
+                if player.lifespan >= eff_max:
+                    return await ctx.send(f"{ctx.author.mention} 当前寿元已达上限（{eff_max}年），「{item_name_clean}」无法生效。")
+                actual = min(gain, eff_max - player.lifespan)
+                player.lifespan = min(player.lifespan + gain, eff_max)
+                msg_parts.append(f"寿元恢复 **+{actual}年**（当前 {player.lifespan}/{eff_max}年）")
+
+            if "lifespan_extend" in effect:
+                gain = effect["lifespan_extend"]
+                player.lifespan += gain
+                from utils.character import get_effective_lifespan_max
+                p_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}
+                eff_max = get_effective_lifespan_max(p_dict)
+                over = f"（超出基础上限 {player.lifespan - player.lifespan_max}年）" if player.lifespan > player.lifespan_max else ""
+                msg_parts.append(f"寿元 **+{gain}年**（当前 {player.lifespan}/{eff_max}年）{over}")
+
+            if "cultivation_speed_bonus" in effect:
+                bonus_pct = effect["cultivation_speed_bonus"]
+                buff_years = 2
+                buff_until = now + buff_years * 2 * 3600
+                from utils.buffs import apply_buff
+                new_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "cultivation_speed_bonus",
+                    bonus_pct,
+                    expires_at=buff_until,
                 )
-            new_lifespan = min(player["lifespan"] + gain, eff_max)
-            actual = new_lifespan - player["lifespan"]
-            with get_conn() as conn:
-                conn.execute("UPDATE players SET lifespan = ? WHERE discord_id = ?", (new_lifespan, uid))
-                conn.commit()
-            remove_item(uid, item_name)
-            return await ctx.send(f"{ctx.author.mention} 服用「{item_name}」，寿元恢复 **+{actual}年**（当前 {new_lifespan}/{eff_max} 年）。")
+                player.active_buffs = new_buffs
+                player.pill_buff_until = buff_until
+                msg_parts.append(f"修炼速度 **+{bonus_pct}%**，持续 2 游戏年（现实 4 小时）")
 
-        if "lifespan_extend" in effect:
-            gain = effect["lifespan_extend"]
-            new_lifespan = player["lifespan"] + gain
-            from utils.character import get_effective_lifespan_max
-            eff_max = get_effective_lifespan_max(player)
-            with get_conn() as conn:
-                conn.execute("UPDATE players SET lifespan = ? WHERE discord_id = ?", (new_lifespan, uid))
-                conn.commit()
-            remove_item(uid, item_name)
-            over = f"（超出基础上限 {new_lifespan - player['lifespan_max']} 年）" if new_lifespan > player["lifespan_max"] else ""
-            return await ctx.send(f"{ctx.author.mention} 服用「{item_name}」，寿元 **+{gain}年**（当前 {new_lifespan}/{eff_max} 年）{over}")
-
-        if "cultivation_speed_bonus" in effect:
-            import time as _t
-            buff_years = 2
-            buff_until = _t.time() + buff_years * 2 * 3600
-            with get_conn() as conn:
-                conn.execute(
-                    "UPDATE players SET pill_buff_until = ? WHERE discord_id = ?",
-                    (buff_until, uid)
+            if "breakthrough_bonus" in effect:
+                bonus = effect["breakthrough_bonus"]
+                msg_parts.append(
+                    f"下次突破成功率 **+{bonus}%**\n（提示：请立即使用 `{COMMAND_PREFIX}突破` 以享受加成）"
                 )
-                conn.commit()
-            remove_item(uid, item_name)
-            return await ctx.send(
-                f"{ctx.author.mention} 服用「{item_name}」，修炼速度提升 **+{effect['cultivation_speed_bonus']}%**，持续 **2 游戏年**（现实 4 小时）。"
-            )
 
-        if "breakthrough_bonus" in effect:
-            remove_item(uid, item_name)
-            return await ctx.send(
-                f"{ctx.author.mention} 服用「{item_name}」，下次突破成功率 **+{effect['breakthrough_bonus']}%**。\n"
-                f"（提示：请立即使用 `{COMMAND_PREFIX}突破` 以享受加成）"
-            )
+            if "stat_permanent" in effect:
+                stat_map = effect["stat_permanent"]
+                stat_max = effect.get("stat_max", 99)
+                gained = []
+                for stat, val in stat_map.items():
+                    cur = getattr(player, stat, 0)
+                    if cur >= stat_max:
+                        return await ctx.send(f"{ctx.author.mention} 「{stat}」已达上限（{stat_max}），「{item_name_clean}」无法生效。")
+                    new_val = min(cur + val, stat_max)
+                    setattr(player, stat, new_val)
+                    gained.append(f"{stat} **+{new_val - cur}**（当前 {new_val}）")
+                msg_parts.extend(gained)
 
-        await ctx.send(f"{ctx.author.mention} 「{item_name}」暂时无法直接使用。")
+            if "stat_temp" in effect:
+                stat_map = effect["stat_temp"]
+                hours = effect.get("buff_duration_hours", 24)
+                from utils.buffs import apply_buff
+                import time as _t
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "stat_temp",
+                    stat_map,
+                    expires_at=now + hours * 3600,
+                )
+                gained = [f"{s} **+{v}**" for s, v in stat_map.items()]
+                msg_parts.append(f"临时属性加成：{'、'.join(gained)}，持续 {hours} 小时")
+
+            if "combat_power_bonus" in effect:
+                bonus = effect["combat_power_bonus"]
+                charges = effect.get("combat_buff_charges", 1)
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "combat_power_bonus",
+                    bonus,
+                    charges=charges,
+                )
+                msg_parts.append(f"战力 **+{bonus}%**，持续 {charges} 次战斗")
+
+            if "escape_bonus_once" in effect:
+                bonus = effect["escape_bonus_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "escape_bonus_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次逃跑成功率 **+{bonus}%**")
+
+            if "explore_rare_bonus_once" in effect:
+                bonus = effect["explore_rare_bonus_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "explore_rare_bonus_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次探险稀有事件概率 **+{bonus}%**")
+
+            if "gather_bonus_once" in effect:
+                bonus = effect["gather_bonus_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "gather_bonus_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次采集获得量 **+{bonus}%**")
+
+            if "gather_cooldown_reduction" in effect:
+                bonus = effect["gather_cooldown_reduction"]
+                hours = effect.get("buff_duration_hours", 24)
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "gather_cooldown_reduction",
+                    bonus,
+                    expires_at=now + hours * 3600,
+                )
+                msg_parts.append(f"采集冷却缩短 **{bonus}%**，持续 {hours} 小时")
+
+            if "combat_lifespan_restore" in effect:
+                restore = effect["combat_lifespan_restore"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "combat_lifespan_restore",
+                    restore,
+                )
+                msg_parts.append(f"战斗中寿元低于20%时自动恢复 **{restore}年**")
+
+            if "spirit_stones_bonus_once" in effect:
+                bonus = effect["spirit_stones_bonus_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "spirit_stones_bonus_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次探险/任务灵石获得量 **+{bonus}%**")
+
+            if "reputation_bonus_once" in effect:
+                bonus = effect["reputation_bonus_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "reputation_bonus_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次任务声望获得量 **+{bonus}%**")
+
+            if "explore_count_restore" in effect:
+                count = effect["explore_count_restore"]
+                player.explore_count = max(0, player.explore_count - count)
+                msg_parts.append(f"恢复 **{count}** 次探险次数")
+
+            if "dual_cooldown_reduction_hours" in effect:
+                hours = effect["dual_cooldown_reduction_hours"]
+                if player.last_dual_cultivate:
+                    player.last_dual_cultivate = max(0, player.last_dual_cultivate - hours * 3600)
+                msg_parts.append(f"双修冷却缩短 **{hours}** 小时")
+
+            if not msg_parts:
+                return await ctx.send(f"{ctx.author.mention} 「{item_name_clean}」暂时无法直接使用。")
+
+            if inv.quantity <= 1:
+                await session.delete(inv)
+            else:
+                inv.quantity -= 1
+            await session.commit()
+
+        await ctx.send(f"{ctx.author.mention} 服用「{item_name_clean}」：\n" + "\n".join(f"• {p}" for p in msg_parts))
 
 
     @commands.hybrid_command(name="出售", aliases=["cs"], description="出售背包中的指定物品换取灵石")

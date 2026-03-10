@@ -33,9 +33,10 @@ def settle_time(player: dict):
     if not cultivating and elapsed_years >= AUTO_CULTIVATE_THRESHOLD_YEARS:
         bonus = get_cultivation_bonus(player["discord_id"], player["current_city"], player.get("cave"))
         gain = calc_cultivation_gain(int(elapsed_years), player["comprehension"], player["spirit_root_type"])
-        pill_active = player.get("pill_buff_until") and now < player["pill_buff_until"]
-        if pill_active:
-            bonus += 0.5
+        from utils.buffs import get_cultivation_speed_bonus
+        speed_bonus = get_cultivation_speed_bonus(player)
+        if speed_bonus > 0:
+            bonus += speed_bonus
         gain = int(gain * (1 + bonus))
         updates["cultivation"] = player["cultivation"] + gain
     return updates, elapsed_years

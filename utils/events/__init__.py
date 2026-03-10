@@ -51,11 +51,13 @@ _recent_events: dict[str, list] = {}
 _RECENT_LIMIT = 8
 
 
-def get_event_pool(player: dict) -> list:
+def get_event_pool(player: dict) -> dict:
     import random
+    from utils.buffs import get_explore_rare_bonus
     uid = player.get("discord_id", "")
 
-    if random.random() < RARE_CHANCE:
+    rare_bonus = get_explore_rare_bonus(player)
+    if random.random() < RARE_CHANCE + rare_bonus:
         return random.choice(RARE_EVENTS)
 
     events = []

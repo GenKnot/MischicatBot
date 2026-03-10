@@ -1,0 +1,5082 @@
+[
+  {
+    "recipe_id": "juling_1",
+    "pill": "聚灵丹",
+    "pill_tier": 1,
+    "name": "聚灵丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "最简单的聚灵丹丹方，材料易得，品质上限低"
+  },
+  {
+    "recipe_id": "juling_2",
+    "pill": "聚灵丹",
+    "pill_tier": 1,
+    "name": "聚灵丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 75,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "标准聚灵丹丹方，品质上限七纹"
+  },
+  {
+    "recipe_id": "juling_3",
+    "pill": "聚灵丹",
+    "pill_tier": 1,
+    "name": "聚灵丹·秘传丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 55,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传丹方，可炼出无暇聚灵丹，需二品炼丹师"
+  },
+  {
+    "recipe_id": "xiaoyanshou_1",
+    "pill": "小延寿丹",
+    "pill_tier": 1,
+    "name": "小延寿丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 80,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "九节菖蒲",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "何首乌藤",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "入门延寿丹，材料易得"
+  },
+  {
+    "recipe_id": "xiaoyanshou_2",
+    "pill": "小延寿丹",
+    "pill_tier": 1,
+    "name": "小延寿丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 70,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "九节菖蒲",
+        "qty": 2
+      },
+      {
+        "item": "何首乌藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "石斛灵茎",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "标准小延寿丹方"
+  },
+  {
+    "recipe_id": "yanshou_1",
+    "pill": "延寿丹",
+    "pill_tier": 2,
+    "name": "延寿丹·粗陋丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 75,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "石斛灵茎",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "何首乌藤",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "二阶延寿丹，粗陋丹方"
+  },
+  {
+    "recipe_id": "yanshou_2",
+    "pill": "延寿丹",
+    "pill_tier": 2,
+    "name": "延寿丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 65,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "石斛灵茎",
+        "qty": 2
+      },
+      {
+        "item": "何首乌藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "标准延寿丹方，二品炼丹师"
+  },
+  {
+    "recipe_id": "yanshou_3",
+    "pill": "延寿丹",
+    "pill_tier": 2,
+    "name": "延寿丹·秘传丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 45,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "石斛灵茎",
+        "qty": 3
+      },
+      {
+        "item": "千年参须",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传延寿丹方，可炼无暇延寿丹"
+  },
+  {
+    "recipe_id": "xumingdan_1",
+    "pill": "续命丹",
+    "pill_tier": 3,
+    "name": "续命丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "九转还魂草",
+        "qty": 1
+      },
+      {
+        "item": "千年参须",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "续命辅药（选一）",
+        "options": [
+          {
+            "item": "石斛灵茎",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "恢复寿元，不超上限，三品炼丹师"
+  },
+  {
+    "recipe_id": "xumingdan_2",
+    "pill": "续命丹",
+    "pill_tier": 3,
+    "name": "续命丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 40,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "九转还魂草",
+        "qty": 1
+      },
+      {
+        "item": "千年参须",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "续命辅药（选一）",
+        "options": [
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "石斛灵茎",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传续命丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "pozhan_1",
+    "pill": "破障丹",
+    "pill_tier": 2,
+    "name": "破障丹·粗陋丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 70,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "雷灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "破障辅药（选一）",
+        "options": [
+          {
+            "item": "赤焰莲",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "粗陋破障丹方，二品炼丹师"
+  },
+  {
+    "recipe_id": "pozhan_2",
+    "pill": "破障丹",
+    "pill_tier": 2,
+    "name": "破障丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "雷灵芝",
+        "qty": 1
+      },
+      {
+        "item": "赤焰莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "破障辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "通用突破辅助丹，正统丹方"
+  },
+  {
+    "recipe_id": "zhujidan_1",
+    "pill": "筑基丹",
+    "pill_tier": 2,
+    "name": "筑基丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "筑基辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "炼气期突破必备，二品炼丹师"
+  },
+  {
+    "recipe_id": "zhujidan_2",
+    "pill": "筑基丹",
+    "pill_tier": 2,
+    "name": "筑基丹·秘传丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 40,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "筑基辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传筑基丹方，三品炼丹师"
+  },
+  {
+    "recipe_id": "ningdan_1",
+    "pill": "凝丹丹",
+    "pill_tier": 3,
+    "name": "凝丹丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 45,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "凝丹辅药（选一）",
+        "options": [
+          {
+            "item": "千年参须",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "石斛灵茎",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "筑基期突破结丹所用，三品炼丹师"
+  },
+  {
+    "recipe_id": "ningdan_2",
+    "pill": "凝丹丹",
+    "pill_tier": 3,
+    "name": "凝丹丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 30,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "凝丹辅药（选一）",
+        "options": [
+          {
+            "item": "千年参须",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太岁灵芝",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传凝丹丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "dayanshou_1",
+    "pill": "大延寿丹",
+    "pill_tier": 3,
+    "name": "大延寿丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "千年参须",
+        "qty": 1
+      },
+      {
+        "item": "石斛灵茎",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "上品延寿丹，三品炼丹师"
+  },
+  {
+    "recipe_id": "jiuzhuan_1",
+    "pill": "九转延寿丹",
+    "pill_tier": 4,
+    "name": "九转延寿丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 45,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "千年参须",
+        "qty": 2
+      },
+      {
+        "item": "幽冥还阳草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "石斛灵茎",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "九转炼制，四品炼丹师"
+  },
+  {
+    "recipe_id": "jiuzhuan_2",
+    "pill": "九转延寿丹",
+    "pill_tier": 4,
+    "name": "九转延寿丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 30,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "千年参须",
+        "qty": 2
+      },
+      {
+        "item": "幽冥还阳草",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "石斛灵茎",
+            "qty": 3,
+            "quality_bonus": 0
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传九转延寿丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "busi_1",
+    "pill": "不死丹",
+    "pill_tier": 4,
+    "name": "不死丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 35,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "九转还魂草",
+        "qty": 1
+      },
+      {
+        "item": "幽冥还阳草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "千年参须",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太岁灵芝",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      }
+    ],
+    "notes": "珍贵延寿丹，四品炼丹师"
+  },
+  {
+    "recipe_id": "huaying_1",
+    "pill": "化婴丹",
+    "pill_tier": 5,
+    "name": "化婴丹·正统丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 30,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "涅槃凤翎花",
+        "qty": 1
+      },
+      {
+        "item": "造化青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "化婴辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "千年参须",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      }
+    ],
+    "notes": "结丹期突破元婴所用，五品炼丹师"
+  },
+  {
+    "recipe_id": "huaying_2",
+    "pill": "化婴丹",
+    "pill_tier": 5,
+    "name": "化婴丹·秘传丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 20,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "涅槃凤翎花",
+        "qty": 1
+      },
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "化婴辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传化婴丹方，六品炼丹师"
+  },
+  {
+    "recipe_id": "wanshou_1",
+    "pill": "万寿丹",
+    "pill_tier": 6,
+    "name": "万寿丹·正统丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 25,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "不死药残根",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "万寿辅药（选一）",
+        "options": [
+          {
+            "item": "九转还魂草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "绝世延寿丹，六品炼丹师"
+  },
+  {
+    "recipe_id": "wanshou_2",
+    "pill": "万寿丹",
+    "pill_tier": 6,
+    "name": "万寿丹·秘传丹方",
+    "alchemy_level_req": 7,
+    "base_success_rate": 15,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "不死药残根",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      },
+      {
+        "item": "混沌青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "万寿辅药（选一）",
+        "options": [
+          {
+            "item": "九转还魂草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传万寿丹方，七品炼丹师"
+  },
+  {
+    "recipe_id": "dajuling_1",
+    "pill": "大聚灵丹",
+    "pill_tier": 3,
+    "name": "大聚灵丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 3
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "上品聚灵丹，三品炼丹师"
+  },
+  {
+    "recipe_id": "dajuling_2",
+    "pill": "大聚灵丹",
+    "pill_tier": 3,
+    "name": "大聚灵丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 40,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 3
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "碧灵花",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传大聚灵丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "cuigu_1",
+    "pill": "淬骨丹",
+    "pill_tier": 3,
+    "name": "淬骨丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "地火灵草",
+        "qty": 1
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "淬骨辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久提升根骨，三品炼丹师"
+  },
+  {
+    "recipe_id": "cuigu_2",
+    "pill": "淬骨丹",
+    "pill_tier": 3,
+    "name": "淬骨丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 38,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "地火灵草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "淬骨辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 3,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传淬骨丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "wudao_1",
+    "pill": "悟道丹",
+    "pill_tier": 3,
+    "name": "悟道丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 1
+      },
+      {
+        "item": "灵芝草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "悟道辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久提升悟性，三品炼丹师"
+  },
+  {
+    "recipe_id": "wudao_2",
+    "pill": "悟道丹",
+    "pill_tier": 3,
+    "name": "悟道丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 38,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 2
+      },
+      {
+        "item": "灵芝草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "悟道辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 3,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传悟道丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "zaohua_1",
+    "pill": "造化丹",
+    "pill_tier": 3,
+    "name": "造化丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化灵草",
+        "qty": 1
+      },
+      {
+        "item": "枸杞灵果",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "造化辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久提升福缘，三品炼丹师"
+  },
+  {
+    "recipe_id": "lianshen_1",
+    "pill": "炼神丹",
+    "pill_tier": 4,
+    "name": "炼神丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 1
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "炼神辅药（选一）",
+        "options": [
+          {
+            "item": "菩提灵叶",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵芝草",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久提升神魂，四品炼丹师"
+  },
+  {
+    "recipe_id": "lianshen_2",
+    "pill": "炼神丹",
+    "pill_tier": 4,
+    "name": "炼神丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 32,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "炼神辅药（选一）",
+        "options": [
+          {
+            "item": "菩提灵叶",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传炼神丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "hupo_1",
+    "pill": "虎魄丹",
+    "pill_tier": 3,
+    "name": "虎魄丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 55,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "猛虎精血草",
+        "qty": 1
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "强体辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久提升体魄，三品炼丹师"
+  },
+  {
+    "recipe_id": "hupo_2",
+    "pill": "虎魄丹",
+    "pill_tier": 3,
+    "name": "虎魄丹·秘传丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 38,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "猛虎精血草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "强体辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 3,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传虎魄丹方，四品炼丹师"
+  },
+  {
+    "recipe_id": "zhanpo_1",
+    "pill": "战魄丹",
+    "pill_tier": 3,
+    "name": "战魄丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 58,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "赤焰莲",
+        "qty": 1
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "战力辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "战力提升30%持续3次，三品炼丹师"
+  },
+  {
+    "recipe_id": "dunxing_1",
+    "pill": "遁形丹",
+    "pill_tier": 1,
+    "name": "遁形丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 80,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "隐灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "遁形辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "提升逃跑成功率，一品炼丹师"
+  },
+  {
+    "recipe_id": "tanling_1",
+    "pill": "探灵丹",
+    "pill_tier": 1,
+    "name": "探灵丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "灵感草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "探灵辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "提升稀有事件概率，一品炼丹师"
+  },
+  {
+    "recipe_id": "fengshou_1",
+    "pill": "丰收丹",
+    "pill_tier": 1,
+    "name": "丰收丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "丰灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "丰收辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "提升采集获得量，一品炼丹师"
+  },
+  {
+    "recipe_id": "suling_1",
+    "pill": "速灵丹",
+    "pill_tier": 2,
+    "name": "速灵丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 70,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "疾风灵草",
+        "qty": 1
+      },
+      {
+        "item": "碧灵花",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "速效辅药（选一）",
+        "options": [
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "缩短采集冷却，二品炼丹师"
+  },
+  {
+    "recipe_id": "huichun_1",
+    "pill": "回春丹",
+    "pill_tier": 3,
+    "name": "回春丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "九转还魂草",
+        "qty": 1
+      },
+      {
+        "item": "枸杞灵果",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "回春辅药（选一）",
+        "options": [
+          {
+            "item": "石斛灵茎",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "战斗中自动触发回复寿元，三品炼丹师"
+  },
+  {
+    "recipe_id": "caiyun_1",
+    "pill": "财运丹",
+    "pill_tier": 1,
+    "name": "财运丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "金灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "财运辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "提升灵石获得量，一品炼丹师"
+  },
+  {
+    "recipe_id": "shengwang_1",
+    "pill": "声望丹",
+    "pill_tier": 1,
+    "name": "声望丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 80,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "名望灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "声望辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "提升声望获得量，一品炼丹师"
+  },
+  {
+    "recipe_id": "fuyuan_1",
+    "pill": "复元丹",
+    "pill_tier": 3,
+    "name": "复元丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 58,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "复元灵草",
+        "qty": 1
+      },
+      {
+        "item": "灵芝草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "复元辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "石斛灵茎",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "恢复探险次数，三品炼丹师"
+  },
+  {
+    "recipe_id": "qingyuan_1",
+    "pill": "情缘丹",
+    "pill_tier": 4,
+    "name": "情缘丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "合欢花蕊",
+        "qty": 1
+      },
+      {
+        "item": "碧灵花",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "情缘辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "缩短双修冷却，四品炼丹师"
+  },
+  {
+    "recipe_id": "wuxing_1",
+    "pill": "五行归元丹",
+    "pill_tier": 5,
+    "name": "五行归元丹·正统丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 40,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "五行灵草",
+        "qty": 1
+      },
+      {
+        "item": "造化青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "五行辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "全属性临时+2，五品炼丹师"
+  },
+  {
+    "recipe_id": "wuxing_2",
+    "pill": "五行归元丹",
+    "pill_tier": 5,
+    "name": "五行归元丹·秘传丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 25,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "五行灵草",
+        "qty": 2
+      },
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "五行辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传五行归元丹方，六品炼丹师"
+  },
+  {
+    "recipe_id": "peiyuan_1",
+    "pill": "培元丹",
+    "pill_tier": 1,
+    "name": "培元丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 1
+      },
+      {
+        "item": "枸杞灵果",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "培元辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶修为丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "peiyuan_2",
+    "pill": "培元丹",
+    "pill_tier": 1,
+    "name": "培元丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 75,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 2
+      },
+      {
+        "item": "枸杞灵果",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "培元辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "标准培元丹方，一品炼丹师"
+  },
+  {
+    "recipe_id": "guben_1",
+    "pill": "固本丹",
+    "pill_tier": 3,
+    "name": "固本丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 2
+      },
+      {
+        "item": "千年参须",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "固本辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "中阶修为丹，三品炼丹师"
+  },
+  {
+    "recipe_id": "huayuan_1",
+    "pill": "化元丹",
+    "pill_tier": 5,
+    "name": "化元丹·正统丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 45,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "千年参须",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "化元辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "高阶修为丹，五品炼丹师"
+  },
+  {
+    "recipe_id": "zaohualyuan_1",
+    "pill": "造化元丹",
+    "pill_tier": 7,
+    "name": "造化元丹·正统丹方",
+    "alchemy_level_req": 7,
+    "base_success_rate": 30,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 2
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "造化辅药（选一）",
+        "options": [
+          {
+            "item": "混沌青莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "不死药残根",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "极品修为丹，七品炼丹师"
+  },
+  {
+    "recipe_id": "zaohualyuan_2",
+    "pill": "造化元丹",
+    "pill_tier": 7,
+    "name": "造化元丹·秘传丹方",
+    "alchemy_level_req": 8,
+    "base_success_rate": 18,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 2
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      },
+      {
+        "item": "混沌青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "造化辅药（选一）",
+        "options": [
+          {
+            "item": "不死药残根",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传造化元丹方，八品炼丹师"
+  },
+  {
+    "recipe_id": "qingxinjuling_1",
+    "pill": "清心聚灵丹",
+    "pill_tier": 1,
+    "name": "清心聚灵丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 88,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "清心草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚灵辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶聚灵丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "yusui_1",
+    "pill": "玉髓聚灵丹",
+    "pill_tier": 3,
+    "name": "玉髓聚灵丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 58,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      },
+      {
+        "item": "灵芝草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚灵辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "修炼速度+70%，三品炼丹师"
+  },
+  {
+    "recipe_id": "taixu_1",
+    "pill": "太虚聚灵丹",
+    "pill_tier": 5,
+    "name": "太虚聚灵丹·正统丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 42,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "太虚灵草",
+        "qty": 1
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚灵辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵芝草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "修炼速度+150%，五品炼丹师"
+  },
+  {
+    "recipe_id": "taixu_2",
+    "pill": "太虚聚灵丹",
+    "pill_tier": 5,
+    "name": "太虚聚灵丹·秘传丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 28,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "太虚灵草",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚灵辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "造化青莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传太虚聚灵丹方，六品炼丹师"
+  },
+  {
+    "recipe_id": "sanxiu_1",
+    "pill": "散修破境丹",
+    "pill_tier": 1,
+    "name": "散修破境丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "雷灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "破境辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶破境丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "jindan_1",
+    "pill": "金丹稳境丹",
+    "pill_tier": 4,
+    "name": "金丹稳境丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 48,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "造化青莲",
+        "qty": 1
+      },
+      {
+        "item": "雷灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "稳境辅药（选一）",
+        "options": [
+          {
+            "item": "千年参须",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "金丹期突破辅助，四品炼丹师"
+  },
+  {
+    "recipe_id": "dujie_1",
+    "pill": "渡劫护元丹",
+    "pill_tier": 6,
+    "name": "渡劫护元丹·正统丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 30,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "涅槃凤翎花",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "护元辅药（选一）",
+        "options": [
+          {
+            "item": "不死药残根",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "九转还魂草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "大境界渡劫护元，六品炼丹师"
+  },
+  {
+    "recipe_id": "dujie_2",
+    "pill": "渡劫护元丹",
+    "pill_tier": 6,
+    "name": "渡劫护元丹·秘传丹方",
+    "alchemy_level_req": 7,
+    "base_success_rate": 18,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "涅槃凤翎花",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      },
+      {
+        "item": "混沌青莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "护元辅药（选一）",
+        "options": [
+          {
+            "item": "不死药残根",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "幽冥还阳草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传渡劫护元丹方，七品炼丹师"
+  },
+  {
+    "recipe_id": "xiaocuigu_1",
+    "pill": "小淬骨丹",
+    "pill_tier": 1,
+    "name": "小淬骨丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "铁骨灵藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "淬骨辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "低阶淬骨丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "xiaowudao_1",
+    "pill": "小悟道丹",
+    "pill_tier": 1,
+    "name": "小悟道丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "悟道辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶悟道丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "xiaolianshen_1",
+    "pill": "小炼神丹",
+    "pill_tier": 1,
+    "name": "小炼神丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 80,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "炼神辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "低阶炼神丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "jiangu_1",
+    "pill": "坚骨丹",
+    "pill_tier": 4,
+    "name": "坚骨丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "地火灵草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "坚骨辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久根骨+2，四品炼丹师"
+  },
+  {
+    "recipe_id": "jiangu_2",
+    "pill": "坚骨丹",
+    "pill_tier": 4,
+    "name": "坚骨丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 32,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "地火灵草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 3
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "坚骨辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "黄芪灵草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传坚骨丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "tongxuan_1",
+    "pill": "通玄悟道丹",
+    "pill_tier": 4,
+    "name": "通玄悟道丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "悟道辅药（选一）",
+        "options": [
+          {
+            "item": "灵芝草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久悟性+2，四品炼丹师"
+  },
+  {
+    "recipe_id": "tongxuan_2",
+    "pill": "通玄悟道丹",
+    "pill_tier": 4,
+    "name": "通玄悟道丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 32,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 3
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "悟道辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵芝草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传通玄悟道丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "hudao_1",
+    "pill": "护道神魂丹",
+    "pill_tier": 4,
+    "name": "护道神魂丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "神魂辅药（选一）",
+        "options": [
+          {
+            "item": "菩提灵叶",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久神魂+2，四品炼丹师"
+  },
+  {
+    "recipe_id": "hudao_2",
+    "pill": "护道神魂丹",
+    "pill_tier": 4,
+    "name": "护道神魂丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 32,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 2
+      },
+      {
+        "item": "玉髓芝",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "神魂辅药（选一）",
+        "options": [
+          {
+            "item": "菩提灵叶",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传护道神魂丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "xuanhu_1",
+    "pill": "玄虎淬体丹",
+    "pill_tier": 4,
+    "name": "玄虎淬体丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "猛虎精血草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "淬体辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "永久体魄+2，四品炼丹师"
+  },
+  {
+    "recipe_id": "xuanhu_2",
+    "pill": "玄虎淬体丹",
+    "pill_tier": 4,
+    "name": "玄虎淬体丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 32,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "猛虎精血草",
+        "qty": 2
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 3
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "淬体辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "黄芪灵草",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传玄虎淬体丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "linzhan_1",
+    "pill": "临战强身丹",
+    "pill_tier": 1,
+    "name": "临战强身丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "铁骨灵藤",
+        "qty": 1
+      },
+      {
+        "item": "黄芪灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "强身辅药（选一）",
+        "options": [
+          {
+            "item": "丹参灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "临时体魄+2，一品炼丹师"
+  },
+  {
+    "recipe_id": "linzhan_2",
+    "pill": "临战强身丹",
+    "pill_tier": 1,
+    "name": "临战强身丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 72,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "铁骨灵藤",
+        "qty": 2
+      },
+      {
+        "item": "黄芪灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "强身辅药（选一）",
+        "options": [
+          {
+            "item": "丹参灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "赤焰莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "临时体魄+2，正统丹方"
+  },
+  {
+    "recipe_id": "dingshen_1",
+    "pill": "定神安魂丹",
+    "pill_tier": 2,
+    "name": "定神安魂丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 70,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 1
+      },
+      {
+        "item": "菩提灵叶",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "安魂辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "临时神魂+2，二品炼丹师"
+  },
+  {
+    "recipe_id": "lingji_1",
+    "pill": "灵机一动丸",
+    "pill_tier": 2,
+    "name": "灵机一动丸·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 70,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "菩提灵叶",
+        "qty": 1
+      },
+      {
+        "item": "碧灵花",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "灵机辅药（选一）",
+        "options": [
+          {
+            "item": "灵芝草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "临时悟性+2，二品炼丹师"
+  },
+  {
+    "recipe_id": "linyuan_1",
+    "pill": "临渊慎行丹",
+    "pill_tier": 3,
+    "name": "临渊慎行丹·正统丹方",
+    "alchemy_level_req": 3,
+    "base_success_rate": 60,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "赤焰莲",
+        "qty": 1
+      },
+      {
+        "item": "铁骨灵藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "战力辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "战力+20%持续3次，三品炼丹师"
+  },
+  {
+    "recipe_id": "xuezhan_1",
+    "pill": "血战狂徒丹",
+    "pill_tier": 4,
+    "name": "血战狂徒丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 48,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "赤焰莲",
+        "qty": 2
+      },
+      {
+        "item": "猛虎精血草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "狂暴辅药（选一）",
+        "options": [
+          {
+            "item": "铁骨灵藤",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "战力+50%持续1次，四品炼丹师"
+  },
+  {
+    "recipe_id": "xuezhan_2",
+    "pill": "血战狂徒丹",
+    "pill_tier": 4,
+    "name": "血战狂徒丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 30,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "赤焰莲",
+        "qty": 2
+      },
+      {
+        "item": "猛虎精血草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "狂暴辅药（选一）",
+        "options": [
+          {
+            "item": "太阳精草",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "铁骨灵藤",
+            "qty": 3,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传血战狂徒丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "xiaotanling_1",
+    "pill": "小探灵丹",
+    "pill_tier": 1,
+    "name": "小探灵丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "灵感草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "探灵辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶探灵丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "tianji_1",
+    "pill": "天机探宝丹",
+    "pill_tier": 4,
+    "name": "天机探宝丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 48,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "天机灵草",
+        "qty": 1
+      },
+      {
+        "item": "金灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "探宝辅药（选一）",
+        "options": [
+          {
+            "item": "灵感草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "稀有事件+30%且灵石+20%，四品炼丹师"
+  },
+  {
+    "recipe_id": "tianji_2",
+    "pill": "天机探宝丹",
+    "pill_tier": 4,
+    "name": "天机探宝丹·秘传丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 30,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "天机灵草",
+        "qty": 2
+      },
+      {
+        "item": "金灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "探宝辅药（选一）",
+        "options": [
+          {
+            "item": "灵感草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "造化灵草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "玉髓芝",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "秘传天机探宝丹方，五品炼丹师"
+  },
+  {
+    "recipe_id": "baicao_1",
+    "pill": "百草增益丹",
+    "pill_tier": 2,
+    "name": "百草增益丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 70,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "丰灵草",
+        "qty": 1
+      },
+      {
+        "item": "疾风灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "增益辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "何首乌藤",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "采集量+30%且冷却-20%，二品炼丹师"
+  },
+  {
+    "recipe_id": "hangshang_1",
+    "pill": "行商赚宝丹",
+    "pill_tier": 2,
+    "name": "行商赚宝丹·正统丹方",
+    "alchemy_level_req": 2,
+    "base_success_rate": 72,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "金灵草",
+        "qty": 2
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "财运辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "灵石获得量+50%，二品炼丹师"
+  },
+  {
+    "recipe_id": "mingsheng_1",
+    "pill": "名声远播丹",
+    "pill_tier": 4,
+    "name": "名声远播丹·正统丹方",
+    "alchemy_level_req": 4,
+    "base_success_rate": 50,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "名望灵草",
+        "qty": 2
+      },
+      {
+        "item": "造化灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "声望辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "灵泉草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "声望获得量+100%，四品炼丹师"
+  },
+  {
+    "recipe_id": "tianyi_1",
+    "pill": "天意垂青丹",
+    "pill_tier": 5,
+    "name": "天意垂青丹·正统丹方",
+    "alchemy_level_req": 5,
+    "base_success_rate": 38,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "天机灵草",
+        "qty": 2
+      },
+      {
+        "item": "造化灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "天意辅药（选一）",
+        "options": [
+          {
+            "item": "灵感草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "太阳精草",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 1,
+            "quality_bonus": 1
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 2,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "稀有事件+50%，五品炼丹师"
+  },
+  {
+    "recipe_id": "tianyi_2",
+    "pill": "天意垂青丹",
+    "pill_tier": 5,
+    "name": "天意垂青丹·秘传丹方",
+    "alchemy_level_req": 6,
+    "base_success_rate": 22,
+    "max_quality": 11,
+    "main_ingredients": [
+      {
+        "item": "天机灵草",
+        "qty": 2
+      },
+      {
+        "item": "造化灵草",
+        "qty": 1
+      },
+      {
+        "item": "太岁灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "天意辅药（选一）",
+        "options": [
+          {
+            "item": "灵感草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "造化青莲",
+            "qty": 1,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "天山雪莲",
+            "qty": 2,
+            "quality_bonus": 1
+          },
+          {
+            "item": "玉髓芝",
+            "qty": 2,
+            "quality_bonus": 1
+          }
+        ]
+      },
+      {
+        "desc": "增效辅药（选一）",
+        "options": [
+          {
+            "item": "灵泉草",
+            "qty": 2,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 3,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "秘传天意垂青丹方，六品炼丹师"
+  },
+  {
+    "recipe_id": "xiaojuqi_1",
+    "pill": "小聚气丸",
+    "pill_tier": 1,
+    "name": "小聚气丸·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 90,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚气辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "最简单的修为丸，一品炼丹师"
+  },
+  {
+    "recipe_id": "wenshen_1",
+    "pill": "稳神丹",
+    "pill_tier": 1,
+    "name": "稳神丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 82,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "稳神辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "战斗中自动触发回复寿元，一品炼丹师"
+  },
+  {
+    "recipe_id": "wenshen_2",
+    "pill": "稳神丹",
+    "pill_tier": 1,
+    "name": "稳神丹·正统丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 72,
+    "max_quality": 7,
+    "main_ingredients": [
+      {
+        "item": "太阴灵芝",
+        "qty": 1
+      },
+      {
+        "item": "枸杞灵果",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "稳神辅药（选一）",
+        "options": [
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      },
+      {
+        "desc": "稳定辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "稳神丹正统丹方"
+  },
+  {
+    "recipe_id": "xiaocaiyun_1",
+    "pill": "小财运丹",
+    "pill_tier": 1,
+    "name": "小财运丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "金灵草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "财运辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "碧灵花",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "低阶财运丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "cuzhi_1",
+    "pill": "粗制延寿丹",
+    "pill_tier": 1,
+    "name": "粗制延寿丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 88,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "何首乌藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "延寿辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "最简单的延寿丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "shiyan_1",
+    "pill": "试验品聚灵丹",
+    "pill_tier": 1,
+    "name": "试验品聚灵丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 90,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "碧灵花",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "聚灵辅药（选一）",
+        "options": [
+          {
+            "item": "九节菖蒲",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": -1
+          }
+        ]
+      }
+    ],
+    "notes": "失败品，效果极低，一品炼丹师"
+  },
+  {
+    "recipe_id": "weipozhan_1",
+    "pill": "伪破障丹",
+    "pill_tier": 1,
+    "name": "伪破障丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 88,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "碧灵花",
+        "qty": 1
+      },
+      {
+        "item": "九节菖蒲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "破障辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "劣质破障丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "hanshe_1",
+    "pill": "寒舍招待丹",
+    "pill_tier": 1,
+    "name": "寒舍招待丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 90,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "灵芝草",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "补气辅药（选一）",
+        "options": [
+          {
+            "item": "枸杞灵果",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "低劣修为丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "culiang_1",
+    "pill": "粗粮补气丸",
+    "pill_tier": 1,
+    "name": "粗粮补气丸·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 92,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "枸杞灵果",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "补气辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "最低阶修为丸，一品炼丹师"
+  },
+  {
+    "recipe_id": "lianjia_1",
+    "pill": "廉价战力丹",
+    "pill_tier": 1,
+    "name": "廉价战力丹·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 85,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "赤焰莲",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "战力辅药（选一）",
+        "options": [
+          {
+            "item": "黄芪灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "丹参灵草",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "低阶战力丹，一品炼丹师"
+  },
+  {
+    "recipe_id": "fanren_1",
+    "pill": "凡人养生丸",
+    "pill_tier": 1,
+    "name": "凡人养生丸·粗陋丹方",
+    "alchemy_level_req": 1,
+    "base_success_rate": 92,
+    "max_quality": 3,
+    "main_ingredients": [
+      {
+        "item": "枸杞灵果",
+        "qty": 1
+      },
+      {
+        "item": "何首乌藤",
+        "qty": 1
+      }
+    ],
+    "aux_groups": [
+      {
+        "desc": "养生辅药（选一）",
+        "options": [
+          {
+            "item": "甘草灵根",
+            "qty": 1,
+            "quality_bonus": 0
+          },
+          {
+            "item": "茯苓灵块",
+            "qty": 1,
+            "quality_bonus": 0
+          }
+        ]
+      }
+    ],
+    "notes": "凡人也能服用，一品炼丹师"
+  }
+]

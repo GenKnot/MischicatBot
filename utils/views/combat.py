@@ -38,6 +38,11 @@ class PlayerActionView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         self.stop()
+
+        from utils.combat import consume_combat_buffs, consume_escape_buff
+        consume_combat_buffs(uid, atk)
+        consume_combat_buffs(def_uid, dfn)
+
         result_embed = discord.Embed(
             title="⚔️ 战斗结算",
             description=f"**{atk['name']}** 战力：{atk_power}\n**{dfn['name']}** 战力：{def_power}\n\n",
@@ -49,6 +54,7 @@ class PlayerActionView(discord.ui.View):
         else:
             escaped, escape_pct = roll_escape(dfn)
             if escaped:
+                consume_escape_buff(def_uid, dfn)
                 result_embed.description += f"**{atk['name']}** 败北！\n**{dfn['name']}** 趁乱逃脱（逃跑成功率 {escape_pct}%）。"
                 await interaction.followup.send(embed=result_embed, ephemeral=True)
             else:
@@ -63,6 +69,32 @@ class VictoryActionView(discord.ui.View):
         self.author = author
         self.winner = winner
         self.loser = loser
+        self._check_lifespan_restore(loser)
+
+    def _check_lifespan_restore(self, player: dict):
+        from utils.buffs import get_buff_value, consume_once_buff
+        from utils.db import get_conn
+        lifespan = player.get("lifespan", 0)
+        lifespan_max = player.get("lifespan_max", 1)
+        if lifespan_max <= 0:
+            return
+        if lifespan / lifespan_max > 0.2:
+            return
+        restore_pct = get_buff_value(player, "combat_lifespan_restore", 0)
+        if restore_pct <= 0:
+            return
+        restore_amount = int(lifespan_max * restore_pct / 100)
+        if restore_amount <= 0:
+            return
+        raw = player.get("active_buffs") or "{}"
+        _, raw = consume_once_buff(raw, "combat_lifespan_restore")
+        uid = player.get("discord_id", "")
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE players SET lifespan = MIN(lifespan_max, lifespan + ?), active_buffs = ? WHERE discord_id = ?",
+                (restore_amount, raw, uid)
+            )
+            conn.commit()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:

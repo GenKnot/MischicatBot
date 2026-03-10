@@ -54,9 +54,34 @@ def _reward_lines(rewards: dict) -> list[str]:
 
 
 def _apply_quest_rewards(uid: str, rewards: dict, player: dict = None):
+    from utils.buffs import get_spirit_stones_bonus, get_reputation_bonus, consume_once_buff
+    p = player or _get_player(uid)
     fields = []
     values = []
-    for key in ["spirit_stones", "reputation", "cultivation", "lifespan"]:
+    active_buffs_raw = (p.get("active_buffs") or "{}") if p else "{}"
+    buffs_changed = False
+
+    stones = rewards.get("spirit_stones", 0)
+    if stones:
+        stones_bonus = get_spirit_stones_bonus(p) if p else 0
+        if stones_bonus > 0:
+            stones = int(stones * (1 + stones_bonus))
+            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "spirit_stones_bonus_once")
+            buffs_changed = True
+        fields.append("spirit_stones = spirit_stones + ?")
+        values.append(stones)
+
+    rep = rewards.get("reputation", 0)
+    if rep:
+        rep_bonus = get_reputation_bonus(p) if p else 0
+        if rep_bonus > 0:
+            rep = int(rep * (1 + rep_bonus))
+            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "reputation_bonus_once")
+            buffs_changed = True
+        fields.append("reputation = reputation + ?")
+        values.append(rep)
+
+    for key in ["cultivation", "lifespan"]:
         if rewards.get(key):
             fields.append(f"{key} = {key} + ?")
             values.append(rewards[key])
@@ -64,6 +89,9 @@ def _apply_quest_rewards(uid: str, rewards: dict, player: dict = None):
         for stat, val in rewards["stat_bonus"].items():
             fields.append(f"{stat} = {stat} + ?")
             values.append(val)
+    if buffs_changed:
+        fields.append("active_buffs = ?")
+        values.append(active_buffs_raw)
     if fields:
         values.append(uid)
         with get_conn() as conn:

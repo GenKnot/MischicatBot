@@ -16,6 +16,7 @@ def _parse_techniques(raw) -> list:
 
 
 def calc_power(player: dict) -> float:
+    from utils.buffs import get_combat_power_bonus, get_stat_temp
     base = (
         player.get("comprehension", 5) +
         player.get("physique", 5) +
@@ -23,6 +24,9 @@ def calc_power(player: dict) -> float:
         player.get("soul", 5) +
         player.get("fortune", 5)
     )
+    stat_temp = get_stat_temp(player)
+    base += sum(stat_temp.values())
+
     realm_idx = get_realm_index(player.get("realm", "炼气期1层"))
     realm_mult = 1.0 + realm_idx * 0.15
 
@@ -49,11 +53,13 @@ def calc_power(player: dict) -> float:
         equip_bonus.get("fortune", 0)
     )
 
-    total = (base + stat_bonus + equip_stat) * realm_mult * (1 + speed_bonus)
+    combat_buff = get_combat_power_bonus(player)
+    total = (base + stat_bonus + equip_stat) * realm_mult * (1 + speed_bonus) * (1 + combat_buff)
     return total
 
 
 def calc_escape_rate(player: dict) -> float:
+    from utils.buffs import get_escape_bonus
     from utils.db import get_equipped
     from utils.equipment import equip_stat_bonus
     equipped = get_equipped(player.get("discord_id", ""))
@@ -61,16 +67,50 @@ def calc_escape_rate(player: dict) -> float:
     soul = player.get("soul", 5) + equip_bonus.get("soul", 0)
     realm_idx = get_realm_index(player.get("realm", "炼气期1层"))
     extra = player.get("escape_rate", 0)
-    rate = 0.30 + soul * 0.01 + realm_idx * 0.005 + extra / 100
+    escape_buff = get_escape_bonus(player)
+    rate = 0.30 + soul * 0.01 + realm_idx * 0.005 + extra / 100 + escape_buff
     return min(0.90, max(0.05, rate))
 
 
 def roll_combat(attacker: dict, defender: dict) -> tuple[bool, float, float]:
     atk = calc_power(attacker) * random.uniform(0.85, 1.15)
     dfn = calc_power(defender) * random.uniform(0.85, 1.15)
-    return atk > dfn, round(atk, 1), round(dfn, 1)
+    won = atk > dfn
+    return won, round(atk, 1), round(dfn, 1)
 
 
 def roll_escape(defender: dict) -> tuple[bool, float]:
     rate = calc_escape_rate(defender)
-    return random.random() < rate, round(rate * 100, 1)
+    success = random.random() < rate
+    return success, round(rate * 100, 1)
+
+
+def consume_combat_buffs(discord_id: str, player: dict):
+    from utils.buffs import consume_charge_buff, get_combat_power_bonus
+    from utils.db import get_conn
+    raw = player.get("active_buffs") or "{}"
+    changed = False
+    if get_combat_power_bonus(player) > 0:
+        _, raw = consume_charge_buff(raw, "combat_power_bonus")
+        changed = True
+    if changed:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE players SET active_buffs = ? WHERE discord_id = ?",
+                (raw, discord_id)
+            )
+            conn.commit()
+
+
+def consume_escape_buff(discord_id: str, player: dict):
+    from utils.buffs import consume_once_buff, get_escape_bonus
+    from utils.db import get_conn
+    raw = player.get("active_buffs") or "{}"
+    if get_escape_bonus(player) > 0:
+        _, raw = consume_once_buff(raw, "escape_bonus_once")
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE players SET active_buffs = ? WHERE discord_id = ?",
+                (raw, discord_id)
+            )
+            conn.commit()

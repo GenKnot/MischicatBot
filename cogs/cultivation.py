@@ -251,9 +251,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         now = time.time()
         cultivating_until = now + years_to_seconds(years)
         bonus = get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
-        pill_active = player.get("pill_buff_until") and now < player["pill_buff_until"]
-        if pill_active:
-            bonus += 0.5
+        from utils.buffs import get_cultivation_speed_bonus
+        speed_bonus = get_cultivation_speed_bonus(player)
+        if speed_bonus > 0:
+            bonus += speed_bonus
         gain = int(calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"]) * (1 + bonus))
         with get_conn() as conn:
             conn.execute("""
@@ -263,7 +264,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             """, (cultivating_until, years, now, uid))
             conn.commit()
         needed = cultivation_needed(player["realm"])
-        pill_note = "（聚灵丹加持中 +50%）\n" if pill_active else ""
+        pill_note = f"（修炼速度加成 +{int(speed_bonus * 100)}%）\n" if speed_bonus > 0 else ""
         await interaction.followup.send(
             f"{interaction.user.mention} **{player['name']}** 开始闭关修炼 **{years} 年**（现实 {years * 2} 小时）。\n"
             f"{pill_note}"
@@ -282,9 +283,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             return await interaction.response.send_message("当前没有待领取的修炼成果。")
         years_done = player.get("cultivating_years") or 0
         bonus = get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
-        pill_active = player.get("pill_buff_until") and now < player["pill_buff_until"]
-        if pill_active:
-            bonus += 0.5
+        from utils.buffs import get_cultivation_speed_bonus
+        speed_bonus = get_cultivation_speed_bonus(player)
+        if speed_bonus > 0:
+            bonus += speed_bonus
         gain = int(calc_cultivation_gain(years_done, player["comprehension"], player["spirit_root_type"]) * (1 + bonus))
         new_cultivation = player["cultivation"] + gain
         with get_conn() as conn:
@@ -474,9 +476,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 gain = int(overflow * actual_years / max(int(total_years or 1), 1))
             else:
                 bonus = get_cultivation_bonus(str(p["discord_id"]), p["current_city"], p.get("cave"))
-                pill_active = p.get("pill_buff_until") and now < p["pill_buff_until"]
-                if pill_active:
-                    bonus += 0.5
+                from utils.buffs import get_cultivation_speed_bonus
+                speed_bonus = get_cultivation_speed_bonus(p)
+                if speed_bonus > 0:
+                    bonus += speed_bonus
                 gain = int(calc_cultivation_gain(actual_years, p["comprehension"], p["spirit_root_type"]) * (1 + bonus))
             new_cultivation = (p.get("cultivation") or 0) + gain
             if is_dual:
@@ -683,9 +686,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             return await ctx.send(f"{ctx.author.mention} 寿元不足，剩余寿元 **{player['lifespan']} 年**，无法修炼 {years} 年。")
         cultivating_until = now + years_to_seconds(years)
         bonus = get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
-        pill_active = player.get("pill_buff_until") and now < player["pill_buff_until"]
-        if pill_active:
-            bonus += 0.5
+        from utils.buffs import get_cultivation_speed_bonus
+        speed_bonus = get_cultivation_speed_bonus(player)
+        if speed_bonus > 0:
+            bonus += speed_bonus
         gain = int(calc_cultivation_gain(years, player["comprehension"], player["spirit_root_type"]) * (1 + bonus))
         with get_conn() as conn:
             conn.execute("""
@@ -694,7 +698,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             """, (cultivating_until, years, now, uid))
             conn.commit()
         needed = cultivation_needed(player["realm"])
-        pill_note = "（聚灵丹加持中 +50%）\n" if pill_active else ""
+        pill_note = f"（修炼速度加成 +{int(speed_bonus * 100)}%）\n" if speed_bonus > 0 else ""
         await ctx.send(
             f"{ctx.author.mention} **{player['name']}** 开始闭关修炼 **{years} 年**。\n"
             f"{pill_note}预计现实时间 **{years * 2} 小时**后结束。\n"
@@ -921,7 +925,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         with get_conn() as conn:
             rows = conn.execute(
                 "SELECT discord_id, name, cultivation, realm, comprehension, spirit_root_type, "
-                "cultivating_years, current_city, cave, pill_buff_until, cultivation_overflow FROM players "
+                "cultivating_years, current_city, cave, active_buffs, cultivation_overflow FROM players "
                 "WHERE cultivating_until IS NOT NULL AND cultivating_until <= ? AND is_dead = 0",
                 (now,)
             ).fetchall()
@@ -932,9 +936,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             self._notified.add(uid)
             years_done = row["cultivating_years"] or 0
             bonus = get_cultivation_bonus(uid, row["current_city"], row["cave"])
-            pill_active = row["pill_buff_until"] and now < row["pill_buff_until"]
-            if pill_active:
-                bonus += 0.5
+            from utils.buffs import get_cultivation_speed_bonus
+            speed_bonus = get_cultivation_speed_bonus(dict(row))
+            if speed_bonus > 0:
+                bonus += speed_bonus
             overflow = row["cultivation_overflow"] or 0
             gain = overflow if overflow > 0 else int(calc_cultivation_gain(years_done, row["comprehension"], row["spirit_root_type"]) * (1 + bonus))
             new_cultivation = row["cultivation"] + gain
@@ -985,10 +990,11 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             region_name = row["current_city"]
             realm_idx = _gri(row["realm"])
             with get_conn() as conn:
-                p = conn.execute("SELECT gathering_until, last_active FROM players WHERE discord_id = ?", (uid,)).fetchone()
+                p = conn.execute("SELECT gathering_until, last_active, gathering_bonus FROM players WHERE discord_id = ?", (uid,)).fetchone()
                 actual_duration = (p["gathering_until"] - p["last_active"]) if p and p["gathering_until"] else 7200
                 years_spent = max(0.25, seconds_to_years(actual_duration))
-            rewards = roll_gathering_rewards(years_spent, realm_idx, region_name, gather_type)
+                saved_bonus = p["gathering_bonus"] if p else 0
+            rewards = roll_gathering_rewards(years_spent, realm_idx, region_name, gather_type, gather_bonus=saved_bonus or 0)
             with get_conn() as conn:
                 conn.execute("UPDATE players SET gathering_until = NULL, gathering_type = NULL WHERE discord_id = ?", (uid,))
                 conn.commit()

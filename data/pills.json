@@ -1,0 +1,566 @@
+{
+  "_schema_notes": {
+    "stackable": "true=可叠加（永久属性类），false=同类buff只能一个，再吃刷新不叠加",
+    "effect_keys": {
+      "cultivation_speed_bonus": "修炼速度加成百分比，下次闭关生效，配合 buff_duration_hours 或单次",
+      "lifespan_extend": "延寿，可突破寿元上限，单位：年",
+      "lifespan": "恢复寿元，不超过当前上限，单位：年",
+      "breakthrough_bonus": "突破成功率加成百分比，下次突破时消耗",
+      "stat_permanent": "永久属性加点，key为属性名，value为加点数，受stat_max约束",
+      "stat_max": "stat_permanent的属性上限，超过不生效",
+      "stat_temp": "临时属性加成，配合buff_duration_hours使用",
+      "buff_duration_hours": "buff持续时间（现实小时），配合其他效果使用",
+      "combat_power_bonus": "战力加成百分比，配合combat_buff_charges使用",
+      "combat_buff_charges": "战力buff剩余次数，每次战斗消耗1次",
+      "escape_bonus_once": "本次逃跑成功率加成百分比，一次性消耗",
+      "explore_rare_bonus_once": "下次探险稀有事件概率加成百分比，一次性消耗",
+      "gather_bonus_once": "下次采集获得量加成百分比，一次性消耗",
+      "gather_cooldown_reduction": "采集冷却缩短百分比，配合buff_duration_hours使用",
+      "combat_lifespan_restore": "战斗中寿元低于20%时自动触发，恢复寿元，单位：年，一次性",
+      "spirit_stones_bonus_once": "下次任务/探险灵石获得量加成百分比，一次性消耗",
+      "reputation_bonus_once": "下次任务声望获得量加成百分比，一次性消耗",
+      "explore_count_restore": "恢复探险次数，单位：次",
+      "dual_cooldown_reduction_hours": "双修冷却缩短小时数，一次性消耗",
+      "cultivation_gain": "直接增加修为值，单位与cultivation字段一致，可叠加"
+    }
+  },
+
+  "聚灵丹": {
+    "name": "聚灵丹",
+    "desc": "服用后修炼速度提升50%，下次闭关生效，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 50 }
+  },
+
+  "大聚灵丹": {
+    "name": "大聚灵丹",
+    "desc": "上品聚灵丹，服用后修炼速度提升100%，下次闭关生效，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 100 }
+  },
+
+  "小延寿丹": {
+    "name": "小延寿丹",
+    "desc": "入门延寿丹，服用后寿元 +5年，可突破上限，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "lifespan_extend": 5 }
+  },
+
+  "延寿丹": {
+    "name": "延寿丹",
+    "desc": "正统延寿丹方，服用后寿元 +10年，可突破上限，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "lifespan_extend": 10 }
+  },
+
+  "大延寿丹": {
+    "name": "大延寿丹",
+    "desc": "上品延寿丹药，服用后寿元 +15年，可突破上限，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "lifespan_extend": 15 }
+  },
+
+  "九转延寿丹": {
+    "name": "九转延寿丹",
+    "desc": "九转炼制，服用后寿元 +20年，可突破上限，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "lifespan_extend": 20 }
+  },
+
+  "不死丹": {
+    "name": "不死丹",
+    "desc": "传说仙丹，服用后寿元 +30年，可突破上限，可叠加。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "lifespan_extend": 30 }
+  },
+
+  "万寿丹": {
+    "name": "万寿丹",
+    "desc": "万年难遇至宝，服用后寿元 +50年，可突破上限，可叠加。",
+    "rarity": "绝世",
+    "stackable": true,
+    "effect": { "lifespan_extend": 50 }
+  },
+
+  "续命丹": {
+    "name": "续命丹",
+    "desc": "珍贵丹药，服用后恢复30年寿元，不可超过当前上限，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "lifespan": 30 }
+  },
+
+  "破障丹": {
+    "name": "破障丹",
+    "desc": "突破瓶颈时服用，下次突破成功率 +20%，不可叠加。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 20 }
+  },
+
+  "筑基丹": {
+    "name": "筑基丹",
+    "desc": "炼气期突破筑基必备，下次突破成功率 +40%，不可叠加。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 40 }
+  },
+
+  "凝丹丹": {
+    "name": "凝丹丹",
+    "desc": "筑基期凝结金丹所用，下次突破成功率 +35%，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 35 }
+  },
+
+  "化婴丹": {
+    "name": "化婴丹",
+    "desc": "结丹期化婴所用，下次突破成功率 +30%，不可叠加。",
+    "rarity": "绝世",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 30 }
+  },
+
+  "淬骨丹": {
+    "name": "淬骨丹",
+    "desc": "地火灵草所炼，永久提升根骨 +1，上限10，可叠加至上限。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "stat_permanent": { "bone": 1 }, "stat_max": 10 }
+  },
+
+  "悟道丹": {
+    "name": "悟道丹",
+    "desc": "菩提灵叶所炼，永久提升悟性 +1，上限10，可叠加至上限。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "stat_permanent": { "comprehension": 1 }, "stat_max": 10 }
+  },
+
+  "造化丹": {
+    "name": "造化丹",
+    "desc": "造化灵草所炼，永久提升福缘 +1，上限10，可叠加至上限。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "stat_permanent": { "fortune": 1 }, "stat_max": 10 }
+  },
+
+  "炼神丹": {
+    "name": "炼神丹",
+    "desc": "太阴灵芝所炼，永久提升神魂 +1，上限10，可叠加至上限。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "stat_permanent": { "soul": 1 }, "stat_max": 10 }
+  },
+
+  "虎魄丹": {
+    "name": "虎魄丹",
+    "desc": "猛兽精血与灵草合炼，永久提升体魄 +1，上限10，可叠加至上限。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "stat_permanent": { "physique": 1 }, "stat_max": 10 }
+  },
+
+  "战魄丹": {
+    "name": "战魄丹",
+    "desc": "服用后战力提升30%，持续3次战斗，不可叠加（再吃刷新次数）。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "combat_power_bonus": 30, "combat_buff_charges": 3 }
+  },
+
+  "遁形丹": {
+    "name": "遁形丹",
+    "desc": "服用后下次战斗逃跑成功率 +50%，一次性消耗，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "escape_bonus_once": 50 }
+  },
+
+  "探灵丹": {
+    "name": "探灵丹",
+    "desc": "服用后下次探险稀有事件概率 +20%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "explore_rare_bonus_once": 20 }
+  },
+
+  "丰收丹": {
+    "name": "丰收丹",
+    "desc": "服用后下次采集获得量 +50%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "gather_bonus_once": 50 }
+  },
+
+  "速灵丹": {
+    "name": "速灵丹",
+    "desc": "服用后采集冷却缩短30%，持续24小时，不可叠加（再吃刷新时间）。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "gather_cooldown_reduction": 30, "buff_duration_hours": 24 }
+  },
+
+  "回春丹": {
+    "name": "回春丹",
+    "desc": "战斗中寿元低于20%时自动触发，恢复10年寿元，一次性消耗，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "combat_lifespan_restore": 10, "trigger": "low_hp" }
+  },
+
+  "财运丹": {
+    "name": "财运丹",
+    "desc": "服用后下次探险/任务灵石获得量 +30%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "spirit_stones_bonus_once": 30 }
+  },
+
+  "声望丹": {
+    "name": "声望丹",
+    "desc": "服用后下次任务声望获得量 +50%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "reputation_bonus_once": 50 }
+  },
+
+  "复元丹": {
+    "name": "复元丹",
+    "desc": "服用后立即恢复1次探险次数，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "explore_count_restore": 1 }
+  },
+
+  "情缘丹": {
+    "name": "情缘丹",
+    "desc": "服用后双修冷却缩短48小时，一次性消耗，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "dual_cooldown_reduction_hours": 48 }
+  },
+
+  "五行归元丹": {
+    "name": "五行归元丹",
+    "desc": "五行灵草合炼，服用后所有属性临时 +2，持续7天，不可叠加（再吃刷新时间）。",
+    "rarity": "绝世",
+    "stackable": false,
+    "effect": {
+      "stat_temp": { "comprehension": 2, "physique": 2, "fortune": 2, "bone": 2, "soul": 2 },
+      "buff_duration_hours": 168
+    }
+  },
+
+  "培元丹": {
+    "name": "培元丹",
+    "desc": "低阶修为丹，服用后直接增加100点修为，相当于一层炼气期积累，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "cultivation_gain": 100 }
+  },
+
+  "固本丹": {
+    "name": "固本丹",
+    "desc": "中阶修为丹，服用后直接增加300点修为，可叠加。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "cultivation_gain": 300 }
+  },
+
+  "化元丹": {
+    "name": "化元丹",
+    "desc": "高阶修为丹，服用后直接增加800点修为，可叠加。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "cultivation_gain": 800 }
+  },
+
+  "造化元丹": {
+    "name": "造化元丹",
+    "desc": "极品修为丹，服用后直接增加2000点修为，可叠加。",
+    "rarity": "绝世",
+    "stackable": true,
+    "effect": { "cultivation_gain": 2000 }
+  },
+
+  "清心聚灵丹": {
+    "name": "清心聚灵丹",
+    "desc": "清心静气后修炼更易事半功倍，服用后修炼速度提升20%，下次闭关生效，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 20 }
+  },
+
+  "玉髓聚灵丹": {
+    "name": "玉髓聚灵丹",
+    "desc": "玉髓灵气凝成的聚灵丹，服用后修炼速度提升70%，下次闭关生效，不可叠加。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 70 }
+  },
+
+  "太虚聚灵丹": {
+    "name": "太虚聚灵丹",
+    "desc": "太虚灵气所聚之丹，服用后修炼速度提升150%，下次闭关生效，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 150 }
+  },
+
+  "散修破境丹": {
+    "name": "散修破境丹",
+    "desc": "坊间流传的粗陋破境丹，下次突破成功率 +10%，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 10 }
+  },
+
+  "金丹稳境丹": {
+    "name": "金丹稳境丹",
+    "desc": "金丹修士巩固境界所用，下次突破失败时可减少一半损失（以提高成功率体现）：突破成功率 +25%，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 25 }
+  },
+
+  "渡劫护元丹": {
+    "name": "渡劫护元丹",
+    "desc": "专为大境界渡劫准备，下次突破成功率 +15%，并在失败时略减伤（以提高成功率体现），不可叠加。",
+    "rarity": "绝世",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 15 }
+  },
+
+  "小淬骨丹": {
+    "name": "小淬骨丹",
+    "desc": "低阶淬骨丹，永久提升根骨 +1，上限5，可叠加至上限。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "stat_permanent": { "bone": 1 }, "stat_max": 5 }
+  },
+
+  "小悟道丹": {
+    "name": "小悟道丹",
+    "desc": "入门悟道丹，永久提升悟性 +1，上限5，可叠加至上限。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "stat_permanent": { "comprehension": 1 }, "stat_max": 5 }
+  },
+
+  "小炼神丹": {
+    "name": "小炼神丹",
+    "desc": "低阶炼神丹，永久提升神魂 +1，上限5，可叠加至上限。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "stat_permanent": { "soul": 1 }, "stat_max": 5 }
+  },
+
+  "坚骨丹": {
+    "name": "坚骨丹",
+    "desc": "正统锻骨丹方，永久提升根骨 +2，上限12，可叠加至上限。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "stat_permanent": { "bone": 2 }, "stat_max": 12 }
+  },
+
+  "通玄悟道丹": {
+    "name": "通玄悟道丹",
+    "desc": "高阶悟道丹，永久提升悟性 +2，上限12，可叠加至上限。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "stat_permanent": { "comprehension": 2 }, "stat_max": 12 }
+  },
+
+  "护道神魂丹": {
+    "name": "护道神魂丹",
+    "desc": "护持道心的神魂丹，永久提升神魂 +2，上限12，可叠加至上限。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "stat_permanent": { "soul": 2 }, "stat_max": 12 }
+  },
+
+  "玄虎淬体丹": {
+    "name": "玄虎淬体丹",
+    "desc": "以玄虎精血炼成，永久提升体魄 +2，上限12，可叠加至上限。",
+    "rarity": "珍贵",
+    "stackable": true,
+    "effect": { "stat_permanent": { "physique": 2 }, "stat_max": 12 }
+  },
+
+  "临战强身丹": {
+    "name": "临战强身丹",
+    "desc": "战前服用，体魄临时 +2，持续12小时，不可叠加（再吃刷新时间）。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "stat_temp": { "physique": 2 }, "buff_duration_hours": 12 }
+  },
+
+  "定神安魂丹": {
+    "name": "定神安魂丹",
+    "desc": "静心安魂之丹，神魂临时 +2，持续24小时，不可叠加（再吃刷新时间）。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "stat_temp": { "soul": 2 }, "buff_duration_hours": 24 }
+  },
+
+  "灵机一动丸": {
+    "name": "灵机一动丸",
+    "desc": "短时间内灵光频现，悟性临时 +2，持续6小时，不可叠加（再吃刷新时间）。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "stat_temp": { "comprehension": 2 }, "buff_duration_hours": 6 }
+  },
+
+  "临渊慎行丹": {
+    "name": "临渊慎行丹",
+    "desc": "服用后下次战斗战力 +20%，可叠加次数3次，适合在危险区域前服用。",
+    "rarity": "稀有",
+    "stackable": true,
+    "effect": { "combat_power_bonus": 20, "combat_buff_charges": 3 }
+  },
+
+  "血战狂徒丹": {
+    "name": "血战狂徒丹",
+    "desc": "激发潜能的狂暴丹药，战力 +50%，持续1次战斗，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "combat_power_bonus": 50, "combat_buff_charges": 1 }
+  },
+
+  "小探灵丹": {
+    "name": "小探灵丹",
+    "desc": "低阶探灵丹，服用后下次探险稀有事件概率 +10%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "explore_rare_bonus_once": 10 }
+  },
+
+  "天机探宝丹": {
+    "name": "天机探宝丹",
+    "desc": "推演天机所炼丹药，下次探险稀有事件概率 +30%，同时灵石获得量 +20%，一次性消耗，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "explore_rare_bonus_once": 30, "spirit_stones_bonus_once": 20 }
+  },
+
+  "百草增益丹": {
+    "name": "百草增益丹",
+    "desc": "采药时服用，下次采集获得量 +30%，并缩短采集冷却20%，一次性消耗，不可叠加。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "gather_bonus_once": 30, "gather_cooldown_reduction": 20 }
+  },
+
+  "行商赚宝丹": {
+    "name": "行商赚宝丹",
+    "desc": "游历坊市前服用，下次任务/探险灵石获得量 +50%，一次性消耗，不可叠加。",
+    "rarity": "稀有",
+    "stackable": false,
+    "effect": { "spirit_stones_bonus_once": 50 }
+  },
+
+  "名声远播丹": {
+    "name": "名声远播丹",
+    "desc": "专门扩大名声的丹药，服用后下次任务声望获得量 +100%，一次性消耗，不可叠加。",
+    "rarity": "珍贵",
+    "stackable": false,
+    "effect": { "reputation_bonus_once": 100 }
+  },
+
+  "天意垂青丹": {
+    "name": "天意垂青丹",
+    "desc": "传说可得天意垂青的丹药，下次探险稀有事件概率 +50%，一次性消耗，不可叠加。",
+    "rarity": "绝世",
+    "stackable": false,
+    "effect": { "explore_rare_bonus_once": 50 }
+  },
+
+  "小聚气丸": {
+    "name": "小聚气丸",
+    "desc": "炼气期散修常用的小药，服用后直接增加30点修为，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "cultivation_gain": 30 }
+  },
+
+  "稳神丹": {
+    "name": "稳神丹",
+    "desc": "在突破或受创前服用，可略微稳固神识，战斗中寿元低于20%时自动触发，恢复5年寿元，一次性消耗，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "combat_lifespan_restore": 5, "trigger": "low_hp" }
+  },
+
+  "小财运丹": {
+    "name": "小财运丹",
+    "desc": "简易版财运丹，服用后下次探险/任务灵石获得量 +15%，一次性消耗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "spirit_stones_bonus_once": 15 }
+  },
+
+  "粗制延寿丹": {
+    "name": "粗制延寿丹",
+    "desc": "粗制滥造的延寿丹，服用后寿元 +3年，可突破上限，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "lifespan_extend": 3 }
+  },
+
+  "试验品聚灵丹": {
+    "name": "试验品聚灵丹",
+    "desc": "丹师试验失败的聚灵丹，修炼速度仅提升10%，下次闭关生效，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "cultivation_speed_bonus": 10 }
+  },
+
+  "伪破障丹": {
+    "name": "伪破障丹",
+    "desc": "劣质破障丹，下次突破成功率仅 +5%，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "breakthrough_bonus": 5 }
+  },
+
+  "寒舍招待丹": {
+    "name": "寒舍招待丹",
+    "desc": "小门小派用来招待客人的低劣丹药，服用后直接增加10点修为，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "cultivation_gain": 10 }
+  },
+
+  "粗粮补气丸": {
+    "name": "粗粮补气丸",
+    "desc": "以粗粮混入少量灵草制成，只能略微恢复精力，服用后直接增加5点修为，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "cultivation_gain": 5 }
+  },
+
+  "廉价战力丹": {
+    "name": "廉价战力丹",
+    "desc": "坊市常见的廉价战力丹，战力 +10%，持续1次战斗，不可叠加。",
+    "rarity": "普通",
+    "stackable": false,
+    "effect": { "combat_power_bonus": 10, "combat_buff_charges": 1 }
+  },
+
+  "凡人养生丸": {
+    "name": "凡人养生丸",
+    "desc": "凡人也能服用的养生丸，服用后寿元 +1年，可突破上限，可叠加。",
+    "rarity": "普通",
+    "stackable": true,
+    "effect": { "lifespan_extend": 1 }
+  }
+}
