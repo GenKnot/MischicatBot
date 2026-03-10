@@ -1,5 +1,5 @@
 # Use official Python image
-FROM python:3-alpine
+FROM python:3-slim
 
 # Set working directory
 RUN apk add --no-cache ffmpeg
