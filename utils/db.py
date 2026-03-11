@@ -43,6 +43,9 @@ def _migrate(conn):
         ("alchemy_daily_reset",  "REAL NOT NULL DEFAULT 0"),
         ("active_buffs",         "TEXT NOT NULL DEFAULT '{}'"),
         ("gathering_bonus",      "REAL NOT NULL DEFAULT 0"),
+        ("job_cooldown_until",   "REAL"),
+        ("job_daily_count",      "INTEGER NOT NULL DEFAULT 0"),
+        ("job_daily_reset",      "REAL NOT NULL DEFAULT 0"),
     ]
     for col, definition in migrations:
         if col not in existing:

@@ -246,6 +246,24 @@ class TavernCog(commands.Cog, name="Tavern"):
         
         return embed
 
+    @commands.command(name="重置打工", hidden=True)
+    async def reset_job(self, ctx, target_id: str = None):
+        if str(ctx.author.id) != "304758476448595970":
+            return
+        uid = target_id or str(ctx.author.id)
+        from utils.db import get_conn
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE players SET job_cooldown_until = 0, job_daily_count = 0, job_daily_reset = 0 WHERE discord_id = ?",
+                (uid,)
+            )
+            conn.commit()
+        row = None
+        with get_conn() as conn:
+            row = conn.execute("SELECT name FROM players WHERE discord_id = ?", (uid,)).fetchone()
+        name = row["name"] if row else uid
+        await ctx.send(f"已重置 **{name}** 的打工冷却与次数。", ephemeral=True)
+
 
 class TavernView(discord.ui.View):
     def __init__(self, author, quests: dict, cog):

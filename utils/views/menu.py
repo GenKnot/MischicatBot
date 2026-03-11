@@ -180,8 +180,7 @@ class MainMenuView(discord.ui.View):
         if has_player:
             from utils.world import get_region
             region = get_region(player.get("current_city", "")) if player else None
-            if not region:
-                self.add_item(MenuButton("茶馆", discord.ButtonStyle.secondary, "tavern"))
+            self.add_item(MenuButton("城市", discord.ButtonStyle.secondary, "city"))
             if region:
                 emoji_map = {"采矿": "⛏️", "采药": "🌿", "伐木": "🪓", "钓鱼": "🎣"}
                 rtype = region.get("type", "")
@@ -307,6 +306,17 @@ class MenuButton(discord.ui.Button):
                     await tavern_cog.tavern(ctx)
                 else:
                     await interaction.followup.send("茶馆暂时不可用。", ephemeral=True)
+            elif self.action == "city":
+                from utils.views.city import CityMenuView, _city_menu_embed
+                from utils.db import get_conn as _gc
+                uid = str(interaction.user.id)
+                with _gc() as conn:
+                    player = dict(conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone())
+                await interaction.followup.edit_message(
+                    message_id=interaction.message.id,
+                    embed=_city_menu_embed(player),
+                    view=CityMenuView(interaction.user, player, cog),
+                )
             elif self.action == "backpack":
                 equip_cog = cog.bot.cogs.get("Equipment")
                 if equip_cog:

@@ -66,6 +66,9 @@ class Player(Base):
     exam_attempts_left: Mapped[int] = mapped_column(Integer, default=0)
     active_buffs: Mapped[str] = mapped_column(Text, default="{}")
     gathering_bonus: Mapped[float] = mapped_column(Float, default=0)
+    job_cooldown_until: Mapped[float] = mapped_column(Float, nullable=True)
+    job_daily_count: Mapped[int] = mapped_column(Integer, default=0)
+    job_daily_reset: Mapped[float] = mapped_column(Float, default=0)
 
 
 class Inventory(Base):
