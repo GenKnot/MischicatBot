@@ -12,6 +12,62 @@
   <link rel="apple-touch-icon" href="/static/icons/icon.svg">
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
   <link rel="stylesheet" href="/static/style.css?v=2">
+  <style>
+    /* ── PWA install area (bottom of sidebar) ─────────────────────── */
+    .sidebar-install {
+      margin-top: auto;
+      padding: 12px 12px 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    #pwaInstallBtn {
+      display: none;
+      width: 100%;
+      padding: 8px 12px;
+      background: rgba(78, 205, 196, .12);
+      border: 1px solid rgba(78, 205, 196, .3);
+      border-radius: 7px;
+      color: var(--accent2);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: background .15s, border-color .15s;
+      line-height: 1.4;
+    }
+
+    #pwaInstallBtn:hover {
+      background: rgba(78, 205, 196, .22);
+      border-color: var(--accent2);
+    }
+
+    #pwaInstalledMsg {
+      display: none;
+      padding: 7px 10px;
+      background: rgba(34, 197, 94, .1);
+      border: 1px solid rgba(34, 197, 94, .25);
+      border-radius: 7px;
+      color: var(--success);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    #pwaIosHint {
+      display: none;
+      padding: 8px 10px;
+      background: rgba(78, 205, 196, .08);
+      border: 1px solid rgba(78, 205, 196, .2);
+      border-radius: 7px;
+      color: var(--accent2);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    #pwaIosHint strong {
+      color: var(--text);
+    }
+  </style>
 </head>
 <body>
 <div class="layout">
@@ -28,6 +84,23 @@
     <a href="/equipment-preview" {% if request.url.path == "/equipment-preview" %}class="active"{% endif %}>装备预览</a>
     <a href="/dead" {% if request.url.path == "/dead" %}class="active"{% endif %}>已坐化</a>
     <a href="/world" {% if request.url.path == "/world" %}class="active"{% endif %}>世界</a>
+
+    <!-- PWA install area — pushed to the bottom of the sidebar -->
+    <div class="sidebar-install">
+      <!-- Chrome / Edge / Android: native install prompt -->
+      <button id="pwaInstallBtn" title="安装为独立应用">
+        ⬇ 安装应用
+      </button>
+
+      <!-- Shown briefly after a successful install -->
+      <div id="pwaInstalledMsg">✓ 已安装</div>
+
+      <!-- iOS Safari: no beforeinstallprompt, show manual instructions -->
+      <div id="pwaIosHint">
+        📲 安装：点击底栏 <strong>分享</strong>，选择<br>
+        <strong>添加到主屏幕</strong>
+      </div>
+    </div>
   </nav>
   <main class="main-content">
     <div class="container">
@@ -54,6 +127,50 @@
       navigator.serviceWorker.register('/sw.js')
         .catch(err => console.warn('SW registration failed:', err));
     });
+  }
+
+  // ── PWA install prompt ─────────────────────────────────────────────
+  const installBtn   = document.getElementById('pwaInstallBtn');
+  const installedMsg = document.getElementById('pwaInstalledMsg');
+  const iosHint      = document.getElementById('pwaIosHint');
+
+  let deferredPrompt = null;
+
+  // Chrome / Edge / Samsung Internet: capture the deferred prompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'block';
+  });
+
+  // User clicks the install button
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+    if (outcome === 'accepted') {
+      installedMsg.style.display = 'block';
+      setTimeout(() => { installedMsg.style.display = 'none'; }, 3000);
+    }
+  });
+
+  // Hide after the OS reports a successful install
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+    installedMsg.style.display = 'block';
+    setTimeout(() => { installedMsg.style.display = 'none'; }, 3000);
+  });
+
+  // iOS Safari: no beforeinstallprompt — show manual instructions
+  // unless the page is already running in standalone mode
+  const isIos        = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone === true
+                    || window.matchMedia('(display-mode: standalone)').matches;
+  if (isIos && !isStandalone) {
+    iosHint.style.display = 'block';
   }
 </script>
 </body>
