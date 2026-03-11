@@ -1,0 +1,47 @@
+{
+  "name": "Mischicat Admin",
+  "short_name": "Mischicat",
+  "description": "Mischicat 修仙游戏管理面板",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#7c6af7",
+  "orientation": "portrait-primary",
+  "lang": "zh",
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["utilities"],
+  "shortcuts": [
+    {
+      "name": "修士列表",
+      "short_name": "修士",
+      "url": "/players",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "公共事件",
+      "short_name": "事件",
+      "url": "/events",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "属性榜",
+      "short_name": "排行",
+      "url": "/stats",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

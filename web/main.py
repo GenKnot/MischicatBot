@@ -5,8 +5,8 @@ import sys
 import time
 from datetime import datetime
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -24,6 +24,18 @@ _templates_dir = os.path.normpath(os.path.join(_base, "web", "templates"))
 
 app = FastAPI(title="Mischicat Admin")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    """Serve the service worker from the root path so it can control the entire site."""
+    return FileResponse(
+        os.path.join(_static_dir, "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
+
 templates = Jinja2Templates(directory=_templates_dir)
 
 
@@ -62,16 +74,23 @@ templates.env.globals["now"] = time.time
 async def index(request: Request):
     with get_conn() as conn:
         now = time.time()
-        total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0").fetchone()[0]
-        dead = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=1").fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0").fetchone()[
+            0
+        ]
+        dead = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=1").fetchone()[
+            0
+        ]
         cultivating = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE cultivating_until > ? AND is_dead=0", (now,)
+            "SELECT COUNT(*) FROM players WHERE cultivating_until > ? AND is_dead=0",
+            (now,),
         ).fetchone()[0]
         on_quest = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE active_quest IS NOT NULL AND quest_due > ? AND is_dead=0", (now,)
+            "SELECT COUNT(*) FROM players WHERE active_quest IS NOT NULL AND quest_due > ? AND is_dead=0",
+            (now,),
         ).fetchone()[0]
         gathering = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE gathering_until > ? AND is_dead=0", (now,)
+            "SELECT COUNT(*) FROM players WHERE gathering_until > ? AND is_dead=0",
+            (now,),
         ).fetchone()[0]
         events = conn.execute(
             "SELECT * FROM public_events ORDER BY started_at DESC LIMIT 5"
@@ -94,18 +113,40 @@ async def index(request: Request):
             "FROM players WHERE is_dead=0 ORDER BY total DESC LIMIT 5"
         ).fetchall()
         top_stats = [dict(r) for r in top_stats]
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "total": total, "dead": dead, "cultivating": cultivating,
-        "on_quest": on_quest, "gathering": gathering,
-        "events": events, "realm_dist": realm_dist,
-        "recent": recent, "top_stones": top_stones, "top_stats": top_stats,
-    })
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "total": total,
+            "dead": dead,
+            "cultivating": cultivating,
+            "on_quest": on_quest,
+            "gathering": gathering,
+            "events": events,
+            "realm_dist": realm_dist,
+            "recent": recent,
+            "top_stones": top_stones,
+            "top_stats": top_stats,
+        },
+    )
 
 
 @app.get("/players", response_class=HTMLResponse)
-async def players(request: Request, q: str = "", city: str = "", realm: str = "", sort: str = "cultivation"):
-    allowed_sorts = {"cultivation", "lifespan", "spirit_stones", "realm", "name", "last_active"}
+async def players(
+    request: Request,
+    q: str = "",
+    city: str = "",
+    realm: str = "",
+    sort: str = "cultivation",
+):
+    allowed_sorts = {
+        "cultivation",
+        "lifespan",
+        "spirit_stones",
+        "realm",
+        "name",
+        "last_active",
+    }
     if sort not in allowed_sorts:
         sort = "cultivation"
     with get_conn() as conn:
@@ -122,28 +163,42 @@ async def players(request: Request, q: str = "", city: str = "", realm: str = ""
             params.append(f"%{realm}%")
         sql = f"SELECT * FROM players WHERE {' AND '.join(where)} ORDER BY {sort} DESC"
         rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
-        cities = [r[0] for r in conn.execute("SELECT DISTINCT current_city FROM players WHERE is_dead=0 ORDER BY current_city").fetchall()]
-    return templates.TemplateResponse("players.html", {
-        "request": request, "players": rows,
-        "q": q, "city": city, "realm": realm, "sort": sort,
-        "cities": cities,
-    })
+        cities = [
+            r[0]
+            for r in conn.execute(
+                "SELECT DISTINCT current_city FROM players WHERE is_dead=0 ORDER BY current_city"
+            ).fetchall()
+        ]
+    return templates.TemplateResponse(
+        "players.html",
+        {
+            "request": request,
+            "players": rows,
+            "q": q,
+            "city": city,
+            "realm": realm,
+            "sort": sort,
+            "cities": cities,
+        },
+    )
 
 
 @app.get("/players/{discord_id}", response_class=HTMLResponse)
 async def player_detail(request: Request, discord_id: str):
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (discord_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM players WHERE discord_id = ?", (discord_id,)
+        ).fetchone()
         if not row:
             raise HTTPException(404, "玩家不存在")
         player = dict(row)
         inventory = conn.execute(
             "SELECT item_id, quantity FROM inventory WHERE discord_id = ? ORDER BY item_id",
-            (discord_id,)
+            (discord_id,),
         ).fetchall()
         equipment = conn.execute(
             "SELECT * FROM equipment WHERE discord_id = ? ORDER BY equipped DESC, tier DESC",
-            (discord_id,)
+            (discord_id,),
         ).fetchall()
         residences = conn.execute(
             "SELECT city FROM residences WHERE discord_id = ?", (discord_id,)
@@ -153,13 +208,17 @@ async def player_detail(request: Request, discord_id: str):
     equipment = [dict(e) for e in equipment]
     for e in equipment:
         e["stats"] = json.loads(e.get("stats") or "{}")
-    return templates.TemplateResponse("player_detail.html", {
-        "request": request, "player": player,
-        "inventory": [dict(i) for i in inventory],
-        "equipment": equipment,
-        "residences": [r["city"] for r in residences],
-        "quest": json.loads(quests_raw) if quests_raw else None,
-    })
+    return templates.TemplateResponse(
+        "player_detail.html",
+        {
+            "request": request,
+            "player": player,
+            "inventory": [dict(i) for i in inventory],
+            "equipment": equipment,
+            "residences": [r["city"] for r in residences],
+            "quest": json.loads(quests_raw) if quests_raw else None,
+        },
+    )
 
 
 @app.get("/events", response_class=HTMLResponse)
@@ -181,7 +240,7 @@ async def events(request: Request, page: int = 1):
                 "LEFT JOIN players p ON ep.discord_id = p.discord_id "
                 "WHERE ep.event_id = ? "
                 "GROUP BY ep.discord_id ORDER BY contribution DESC",
-                (e["event_id"],)
+                (e["event_id"],),
             ).fetchall()
             merged = []
             for p in participants_raw:
@@ -203,7 +262,7 @@ async def events(request: Request, page: int = 1):
                 "FROM wanbao_lots wl "
                 "LEFT JOIN players p ON wl.bidder_id = p.discord_id "
                 "WHERE wl.auction_id = ? ORDER BY wl.current_bid DESC",
-                (a["auction_id"],)
+                (a["auction_id"],),
             ).fetchall()
             a["lots"] = [dict(l) for l in lots]
             a["event_source"] = "wanbao"
@@ -218,20 +277,38 @@ async def events(request: Request, page: int = 1):
     total = len(events)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     page = max(1, min(page, total_pages))
-    paged = events[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
+    paged = events[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
 
-    return templates.TemplateResponse("events.html", {
-        "request": request, "events": paged,
-        "page": page, "total_pages": total_pages, "total": total,
-    })
+    return templates.TemplateResponse(
+        "events.html",
+        {
+            "request": request,
+            "events": paged,
+            "page": page,
+            "total_pages": total_pages,
+            "total": total,
+        },
+    )
 
 
 @app.get("/items", response_class=HTMLResponse)
-async def items_page(request: Request, type_filter: str = "", rarity: str = "", q: str = ""):
-    import sys, os
+async def items_page(
+    request: Request, type_filter: str = "", rarity: str = "", q: str = ""
+):
+    import os
+    import sys
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     from utils.items import ITEMS
-    TYPE_LABEL = {"pill": "丹药", "ore": "矿石", "wood": "灵木", "fish": "灵鱼", "herb": "草药", "tool": "工具"}
+
+    TYPE_LABEL = {
+        "pill": "丹药",
+        "ore": "矿石",
+        "wood": "灵木",
+        "fish": "灵鱼",
+        "herb": "草药",
+        "tool": "工具",
+    }
     RARITY_ORDER = {"普通": 0, "稀有": 1, "珍贵": 2, "绝世": 3}
     all_items = list(ITEMS.values())
     if q:
@@ -240,26 +317,51 @@ async def items_page(request: Request, type_filter: str = "", rarity: str = "", 
         all_items = [i for i in all_items if i.get("type") == type_filter]
     if rarity:
         all_items = [i for i in all_items if i.get("rarity") == rarity]
-    all_items.sort(key=lambda i: (RARITY_ORDER.get(i.get("rarity", "普通"), 0), i.get("sell_price", 0)), reverse=True)
+    all_items.sort(
+        key=lambda i: (
+            RARITY_ORDER.get(i.get("rarity", "普通"), 0),
+            i.get("sell_price", 0),
+        ),
+        reverse=True,
+    )
     by_type = {}
     for item in all_items:
         t = TYPE_LABEL.get(item.get("type", ""), item.get("type", "其他"))
         by_type.setdefault(t, []).append(item)
     types = list(TYPE_LABEL.values())
     rarities = ["普通", "稀有", "珍贵", "绝世"]
-    return templates.TemplateResponse("items.html", {
-        "request": request,
-        "by_type": by_type, "type_map": TYPE_LABEL, "rarities": rarities,
-        "type_filter": type_filter, "rarity": rarity, "q": q,
-        "total": len(all_items),
-    })
+    return templates.TemplateResponse(
+        "items.html",
+        {
+            "request": request,
+            "by_type": by_type,
+            "type_map": TYPE_LABEL,
+            "rarities": rarities,
+            "type_filter": type_filter,
+            "rarity": rarity,
+            "q": q,
+            "total": len(all_items),
+        },
+    )
 
 
 @app.get("/stats", response_class=HTMLResponse)
 async def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
-    allowed = {"cultivation", "lifespan", "spirit_stones", "reputation",
-               "comprehension", "physique", "fortune", "bone", "soul",
-               "name", "realm", "rebirth_count", "stat_total"}
+    allowed = {
+        "cultivation",
+        "lifespan",
+        "spirit_stones",
+        "reputation",
+        "comprehension",
+        "physique",
+        "fortune",
+        "bone",
+        "soul",
+        "name",
+        "realm",
+        "rebirth_count",
+        "stat_total",
+    }
     if sort not in allowed:
         sort = "cultivation"
     direction = "DESC" if order != "asc" else "ASC"
@@ -274,18 +376,33 @@ async def stats(request: Request, sort: str = "cultivation", order: str = "desc"
                 f"SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
                 f"FROM players WHERE is_dead=0 ORDER BY {sort} {direction}"
             ).fetchall()
-    return templates.TemplateResponse("stats.html", {
-        "request": request,
-        "players": [dict(r) for r in rows],
-        "sort": sort, "order": order,
-    })
+    return templates.TemplateResponse(
+        "stats.html",
+        {
+            "request": request,
+            "players": [dict(r) for r in rows],
+            "sort": sort,
+            "order": order,
+        },
+    )
 
 
 @app.get("/techniques", response_class=HTMLResponse)
-async def techniques_page(request: Request, type_filter: str = "", grade: str = "", q: str = ""):
-    import sys, os
+async def techniques_page(
+    request: Request, type_filter: str = "", grade: str = "", q: str = ""
+):
+    import os
+    import sys
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.sects import TECHNIQUES, STAGE_STAT_MULTIPLIER, STAGE_PCT_MULTIPLIER, PCT_STATS, TECHNIQUE_STAGES, SECTS
+    from utils.sects import (
+        PCT_STATS,
+        SECTS,
+        STAGE_PCT_MULTIPLIER,
+        STAGE_STAT_MULTIPLIER,
+        TECHNIQUE_STAGES,
+        TECHNIQUES,
+    )
 
     tech_to_sect = {}
     for sect_name, sect_info in SECTS.items():
@@ -293,15 +410,27 @@ async def techniques_page(request: Request, type_filter: str = "", grade: str = 
             tech_to_sect[t] = sect_name
 
     GRADE_ORDER = {
-        "黄级下品": 0, "黄级中品": 1, "黄级上品": 2,
-        "玄级下品": 3, "玄级中品": 4, "玄级上品": 5,
-        "地级下品": 6, "地级中品": 7, "地级上品": 8,
-        "天级下品": 9, "天级中品": 10, "天级上品": 11,
+        "黄级下品": 0,
+        "黄级中品": 1,
+        "黄级上品": 2,
+        "玄级下品": 3,
+        "玄级中品": 4,
+        "玄级上品": 5,
+        "地级下品": 6,
+        "地级中品": 7,
+        "地级上品": 8,
+        "天级下品": 9,
+        "天级中品": 10,
+        "天级上品": 11,
     }
     STAT_NAMES = {
-        "physique": "体魄", "bone": "根骨", "soul": "神识",
-        "comprehension": "悟性", "fortune": "机缘",
-        "cultivation_speed": "修炼速度", "escape_rate": "逃跑率",
+        "physique": "体魄",
+        "bone": "根骨",
+        "soul": "神识",
+        "comprehension": "悟性",
+        "fortune": "机缘",
+        "cultivation_speed": "修炼速度",
+        "escape_rate": "逃跑率",
         "lifespan_bonus": "寿元上限",
     }
 
@@ -320,22 +449,28 @@ async def techniques_page(request: Request, type_filter: str = "", grade: str = 
             for stat, val in info.get("stat_bonus", {}).items():
                 if stat in PCT_STATS:
                     mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
-                    bonuses[STAT_NAMES.get(stat, stat)] = f"+{val * mult:.0%}" if stat == "cultivation_speed" else f"+{val * mult:.1f}"
+                    bonuses[STAT_NAMES.get(stat, stat)] = (
+                        f"+{val * mult:.0%}"
+                        if stat == "cultivation_speed"
+                        else f"+{val * mult:.1f}"
+                    )
                 else:
                     mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
                     bonuses[STAT_NAMES.get(stat, stat)] = f"+{val * mult:.0f}"
             stages.append({"stage": stage, "bonuses": bonuses})
 
-        all_techs.append({
-            "name": name,
-            "type": info.get("type", ""),
-            "grade": info.get("grade", ""),
-            "desc": info.get("desc", ""),
-            "stat_bonus": info.get("stat_bonus", {}),
-            "stages": stages,
-            "grade_order": GRADE_ORDER.get(info.get("grade", ""), 99),
-            "sect": tech_to_sect.get(name, ""),
-        })
+        all_techs.append(
+            {
+                "name": name,
+                "type": info.get("type", ""),
+                "grade": info.get("grade", ""),
+                "desc": info.get("desc", ""),
+                "stat_bonus": info.get("stat_bonus", {}),
+                "stages": stages,
+                "grade_order": GRADE_ORDER.get(info.get("grade", ""), 99),
+                "sect": tech_to_sect.get(name, ""),
+            }
+        )
 
     all_techs.sort(key=lambda t: (t["grade_order"], t["name"]))
 
@@ -349,22 +484,38 @@ async def techniques_page(request: Request, type_filter: str = "", grade: str = 
     types = ["修炼", "攻击", "防御", "辅助", "特殊"]
     grades = list(GRADE_ORDER.keys())
 
-    return templates.TemplateResponse("techniques.html", {
-        "request": request,
-        "by_grade": ordered_by_grade,
-        "types": types, "grades": grades,
-        "type_filter": type_filter, "grade": grade, "q": q,
-        "total": len(all_techs),
-        "stat_names": STAT_NAMES,
-        "stages": TECHNIQUE_STAGES,
-    })
+    return templates.TemplateResponse(
+        "techniques.html",
+        {
+            "request": request,
+            "by_grade": ordered_by_grade,
+            "types": types,
+            "grades": grades,
+            "type_filter": type_filter,
+            "grade": grade,
+            "q": q,
+            "total": len(all_techs),
+            "stat_names": STAT_NAMES,
+            "stages": TECHNIQUE_STAGES,
+        },
+    )
 
 
 @app.get("/equipment-preview", response_class=HTMLResponse)
-async def equipment_preview(request: Request, slot: str = "", quality: str = "", tier: int = 0, count: int = 1):
-    import sys, os
+async def equipment_preview(
+    request: Request, slot: str = "", quality: str = "", tier: int = 0, count: int = 1
+):
+    import os
+    import sys
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.equipment import generate_equipment, SLOTS, QUALITY_ORDER, TIER_NAMES, STAT_NAMES
+    from utils.equipment import (
+        QUALITY_ORDER,
+        SLOTS,
+        STAT_NAMES,
+        TIER_NAMES,
+        generate_equipment,
+    )
 
     QUALITY_COLORS = {
         "普通": "#888888",
@@ -383,7 +534,12 @@ async def equipment_preview(request: Request, slot: str = "", quality: str = "",
 
     count = max(1, min(count, 10))
     results = []
-    rolled = "count" in request.query_params or "slot" in request.query_params or "quality" in request.query_params or "tier" in request.query_params
+    rolled = (
+        "count" in request.query_params
+        or "slot" in request.query_params
+        or "quality" in request.query_params
+        or "tier" in request.query_params
+    )
     if rolled:
         for _ in range(count):
             eq = generate_equipment(
@@ -398,18 +554,21 @@ async def equipment_preview(request: Request, slot: str = "", quality: str = "",
 
     tiers = [{"val": i, "label": TIER_NAMES[i]} for i in range(len(TIER_NAMES))]
 
-    return templates.TemplateResponse("equipment_preview.html", {
-        "request": request,
-        "results": results,
-        "slots": SLOTS,
-        "qualities": QUALITY_ORDER,
-        "tiers": tiers,
-        "slot": slot,
-        "quality": quality,
-        "tier": tier,
-        "count": count,
-        "stat_names": STAT_NAMES,
-    })
+    return templates.TemplateResponse(
+        "equipment_preview.html",
+        {
+            "request": request,
+            "results": results,
+            "slots": SLOTS,
+            "qualities": QUALITY_ORDER,
+            "tiers": tiers,
+            "slot": slot,
+            "quality": quality,
+            "tier": tier,
+            "count": count,
+            "stat_names": STAT_NAMES,
+        },
+    )
 
 
 @app.get("/dead", response_class=HTMLResponse)
@@ -418,19 +577,29 @@ async def dead_players(request: Request):
         rows = conn.execute(
             "SELECT * FROM players WHERE is_dead=1 ORDER BY last_active DESC"
         ).fetchall()
-    return templates.TemplateResponse("dead.html", {
-        "request": request, "players": [dict(r) for r in rows],
-    })
+    return templates.TemplateResponse(
+        "dead.html",
+        {
+            "request": request,
+            "players": [dict(r) for r in rows],
+        },
+    )
 
 
 @app.get("/world", response_class=HTMLResponse)
 async def world_page(request: Request):
-    import sys, os
-    _utils = os.path.normpath(os.path.join(_base, "..")) if _base != os.path.dirname(os.path.dirname(os.path.abspath(__file__))) else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    import os
+    import sys
+
+    _utils = (
+        os.path.normpath(os.path.join(_base, ".."))
+        if _base != os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     if _utils not in sys.path:
         sys.path.insert(0, _utils)
-    from utils.world import CITIES, SPECIAL_REGIONS
     from utils.sects import SECTS
+    from utils.world import CITIES, SPECIAL_REGIONS
 
     regions_order = ["中州", "东域", "南域", "西域", "北域"]
     cities_by_region = {}
@@ -458,13 +627,16 @@ async def world_page(request: Request):
             {"name": k, **v} for k, v in SECTS.items() if v["alignment"] == a
         ]
 
-    return templates.TemplateResponse("world.html", {
-        "request": request,
-        "cities_by_region": cities_by_region,
-        "regions_order": regions_order,
-        "special_regions": SPECIAL_REGIONS,
-        "sects_by_alignment": sects_by_alignment,
-        "alignment_order": alignment_order,
-        "city_counts": city_counts,
-        "sect_counts": sect_counts,
-    })
+    return templates.TemplateResponse(
+        "world.html",
+        {
+            "request": request,
+            "cities_by_region": cities_by_region,
+            "regions_order": regions_order,
+            "special_regions": SPECIAL_REGIONS,
+            "sects_by_alignment": sects_by_alignment,
+            "alignment_order": alignment_order,
+            "city_counts": city_counts,
+            "sect_counts": sect_counts,
+        },
+    )

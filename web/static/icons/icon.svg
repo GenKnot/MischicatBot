@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="96" fill="#1a1d27"/>
+
+  <!-- Cat ears (left) -->
+  <polygon points="108,220 152,100 210,220" fill="#7c6af7"/>
+  <polygon points="128,210 152,130 192,210" fill="#5b4ac4"/>
+
+  <!-- Cat ears (right) -->
+  <polygon points="302,220 360,100 404,220" fill="#7c6af7"/>
+  <polygon points="320,210 360,130 384,210" fill="#5b4ac4"/>
+
+  <!-- Cat head circle -->
+  <circle cx="256" cy="300" r="168" fill="#7c6af7"/>
+
+  <!-- Inner head shading -->
+  <circle cx="256" cy="310" r="148" fill="#6b5ce7"/>
+
+  <!-- Left eye -->
+  <ellipse cx="196" cy="272" rx="24" ry="30" fill="#1a1d27"/>
+  <ellipse cx="196" cy="268" rx="10" ry="14" fill="#4ecdc4"/>
+  <circle cx="200" cy="264" r="5" fill="#ffffff" opacity="0.6"/>
+
+  <!-- Right eye -->
+  <ellipse cx="316" cy="272" rx="24" ry="30" fill="#1a1d27"/>
+  <ellipse cx="316" cy="268" rx="10" ry="14" fill="#4ecdc4"/>
+  <circle cx="320" cy="264" r="5" fill="#ffffff" opacity="0.6"/>
+
+  <!-- Nose -->
+  <polygon points="256,310 242,328 270,328" fill="#4ecdc4"/>
+
+  <!-- Mouth -->
+  <path d="M242,328 Q228,344 216,340" stroke="#1a1d27" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M270,328 Q284,344 296,340" stroke="#1a1d27" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Whiskers left -->
+  <line x1="88" y1="305" x2="210" y2="316" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+  <line x1="88" y1="330" x2="210" y2="328" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+  <line x1="88" y1="355" x2="210" y2="342" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+
+  <!-- Whiskers right -->
+  <line x1="302" y1="316" x2="424" y2="305" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+  <line x1="302" y1="328" x2="424" y2="330" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+  <line x1="302" y1="342" x2="424" y2="355" stroke="#e2e8f0" stroke-width="3.5" opacity="0.7" stroke-linecap="round"/>
+
+  <!-- Forehead sparkle -->
+  <circle cx="256" cy="196" r="8" fill="#4ecdc4" opacity="0.9"/>
+  <circle cx="256" cy="196" r="4" fill="#ffffff" opacity="0.8"/>
+</svg>
