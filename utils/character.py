@@ -192,6 +192,8 @@ def get_effective_lifespan_max(player: dict) -> int:
         return base
     bonus = 0
     for t in techs:
+        if isinstance(t, str):
+            continue
         if not t.get("equipped"):
             continue
         info = TECHNIQUES.get(t.get("name", ""), {})
