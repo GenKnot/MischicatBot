@@ -54,6 +54,7 @@ class CityMenuView(discord.ui.View):
             self.add_item(CityMenuButton("茶馆", "tavern", discord.ButtonStyle.primary))
             self.add_item(CityMenuButton("打工", "jobs", discord.ButtonStyle.success))
             self.add_item(CityMenuButton("每日签到", "checkin", discord.ButtonStyle.success))
+            self.add_item(CityMenuButton("赌坊", "gamble", discord.ButtonStyle.danger))
 
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
 
@@ -121,4 +122,15 @@ class CityMenuButton(discord.ui.Button):
             await interaction.response.edit_message(
                 embed=embed,
                 view=CheckinView(interaction.user, player, cog),
+            )
+
+        elif self.action == "gamble":
+            from utils.views.gamble import GambleView, _gamble_overview_embed
+            from utils.db import get_conn
+            uid = str(interaction.user.id)
+            with get_conn() as conn:
+                player = dict(conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone())
+            await interaction.response.edit_message(
+                embed=_gamble_overview_embed(player),
+                view=GambleView(interaction.user, player, cog),
             )

@@ -47,6 +47,8 @@ def _migrate(conn):
         ("job_daily_count",      "INTEGER NOT NULL DEFAULT 0"),
         ("job_daily_reset",      "REAL NOT NULL DEFAULT 0"),
         ("checkin_last_date",    "TEXT"),
+        ("gamble_daily_count",   "INTEGER NOT NULL DEFAULT 0"),
+        ("gamble_daily_reset",   "REAL NOT NULL DEFAULT 0"),
     ]
     for col, definition in migrations:
         if col not in existing:

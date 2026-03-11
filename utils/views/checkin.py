@@ -59,7 +59,7 @@ class CheckinView(discord.ui.View):
             item.disabled = True
         await interaction.response.edit_message(view=self)
 
-        result = do_checkin(self.player)
+        result = await do_checkin(str(interaction.user.id))
         embed = _checkin_result_embed(result, self.player)
 
         done_view = discord.ui.View(timeout=60)

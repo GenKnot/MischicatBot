@@ -189,6 +189,7 @@
 - ~~打工系统（15种工作，5个等级从入门到顶端，立即结算，每日3次，30分钟冷却，每种工作有随机对话）~~
 - ~~城市菜单（主菜单「茶馆」改为「城市」，点击进入城市介绍+在场修士，内含茶馆/打工/每日签到/返回按钮，秘地不显示茶馆与打工）~~
 - ~~每日签到（城市菜单入口，每日一次，随机奖励：灵石/材料/功法/装备，概率分档，配置文件 `data/checkin_config.json` 可直接调整概率）~~
+- ~~赌坊（城市菜单入口，每日10次，押注100/500/1000/5000灵石，大赢×3/赢×2/小赢×1.5/输×0，概率配置文件 `data/gamble_config.json`）~~
 
 ---
 
@@ -296,6 +297,7 @@ utils/                        游戏逻辑层，不直接依赖 Discord
     gathering.py              采集界面（采矿/采药/伐木/钓鱼）
     jobs.py                   打工界面（选工种/结算/冷却显示）
     checkin.py                每日签到界面（roll奖励/结果展示）
+    gamble.py                 赌坊界面（押注按钮/结果展示）
     leaderboard.py            排行榜界面（6种榜单）
     party.py                  组队界面
     sects.py                  宗门界面
@@ -323,6 +325,7 @@ utils/                        游戏逻辑层，不直接依赖 Discord
   equipment.py                装备生成/词缀/战力加成
   jobs.py                     打工系统（15种工种，5个等级，立即结算）
   checkin.py                  每日签到逻辑（读config/roll奖励/写数据库）
+  gamble.py                   赌坊逻辑（押注/概率结算/每日次数限制）
   player.py                   玩家数据读写（get_player/apply_updates）
   quest_logic.py              任务接取/结算/组队分配逻辑
   realms.py                   境界定义、索引、突破路径
@@ -353,6 +356,7 @@ data/                         静态配置文件
   pills.json                  丹药基础属性配置
   recipes.json                炼丹丹方（99个，含主辅药/成功率/品质上限）
   checkin_config.json         每日签到奖励概率配置（可直接修改数字调整概率）
+  gamble_config.json          赌坊押注概率配置（可直接修改数字调整概率）
 
 deploy/
   k8s-deployment.yaml         Kubernetes 部署配置

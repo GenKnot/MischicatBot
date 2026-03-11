@@ -69,6 +69,9 @@ class Player(Base):
     job_cooldown_until: Mapped[float] = mapped_column(Float, nullable=True)
     job_daily_count: Mapped[int] = mapped_column(Integer, default=0)
     job_daily_reset: Mapped[float] = mapped_column(Float, default=0)
+    gamble_daily_count: Mapped[int] = mapped_column(Integer, default=0)
+    gamble_daily_reset: Mapped[float] = mapped_column(Float, default=0)
+    checkin_last_date: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Inventory(Base):

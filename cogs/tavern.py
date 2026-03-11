@@ -110,19 +110,18 @@ class TavernCog(commands.Cog, name="Tavern"):
 
     @commands.hybrid_command(name="签到", aliases=["qd"], description="每日签到，随机获得灵石/材料/功法/装备")
     async def checkin(self, ctx):
-        from utils.db import get_conn
         from utils.views.checkin import CheckinView
+        from utils.db_async import AsyncSessionLocal, Player
         import time
 
         uid = str(ctx.author.id)
-        with get_conn() as conn:
-            row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone()
-        if not row:
+        async with AsyncSessionLocal() as session:
+            player = await session.get(Player, uid)
+        if not player:
             return await ctx.send(f"{ctx.author.mention} 请先创建角色。")
-        player = dict(row)
 
         today = time.strftime("%Y-%m-%d", time.gmtime())
-        if (player.get("checkin_last_date") or "") == today:
+        if (player.checkin_last_date or "") == today:
             return await ctx.send(f"{ctx.author.mention} 今日已签到，明日再来。")
 
         embed = discord.Embed(
@@ -130,7 +129,7 @@ class TavernCog(commands.Cog, name="Tavern"):
             description="点击下方按钮领取今日奖励，每日一次。",
             color=discord.Color.gold(),
         )
-        await ctx.send(ctx.author.mention, embed=embed, view=CheckinView(ctx.author, player, self))
+        await ctx.send(ctx.author.mention, embed=embed, view=CheckinView(ctx.author, {"discord_id": uid}, self))
 
     @commands.hybrid_command(name="茶馆", aliases=["cg"], description="前往茶馆接取任务或采集委托")
     async def tavern(self, ctx):
