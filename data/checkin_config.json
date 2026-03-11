@@ -1,0 +1,41 @@
+{
+  "category_weights": {
+    "spirit_stones": 65,
+    "material": 20,
+    "technique": 10,
+    "equipment": 5
+  },
+  "spirit_stones": {
+    "tiers": [
+      {"label": "一档", "min": 1,    "max": 500,  "weight": 40},
+      {"label": "二档", "min": 501,  "max": 2500, "weight": 42},
+      {"label": "三档", "min": 1501, "max": 3000, "weight": 10},
+      {"label": "四档", "min": 3001, "max": 6000, "weight": 2}
+    ]
+  },
+  "material": {
+    "tiers": [
+      {"label": "普通", "weight": 62, "pool": ["铜矿石","铁矿石","灵芝草","碧灵花","青蒿灵草","薄荷灵叶","茯苓灵块","甘草灵根"]},
+      {"label": "稀有", "weight": 28, "pool": ["精铁矿","灵铁矿","九节菖蒲","茯苓灵块","甘草灵根"]},
+      {"label": "珍贵", "weight": 9,  "pool": ["秘银矿","玄铁矿"]},
+      {"label": "绝世", "weight": 1,  "pool": ["陨铁矿"]}
+    ]
+  },
+  "technique": {
+    "tiers": [
+      {"label": "黄级",   "weight": 60, "grades": ["黄级中品","黄级上品"]},
+      {"label": "玄级下中","weight": 30, "grades": ["玄级下品","玄级中品"]},
+      {"label": "玄级上", "weight": 9,  "grades": ["玄级上品"]},
+      {"label": "地级+",  "weight": 1,  "grades": ["地级下品","地级中品","地级上品"]}
+    ]
+  },
+  "equipment": {
+    "tiers": [
+      {"label": "普通", "quality": "普通", "weight": 48},
+      {"label": "精良", "quality": "精良", "weight": 32},
+      {"label": "稀有", "quality": "稀有", "weight": 16},
+      {"label": "史诗", "quality": "史诗", "weight": 3.5},
+      {"label": "传说", "quality": "传说", "weight": 0.5}
+    ]
+  }
+}

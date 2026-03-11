@@ -53,6 +53,7 @@ class CityMenuView(discord.ui.View):
         if not is_region:
             self.add_item(CityMenuButton("茶馆", "tavern", discord.ButtonStyle.primary))
             self.add_item(CityMenuButton("打工", "jobs", discord.ButtonStyle.success))
+            self.add_item(CityMenuButton("每日签到", "checkin", discord.ButtonStyle.success))
 
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
 
@@ -99,3 +100,25 @@ class CityMenuButton(discord.ui.Button):
                 return
             await interaction.response.defer()
             await _send_main_menu(interaction, cog)
+
+        elif self.action == "checkin":
+            from utils.views.checkin import CheckinView, _checkin_result_embed
+            from utils.db import get_conn
+            import time
+            uid = str(interaction.user.id)
+            with get_conn() as conn:
+                player = dict(conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone())
+            today = time.strftime("%Y-%m-%d", time.gmtime())
+            last = player.get("checkin_last_date") or ""
+            if last == today:
+                await interaction.response.send_message("今日已签到，明日再来。", ephemeral=True)
+                return
+            embed = discord.Embed(
+                title="✦ 每日签到 ✦",
+                description="点击下方按钮领取今日奖励，每日一次。",
+                color=discord.Color.gold(),
+            )
+            await interaction.response.edit_message(
+                embed=embed,
+                view=CheckinView(interaction.user, player, cog),
+            )

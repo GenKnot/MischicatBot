@@ -186,8 +186,9 @@
 - ~~丹阁考核（中州·丹阁，缴费500灵石，获得材料自行摸索，练到通过为止，材料用完可花300补充）~~
 - ~~功法装备上限按境界解锁（炼气5本 · 筑基7本 · 结丹9本 · 元婴12本 · 化神17本 · 炼虚20本 · 合体23本 · 大乘26本 · 真仙29本 · 金仙32本 · 太乙35本 · 大罗38本 · 道祖41本）~~
 - ~~排行榜（境界榜 · 战力榜 · 寿元榜 · 声望榜 · 炼丹榜 · 富豪榜，从世界菜单进入）~~
-- ~~打工系统（15种工作，5个等级从入门到顶端，立即结算，每日3次，30分钟冷却，每种工作有随机NPC对话）~~
-- ~~城市菜单（主菜单「茶馆」改为「城市」，点击进入城市介绍+在场修士，内含茶馆/打工/返回按钮，秘地不显示茶馆与打工）~~
+- ~~打工系统（15种工作，5个等级从入门到顶端，立即结算，每日3次，30分钟冷却，每种工作有随机对话）~~
+- ~~城市菜单（主菜单「茶馆」改为「城市」，点击进入城市介绍+在场修士，内含茶馆/打工/每日签到/返回按钮，秘地不显示茶馆与打工）~~
+- ~~每日签到（城市菜单入口，每日一次，随机奖励：灵石/材料/功法/装备，概率分档，配置文件 `data/checkin_config.json` 可直接调整概率）~~
 
 ---
 
@@ -235,14 +236,128 @@
 ## 项目结构
 
 ```
-cogs/        Discord 命令，每个功能模块一个文件
-utils/       游戏逻辑
-  events/    探险事件池（480个事件）
-  items/     物品定义（321种）
-  quests/    任务列表
-  views/     Discord UI 组件
-web/         FastAPI 管理面板
-deploy/      k8s 部署配置
-scripts/     其他启动脚本备用
+bot.py                        Bot 客户端定义（MischiCat 类）
+main.py                       启动入口，同时启动 Bot 和 Web 面板
+
+cogs/                         Discord 命令入口，每个文件对应一个功能模块
+  alchemy.py                  炼丹命令（开炉/查丹方/炼丹师品级）
+  character.py                角色命令（创建/查看/属性/背包/使用物品）
+  cultivation.py              修炼/突破/坐化/轮回/双修命令
+  equipment.py                装备命令（穿戴/卸下/查看/出售）
+  explore.py                  探险命令（单人/组队探险）
+  music.py                    音乐系统（YouTube/B站点歌，队列管理）
+  property.py                 居所/洞府命令（购买/升级/查看加成）
+  public_events.py            公共事件调度器（灵雨预告/触发/结算，万宝楼定时开拍）
+  sect.py                     宗门命令（加入/退出/查看）
+  tavern.py                   茶馆/城市/打工/任务命令，含管理员工具
+  travel.py                   移动命令（城市间移动，组队带队）
+
+utils/                        游戏逻辑层，不直接依赖 Discord
+  events/                     探险事件池（480个事件）
+    _base.py                  事件基类与公共工具函数
+    common_1~10.py            通用事件（226个，分10个文件）
+    rare_1~3.py               稀有/奇遇事件（49个）
+    adventure.py              特殊奇遇事件
+    sects_events.py           宗门/隐世专属事件（15个）
+    regions/                  五大区域专属事件（100个）
+      central.py / central_2.py   中州
+      east.py / east_2.py         东域
+      south.py / south_2.py       南域
+      west.py / west_2.py         西域
+      north.py / north_2.py       北域
+    public/                   公共事件逻辑
+      spirit_rain.py          天降灵雨（结晶/感悟/淬体/守城）
+      wanbao.py               万宝楼拍卖会（竞价/结算/手续费）
+
+  items/                      物品定义（321种）
+    herbs.py                  草药（170种，含品质/售价/采集地）
+    materials.py              矿石（40种）
+    wood.py                   木材（49种）
+    fish.py                   鱼类（50种）
+    pills.py                  丹药（69种，含效果/品阶）
+    breakthrough.py           突破专属物品（筑基丹/凝丹丹/化婴丹等）
+    tools.py                  工具类物品
+
+  quests/                     任务列表
+    common.py                 普通任务（16个，无声望门槛）
+    elite.py                  精英任务（15个，需声望解锁）
+    legendary.py              传说任务（10个，高声望门槛）
+
+  views/                      Discord UI 组件（View/Button/Select）
+    menu.py                   主菜单
+    city.py                   城市菜单（茶馆/打工/在场修士入口）
+    city_players.py           城市在场修士列表
+    cultivation.py            修炼/闭关界面
+    combat.py                 PVP 战斗结算界面
+    character_create.py       角色创建问卷
+    alchemy.py                炼丹操作界面（选辅药/开炉/结果）
+    dange.py                  丹阁考核界面
+    equipment.py              装备管理界面
+    gathering.py              采集界面（采矿/采药/伐木/钓鱼）
+    jobs.py                   打工界面（选工种/结算/冷却显示）
+    checkin.py                每日签到界面（roll奖励/结果展示）
+    leaderboard.py            排行榜界面（6种榜单）
+    party.py                  组队界面
+    sects.py                  宗门界面
+    techniques.py             功法界面（学习/卸下/查看加成）
+    travel.py                 移动界面
+    dual.py                   双修界面
+    yinyang.py                阴阳奇遇界面
+    crafting.py               锻造界面（预留）
+    wanbao.py                 万宝楼竞价界面（玩家端）
+    wanbao_public.py          万宝楼公告界面
+    public_event_overview.py  公共事件总览
+    spirit_rain.py            灵雨活动参与界面
+    world.py                  世界地图界面
+
+  alchemy.py                  炼丹逻辑（配方匹配/品质计算/熟练度）
+  breakthrough_logic.py       突破判定（成功率/失败惩罚/连续突破）
+  buffs.py                    增益效果管理
+  character.py                角色数据工具函数
+  combat.py                   战斗逻辑（战力计算/PVP判定/逃跑）
+  cultivation_logic.py        修炼结算（时间换修为/寿元消耗）
+  db.py                       同步 SQLite 操作（旧模块使用）
+  db_async.py                 异步 SQLite 操作（新模块使用，逐步迁移中）
+  death_rebirth_logic.py      坐化/轮回逻辑（属性继承/仙葬谷/阴阳奇遇）
+  dual_cultivation_logic.py   双修逻辑（处子加成/冷却/寿元消耗）
+  equipment.py                装备生成/词缀/战力加成
+  jobs.py                     打工系统（15种工种，5个等级，立即结算）
+  checkin.py                  每日签到逻辑（读config/roll奖励/写数据库）
+  player.py                   玩家数据读写（get_player/apply_updates）
+  quest_logic.py              任务接取/结算/组队分配逻辑
+  realms.py                   境界定义、索引、突破路径
+  sects.py                    宗门数据、功法列表、加成计算
+  techniques.py               功法数据与熟练度阶段
+  world.py                    城市/地图/区域/秘地数据
+  ytdlp_helper.py             yt-dlp 封装（音乐下载/流媒体）
+
+web/                          FastAPI 管理面板（端口 8080，只读展示）
+  main.py                     路由定义
+  templates/                  Jinja2 页面模板
+    index.html                总览（在线人数/修炼状态/近期活跃）
+    players.html              修士列表（搜索/筛选/排序）
+    player_detail.html        玩家详情（属性/背包/装备/功法/任务）
+    stats.html                属性榜（多维度排序）
+    events.html               事件记录（灵雨/万宝楼历史）
+    items.html                物品图鉴（321种，按类型/稀有度筛选）
+    techniques.html           功法大全（按品级分组，加成展开）
+    world.html                世界地图（城市/宗门/人口分布）
+    equipment_preview.html    装备预览工具（管理员用）
+    dead.html                 坐化名单
+  static/
+    style.css                 全局样式
+    manifest.json             PWA 配置
+    sw.js                     Service Worker
+
+data/                         静态配置文件
+  pills.json                  丹药基础属性配置
+  recipes.json                炼丹丹方（99个，含主辅药/成功率/品质上限）
+  checkin_config.json         每日签到奖励概率配置（可直接修改数字调整概率）
+
+deploy/
+  k8s-deployment.yaml         Kubernetes 部署配置
+
+scripts/                      备用启动脚本
+  run.bash / run.ps1 / run.py 各平台启动脚本
 ```
 

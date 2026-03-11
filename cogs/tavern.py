@@ -108,6 +108,30 @@ class TavernCog(commands.Cog, name="Tavern"):
     async def cog_unload(self):
         self._quest_notifier.cancel()
 
+    @commands.hybrid_command(name="签到", aliases=["qd"], description="每日签到，随机获得灵石/材料/功法/装备")
+    async def checkin(self, ctx):
+        from utils.db import get_conn
+        from utils.views.checkin import CheckinView
+        import time
+
+        uid = str(ctx.author.id)
+        with get_conn() as conn:
+            row = conn.execute("SELECT * FROM players WHERE discord_id = ?", (uid,)).fetchone()
+        if not row:
+            return await ctx.send(f"{ctx.author.mention} 请先创建角色。")
+        player = dict(row)
+
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        if (player.get("checkin_last_date") or "") == today:
+            return await ctx.send(f"{ctx.author.mention} 今日已签到，明日再来。")
+
+        embed = discord.Embed(
+            title="✦ 每日签到 ✦",
+            description="点击下方按钮领取今日奖励，每日一次。",
+            color=discord.Color.gold(),
+        )
+        await ctx.send(ctx.author.mention, embed=embed, view=CheckinView(ctx.author, player, self))
+
     @commands.hybrid_command(name="茶馆", aliases=["cg"], description="前往茶馆接取任务或采集委托")
     async def tavern(self, ctx):
         uid = str(ctx.author.id)
@@ -263,6 +287,19 @@ class TavernCog(commands.Cog, name="Tavern"):
             row = conn.execute("SELECT name FROM players WHERE discord_id = ?", (uid,)).fetchone()
         name = row["name"] if row else uid
         await ctx.send(f"已重置 **{name}** 的打工冷却与次数。", ephemeral=True)
+
+    @commands.command(name="重置签到", hidden=True)
+    async def reset_checkin(self, ctx, target_id: str = None):
+        if str(ctx.author.id) != "304758476448595970":
+            return
+        uid = target_id or str(ctx.author.id)
+        from utils.db import get_conn
+        with get_conn() as conn:
+            conn.execute("UPDATE players SET checkin_last_date = NULL WHERE discord_id = ?", (uid,))
+            conn.commit()
+            row = conn.execute("SELECT name FROM players WHERE discord_id = ?", (uid,)).fetchone()
+        name = row["name"] if row else uid
+        await ctx.send(f"已重置 **{name}** 的每日签到。", ephemeral=True)
 
 
 class TavernView(discord.ui.View):

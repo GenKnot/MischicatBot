@@ -46,6 +46,7 @@ def _migrate(conn):
         ("job_cooldown_until",   "REAL"),
         ("job_daily_count",      "INTEGER NOT NULL DEFAULT 0"),
         ("job_daily_reset",      "REAL NOT NULL DEFAULT 0"),
+        ("checkin_last_date",    "TEXT"),
     ]
     for col, definition in migrations:
         if col not in existing:
