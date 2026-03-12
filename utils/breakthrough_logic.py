@@ -38,6 +38,8 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
     now = time.time()
     
     if success:
+        needed = cultivation_needed(realm)
+        overflow = max(0, player_dict["cultivation"] - needed)
         new_lifespan_max = lifespan_max_for_realm(nxt)
         lifespan_gain = max(0, new_lifespan_max - player_dict["lifespan_max"])
         new_lifespan = player_dict["lifespan"] + lifespan_gain
@@ -50,7 +52,7 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
             player.realm = nxt
             player.lifespan = new_lifespan
             player.lifespan_max = new_lifespan_max
-            player.cultivation = 0
+            player.cultivation = overflow
             player.last_active = now
             
             await session.commit()
@@ -168,6 +170,8 @@ async def handle_zhuji_breakthrough(discord_id: str, use_pill: bool) -> dict:
         remove_item(discord_id, "筑基丹", 1)
     
     if success:
+        needed = cultivation_needed(player_dict["realm"])
+        overflow = max(0, player_dict["cultivation"] - needed)
         nxt = "筑基期1层"
         new_lifespan_max = lifespan_max_for_realm(nxt)
         lifespan_gain = max(0, new_lifespan_max - player_dict["lifespan_max"])
@@ -183,7 +187,7 @@ async def handle_zhuji_breakthrough(discord_id: str, use_pill: bool) -> dict:
             player.realm = nxt
             player.lifespan = new_lifespan
             player.lifespan_max = new_lifespan_max
-            player.cultivation = 0
+            player.cultivation = overflow
             player.last_active = now
             
             await session.commit()
@@ -250,6 +254,8 @@ async def handle_ningdan_breakthrough(discord_id: str, use_pill: bool) -> dict:
     if use_pill:
         remove_item(discord_id, "凝丹丹", 1)
     if success:
+        needed = cultivation_needed(player_dict["realm"])
+        overflow = max(0, player_dict["cultivation"] - needed)
         nxt = "结丹期初期"
         new_lifespan_max = lifespan_max_for_realm(nxt)
         lifespan_gain = max(0, new_lifespan_max - player_dict["lifespan_max"])
@@ -265,7 +271,7 @@ async def handle_ningdan_breakthrough(discord_id: str, use_pill: bool) -> dict:
             player.realm = nxt
             player.lifespan = new_lifespan
             player.lifespan_max = new_lifespan_max
-            player.cultivation = 0
+            player.cultivation = overflow
             player.last_active = now
             
             await session.commit()
@@ -333,6 +339,8 @@ async def handle_huaying_breakthrough(discord_id: str, use_pill: bool) -> dict:
         remove_item(discord_id, "化婴丹", 1)
     
     if success:
+        needed = cultivation_needed(player_dict["realm"])
+        overflow = max(0, player_dict["cultivation"] - needed)
         nxt = "元婴期初期"
         new_lifespan_max = lifespan_max_for_realm(nxt)
         lifespan_gain = max(0, new_lifespan_max - player_dict["lifespan_max"])
@@ -348,7 +356,7 @@ async def handle_huaying_breakthrough(discord_id: str, use_pill: bool) -> dict:
             player.realm = nxt
             player.lifespan = new_lifespan
             player.lifespan_max = new_lifespan_max
-            player.cultivation = 0
+            player.cultivation = overflow
             player.last_active = now
             
             await session.commit()
