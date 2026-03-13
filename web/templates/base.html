@@ -46,9 +46,11 @@
       border-radius: 99px;
       padding: 1px 8px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 120px;
+        white-space: normal;
+        word-break: break-all;
+        max-width: 120px;
+        overflow-wrap: break-word;
+        overflow: hidden;
     }
 
     #pwaInstallBtn {
