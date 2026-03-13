@@ -13,11 +13,42 @@
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
   <link rel="stylesheet" href="/static/style.css?v=2">
   <style>
-    /* ── PWA install area (bottom of sidebar) ─────────────────────── */
+    /* ── Sidebar bottom area (version + PWA install) ──────────────── */
     .sidebar-install {
       margin-top: auto;
-      padding: 12px 12px 8px;
+      padding: 10px 12px 8px;
       border-top: 1px solid var(--border);
+    }
+
+    .sidebar-version {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 2px 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .sidebar-version-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      flex-shrink: 0;
+    }
+
+    .sidebar-version-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(124, 106, 247, .12);
+      border: 1px solid rgba(124, 106, 247, .25);
+      border-radius: 99px;
+      padding: 1px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
     }
 
     #pwaInstallBtn {
@@ -85,8 +116,15 @@
     <a href="/dead" {% if request.url.path == "/dead" %}class="active"{% endif %}>已坐化</a>
     <a href="/world" {% if request.url.path == "/world" %}class="active"{% endif %}>世界</a>
 
-    <!-- PWA install area — pushed to the bottom of the sidebar -->
+    <!-- ── Sidebar bottom: version + PWA install ── -->
     <div class="sidebar-install">
+
+      <!-- Version badge -->
+      <div class="sidebar-version">
+        <span class="sidebar-version-label">版本</span>
+        <span class="sidebar-version-badge" title="{{ app_version }}">{{ app_version }}</span>
+      </div>
+
       <!-- Chrome / Edge / Android: native install prompt -->
       <button id="pwaInstallBtn" title="安装为独立应用">
         ⬇ 安装应用

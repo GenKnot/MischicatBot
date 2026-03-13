@@ -5,6 +5,11 @@ import sys
 import time
 from datetime import datetime
 
+try:
+    from version import VERSION as _APP_VERSION
+except ImportError:
+    _APP_VERSION = "dev"
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -68,6 +73,7 @@ def duration_left(until):
 templates.env.globals["ts"] = ts
 templates.env.globals["duration_left"] = duration_left
 templates.env.globals["now"] = time.time
+templates.env.globals["app_version"] = _APP_VERSION
 
 
 @app.get("/", response_class=HTMLResponse)

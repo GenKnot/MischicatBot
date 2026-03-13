@@ -47,7 +47,8 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ steps.get_tag.outputs.tag }}
           file: Dockerfile
-
+          build-args: |
+            APP_VERSION=${{ steps.get_tag.outputs.tag }}
 
       - name: Update image tags in GitOps repo
         if: github.event_name == 'push'
