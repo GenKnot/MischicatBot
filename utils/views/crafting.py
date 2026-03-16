@@ -22,11 +22,11 @@ def _crafting_overview_embed() -> discord.Embed:
         inline=False,
     )
     embed.add_field(
-        name="⚙️ 锻造（敬请期待）",
+        name="⚙️ 锻造",
         value=(
             "以灵矿为材，淬炼兵器与防具。\n"
-            "锻造师可为装备附加特殊词条，甚至重铸已有装备的属性。\n"
-            "高阶锻造师方能触碰传说品质的材料。"
+            "矿石品级决定装备境界，辅以木材草药可影响属性偏向。\n"
+            "炼器师品级越高，可锻造的品质上限越高。"
         ),
         inline=False,
     )
@@ -99,9 +99,26 @@ class CraftingMenuView(discord.ui.View):
             view=view,
         )
 
-    @discord.ui.button(label="⚙️ 锻造", style=discord.ButtonStyle.secondary, row=0, disabled=True)
+    @discord.ui.button(label="⚙️ 锻造", style=discord.ButtonStyle.primary, row=0)
     async def forge_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("锻造系统尚未开放。", ephemeral=True)
+        from utils.views.forging import ForgingMainView, _forging_main_embed
+        from utils.forging import FORGING_CITIES
+        uid = str(interaction.user.id)
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
+            row = result.fetchone()
+            player = dict(row._mapping)
+        if player.get("forging_level", 0) == 0 and player.get("current_city") not in FORGING_CITIES:
+            cities_str = "、".join(FORGING_CITIES)
+            await interaction.response.send_message(
+                f"你尚未入门炼器之道。\n前往铸造坊所在城市（{cities_str}）参加入门考核，获得炼器师资质后方可开炉。",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.edit_message(
+            embed=_forging_main_embed(player),
+            view=ForgingMainView(self.author, player, self.cog),
+        )
 
     @discord.ui.button(label="🪆 练傀", style=discord.ButtonStyle.secondary, row=0, disabled=True)
     async def puppet_btn(self, interaction: discord.Interaction, button: discord.ui.Button):

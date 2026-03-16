@@ -311,6 +311,20 @@ class TavernCog(commands.Cog, name="Tavern"):
             name = p.name if p else uid
         await ctx.send(f"已重置 **{name}** 的赌坊次数。", ephemeral=True)
 
+    @commands.command(name="重置轮盘", hidden=True)
+    async def reset_roulette(self, ctx, target_id: str = None):
+        if str(ctx.author.id) != "304758476448595970":
+            return
+        uid = target_id or str(ctx.author.id)
+        async with AsyncSessionLocal() as session:
+            p = await session.get(Player, uid)
+            if p:
+                p.roulette_daily_count = 0
+                p.roulette_daily_reset = 0
+                await session.commit()
+            name = p.name if p else uid
+        await ctx.send(f"已重置 **{name}** 的轮盘次数。")
+
 
 class TavernView(discord.ui.View):
     def __init__(self, author, quests: dict, cog):

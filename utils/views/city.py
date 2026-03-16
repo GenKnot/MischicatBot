@@ -58,6 +58,7 @@ class CityMenuView(discord.ui.View):
             self.add_item(CityMenuButton("打工", "jobs", discord.ButtonStyle.success))
             self.add_item(CityMenuButton("每日签到", "checkin", discord.ButtonStyle.success))
             self.add_item(CityMenuButton("赌坊", "gamble", discord.ButtonStyle.danger))
+            self.add_item(CityMenuButton("轮转赌坊", "roulette", discord.ButtonStyle.danger))
 
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
 
@@ -95,7 +96,7 @@ class CityMenuButton(discord.ui.Button):
                 )
                 player = dict(result.fetchone()._mapping)
             await interaction.response.edit_message(
-                embed=_jobs_overview_embed(player),
+                embed=await _jobs_overview_embed(player),
                 view=JobsView(interaction.user, player, cog),
             )
 
@@ -142,4 +143,17 @@ class CityMenuButton(discord.ui.Button):
             await interaction.response.edit_message(
                 embed=_gamble_overview_embed(player),
                 view=GambleView(interaction.user, player, cog),
+            )
+
+        elif self.action == "roulette":
+            from utils.views.roulette import RouletteView, _wheel_overview_embed
+            uid = str(interaction.user.id)
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
+                )
+                player = dict(result.fetchone()._mapping)
+            await interaction.response.edit_message(
+                embed=_wheel_overview_embed(player),
+                view=RouletteView(interaction.user, player, cog),
             )

@@ -72,6 +72,13 @@ class Player(Base):
     gamble_daily_count: Mapped[int] = mapped_column(Integer, default=0)
     gamble_daily_reset: Mapped[float] = mapped_column(Float, default=0)
     checkin_last_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    forging_level: Mapped[int] = mapped_column(Integer, default=0)
+    forging_exp: Mapped[int] = mapped_column(Integer, default=0)
+    forging_daily_count: Mapped[int] = mapped_column(Integer, default=0)
+    forging_daily_reset: Mapped[float] = mapped_column(Float, default=0)
+    forging_mastery_count: Mapped[int] = mapped_column(Integer, default=0)
+    roulette_daily_count: Mapped[int] = mapped_column(Integer, default=0)
+    roulette_daily_reset: Mapped[float] = mapped_column(Float, default=0)
 
 
 class Inventory(Base):

@@ -94,3 +94,21 @@ async def discard_equipment(discord_id: str, equip_id: str) -> tuple[bool, str]:
         await session.delete(row)
         await session.commit()
     return True, f"已丢弃 **{name}**。"
+
+
+async def get_equipment_by_id(equip_id: str, discord_id: str) -> dict | None:
+    async with AsyncSessionLocal() as session:
+        row = await session.get(Equipment, equip_id)
+        if not row or row.discord_id != discord_id:
+            return None
+        return _row_to_dict(row)
+
+
+async def update_equipment_stats(equip_id: str, new_name: str, new_stats: dict, new_flavor: str):
+    async with AsyncSessionLocal() as session:
+        row = await session.get(Equipment, equip_id)
+        if row:
+            row.name = new_name
+            row.stats = json.dumps(new_stats, ensure_ascii=False)
+            row.flavor = new_flavor
+            await session.commit()

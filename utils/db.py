@@ -49,6 +49,13 @@ def _migrate(conn):
         ("checkin_last_date",    "TEXT"),
         ("gamble_daily_count",   "INTEGER NOT NULL DEFAULT 0"),
         ("gamble_daily_reset",   "REAL NOT NULL DEFAULT 0"),
+        ("forging_level",        "INTEGER NOT NULL DEFAULT 0"),
+        ("forging_exp",          "INTEGER NOT NULL DEFAULT 0"),
+        ("forging_daily_count",  "INTEGER NOT NULL DEFAULT 0"),
+        ("forging_daily_reset",  "REAL NOT NULL DEFAULT 0"),
+        ("forging_mastery_count","INTEGER NOT NULL DEFAULT 0"),
+        ("roulette_daily_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("roulette_daily_reset", "REAL NOT NULL DEFAULT 0"),
     ]
     for col, definition in migrations:
         if col not in existing:

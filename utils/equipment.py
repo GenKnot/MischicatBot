@@ -369,7 +369,7 @@ def _pick_affixes(slot: str, quality: str, tier: int) -> tuple[list[dict], dict 
     return prefixes, suffix
 
 
-def generate_equipment(tier: int = 0, quality: str = None, slot: str = None) -> dict:
+def generate_equipment(tier: int = 0, quality: str = None, slot: str = None, stat_bias: list[str] | None = None) -> dict:
     if slot is None:
         slot = random.choice(SLOTS)
     if quality is None:
@@ -377,6 +377,10 @@ def generate_equipment(tier: int = 0, quality: str = None, slot: str = None) -> 
         quality = random.choices(QUALITY_ORDER, weights=weights)[0]
 
     template = random.choice(EQUIP_TEMPLATES[slot])
+    if stat_bias:
+        biased = [t for t in EQUIP_TEMPLATES[slot] if any(s in t["stats"] for s in stat_bias)]
+        if biased:
+            template = random.choice(biased)
     mult = QUALITY_STAT_MULT[quality]
     base = 1 + tier // 2
 

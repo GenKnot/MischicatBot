@@ -124,7 +124,7 @@ class JobButton(discord.ui.Button):
         if not _check_req(player, self.job["req"]):
             return await interaction.followup.send("你已不满足此工作的要求。", ephemeral=True)
 
-        result = do_job(player, self.job)
+        result = await do_job(player, self.job)
 
         if not result["ok"]:
             return await interaction.followup.send(result["reason"], ephemeral=True)
