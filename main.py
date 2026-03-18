@@ -39,7 +39,7 @@ except Exception:
 
 from bot import MischicatBot
 
-# test commit
+# test commit 1
 def _run_git(*args: str, cwd: str | None = None) -> str:
     """Run git command and return stdout (trimmed)."""
     res = subprocess.run(
