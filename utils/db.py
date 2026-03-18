@@ -264,6 +264,21 @@ def init_db():
                 status       TEXT NOT NULL DEFAULT 'active'
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS market_listings (
+                listing_id  TEXT PRIMARY KEY,
+                seller_id   TEXT NOT NULL,
+                item_type   TEXT NOT NULL,
+                item_id     TEXT NOT NULL,
+                item_name   TEXT NOT NULL,
+                quantity    INTEGER NOT NULL DEFAULT 1,
+                price       INTEGER NOT NULL,
+                listed_at   REAL NOT NULL,
+                expires_at  REAL NOT NULL,
+                status      TEXT NOT NULL DEFAULT 'active',
+                eq_data     TEXT
+            )
+        """)
         conn.commit()
 
 

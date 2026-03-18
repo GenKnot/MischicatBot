@@ -219,3 +219,19 @@ class BankDeposit(Base):
     deposited_at: Mapped[float] = mapped_column(Float, nullable=False)
     due_at: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[str] = mapped_column(String, default="active")
+
+
+class MarketListing(Base):
+    __tablename__ = "market_listings"
+
+    listing_id: Mapped[str] = mapped_column(String, primary_key=True)
+    seller_id: Mapped[str] = mapped_column(String, nullable=False)
+    item_type: Mapped[str] = mapped_column(String, nullable=False)
+    item_id: Mapped[str] = mapped_column(String, nullable=False)
+    item_name: Mapped[str] = mapped_column(String, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    price: Mapped[int] = mapped_column(Integer, nullable=False)
+    listed_at: Mapped[float] = mapped_column(Float, nullable=False)
+    expires_at: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="active")
+    eq_data: Mapped[str | None] = mapped_column(Text, nullable=True)

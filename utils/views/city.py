@@ -60,6 +60,7 @@ class CityMenuView(discord.ui.View):
             self.add_item(CityMenuButton("赌坊", "gamble", discord.ButtonStyle.danger))
             self.add_item(CityMenuButton("轮转赌坊", "roulette", discord.ButtonStyle.danger))
             self.add_item(CityMenuButton("钱庄", "bank", discord.ButtonStyle.primary))
+            self.add_item(CityMenuButton("交易坊", "market", discord.ButtonStyle.primary))
 
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
 
@@ -177,4 +178,23 @@ class CityMenuButton(discord.ui.Button):
             await interaction.response.edit_message(
                 embed=_bank_main_embed(player, account, deposits),
                 view=BankMainView(interaction.user, player, account, deposits, cog),
+            )
+
+        elif self.action == "market":
+            from utils.views.market import MarketMainView, _market_main_embed, _get_listings_with_names
+            from utils.market import MARKET_CITIES
+            uid = str(interaction.user.id)
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
+                )
+                player = dict(result.fetchone()._mapping)
+            if player.get("current_city") not in MARKET_CITIES:
+                cities_str = "、".join(MARKET_CITIES)
+                await interaction.response.send_message(f"交易坊只在以下城市开放：{cities_str}", ephemeral=True)
+                return
+            listings = await _get_listings_with_names("all")
+            await interaction.response.edit_message(
+                embed=_market_main_embed(player, listings, 0, "all"),
+                view=MarketMainView(interaction.user, player, listings, 0, "all", cog),
             )
