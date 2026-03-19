@@ -38,6 +38,10 @@ def _update_log_path() -> str:
 def _log_update(msg: str):
     line = f"[auto-update] {msg}"
     print(line)
+    # Avoid writing log files when running inside Kubernetes pods.
+    if os.getenv("KUBERNETES_SERVICE_HOST") is not None:
+        return
+
     try:
         with open(_update_log_path(), "a", encoding="utf-8") as f:
             f.write(line + "\n")
@@ -107,6 +111,12 @@ def maybe_update_repo_once() -> bool:
     Compare local HEAD with configured target commit.
     If different: git reset --hard to target, then return True.
     """
+
+    # Disable autoupdate if running in Kubernetes
+    if os.getenv("KUBERNETES_SERVICE_HOST") is not None:
+        _log_update("Kubernetes detected, auto-update disabled.")
+        return False
+
     enabled = os.getenv("AUTO_UPDATE", "").strip().lower()
     if enabled not in {"1", "true", "yes", "on"}:
         return False
@@ -138,6 +148,12 @@ def maybe_update_repo_once() -> bool:
 
 
 async def auto_update_loop():
+
+    # Disable autoupdate if running in Kubernetes
+    if os.getenv("KUBERNETES_SERVICE_HOST") is not None:
+        _log_update("Kubernetes detected, auto-update loop disabled.")
+        return
+
     enabled = os.getenv("AUTO_UPDATE", "").strip().lower()
     if enabled not in {"1", "true", "yes", "on"}:
         return
