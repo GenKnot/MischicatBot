@@ -18,6 +18,12 @@ from utils.views.spirit_rain import TravelToEventView, _get_active_event, _get_p
 from utils.views.wanbao_public import _WanbaoTravelButton, WANBAO_DESC
 from utils.views.public_event_overview import PublicEventOverviewView
 
+import logging
+from utils.config import is_master
+
+log = logging.getLogger(__name__)
+
+
 MONTREAL_TZ = ZoneInfo("America/Montreal")
 PUBLIC_EVENT_CHANNEL_ENV = "PUBLIC_EVENT_CHANNEL_ID"
 
@@ -289,7 +295,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
         active = await get_active_auction()
         if active and active["status"] == "active":
             if self._lot_task is None or self._lot_task.done():
-                print(f"[万宝楼] 检测到进行中拍卖，重启 lot timer: {active['auction_id']}")
+                log.info("万宝楼：检测到进行中的拍卖，重启 lot timer auction=%s", active["auction_id"])
                 self._lot_task = asyncio.create_task(self._run_lot_timer(active["auction_id"]))
 
     async def _run_lot_timer(self, auction_id: str):
@@ -333,9 +339,9 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
                         await self._announce_auction_end(channel, auction_id)
                     break
         except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            print(f"[万宝楼] lot timer 异常: {e}")
+            raise                      # 任务取消要往上传，别当成错误吞掉
+        except Exception:
+            log.exception("万宝楼 lot timer 异常")
 
     async def _announce_lot_result(self, channel, result: dict, auction_id: str):
         lot = result["lot"]
@@ -498,8 +504,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
 
     @commands.command(name="开启拍卖", aliases=["kqpm"], hidden=True)
     async def debug_start_auction(self, ctx):
-        ALLOWED = {"304758476448595970"}
-        if str(ctx.author.id) not in ALLOWED:
+        if not is_master(ctx.author.id):
             return
         from utils.events.public.wanbao import get_or_create_auction, get_active_auction, start_auction, get_lots
         now_mt = _montreal_now()
@@ -532,8 +537,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
 
     @commands.command(name="重启拍卖计时", aliases=["cqpm"], hidden=True)
     async def debug_restart_timer(self, ctx):
-        ALLOWED = {"304758476448595970"}
-        if str(ctx.author.id) not in ALLOWED:
+        if not is_master(ctx.author.id):
             return
         from utils.events.public.wanbao import get_active_auction
         active = await get_active_auction()

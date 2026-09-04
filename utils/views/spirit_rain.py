@@ -6,6 +6,7 @@ import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.player import get_player, apply_updates, settle_time
+from utils.views.base import TimedView
 
 
 async def _get_active_event() -> dict | None:
@@ -97,7 +98,8 @@ async def _build_main_menu(interaction: discord.Interaction, cog):
     return embed, view
 
 
-class TravelToEventView(discord.ui.View):
+class TravelToEventView(TimedView):
+    public = True          # 公共事件广播里的按钮，人人可点
     def __init__(self, city: str, event_id: str, pe_cog=None):
         super().__init__(timeout=None)
         self.city = city
@@ -170,9 +172,10 @@ class TravelToEventView(discord.ui.View):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-class ConfirmStopAndTravelView(discord.ui.View):
+class ConfirmStopAndTravelView(TimedView):
+    public = True          # 归属校验在按钮回调里（比对 self.uid）
     def __init__(self, uid: str, city: str, activity: str, is_cultivating: bool, is_gathering: bool, player: dict):
-        super().__init__(timeout=60)
+        super().__init__()
         self.uid = uid
         self.city = city
         self.activity = activity
@@ -216,14 +219,27 @@ class ConfirmStopAndTravelView(discord.ui.View):
             updates["gathering_until"] = None
             updates["gathering_type"] = None
 
-        fields = ", ".join(f"{k} = :{k}" for k in updates)
+        fields = ", ".join(f"{k} = :{k}" for k in updates)   # 字段名全部来自代码，不含用户输入
         params = dict(updates)
         params["uid"] = self.uid
+
+        # 结算只能发生一次。用"还在闭关/采集"当条件，结算完字段置空，
+        # 第二次自然落空。
+        conditions = ["discord_id = :uid"]
+        if "cultivating_until" in updates:
+            conditions.append("cultivating_until IS NOT NULL")
+        if "gathering_until" in updates:
+            conditions.append("gathering_until IS NOT NULL")
+
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text(f"UPDATE players SET {fields} WHERE discord_id = :uid"),
+            result = await session.execute(
+                text(f"UPDATE players SET {fields} WHERE {' AND '.join(conditions)}"),
                 params,
             )
+            if result.rowcount != 1:
+                await session.rollback()
+                return await interaction.response.send_message(
+                    "状态已变化（可能已经结算过了），请重新操作。", ephemeral=True)
             await session.commit()
 
         self.stop()
@@ -240,9 +256,9 @@ class ConfirmStopAndTravelView(discord.ui.View):
         await interaction.response.edit_message(content="已取消。", view=None)
 
 
-class SpiritRainView(discord.ui.View):
+class SpiritRainView(TimedView):
     def __init__(self, author, pe_cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.pe_cog = pe_cog
 
@@ -292,17 +308,11 @@ class _EventDetailButton(discord.ui.Button):
             )
 
 
-class _BackToOverviewView(discord.ui.View):
+class _BackToOverviewView(TimedView):
     def __init__(self, author, pe_cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.pe_cog = pe_cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="返回公共事件", style=discord.ButtonStyle.secondary)
     async def back_overview(self, interaction: discord.Interaction, button: discord.ui.Button):

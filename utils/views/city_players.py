@@ -3,6 +3,7 @@ from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.realms import get_realm_index
 from utils.world import SPECIAL_REGIONS
+from utils.views.base import TimedView
 
 
 def _city_players_embed(city_players: list, viewer: dict) -> discord.Embed:
@@ -26,21 +27,15 @@ def _city_players_embed(city_players: list, viewer: dict) -> discord.Embed:
     return embed
 
 
-class CityPlayersView(discord.ui.View):
+class CityPlayersView(TimedView):
     def __init__(self, author, city_players: list, viewer: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         viewer_idx = get_realm_index(viewer["realm"]) if viewer else 0
         for p in city_players[:5]:
             self.add_item(CityPlayerButton(p, viewer_idx))
         self.add_item(_BackToMenuButton(cog))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _BackToMenuButton(discord.ui.Button):

@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 
@@ -15,6 +16,8 @@ from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.world import CITIES
 from utils.player import get_player, is_defending, settle_time, apply_updates, can_breakthrough
+
+log = logging.getLogger(__name__)
 
 from utils.death_rebirth_logic import (
     check_death, handle_death, handle_rebirth, can_rebirth,
@@ -390,7 +393,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 )
                 await user.send(partner_msg)
             except Exception:
-                pass
+                # 对方关了私信是常态，不当错误处理
+                log.debug("私信发送失败", exc_info=True)
         
         await interaction.followup.send(f"{interaction.user.mention} {msg}")
 
@@ -789,7 +793,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 user = await self.bot.fetch_user(int(uid))
                 await user.send(embed=embed)
             except Exception:
-                pass
+                # 对方关了私信是常态，不当错误处理
+                log.debug("私信发送失败", exc_info=True)
 
     @_cultivation_notifier.before_loop
     async def _before_notifier(self):
@@ -853,7 +858,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 user = await self.bot.fetch_user(int(uid))
                 await user.send(embed=embed)
             except Exception:
-                pass
+                # 对方关了私信是常态，不当错误处理
+                log.debug("私信发送失败", exc_info=True)
 
     @_gathering_notifier.before_loop
     async def _before_gathering_notifier(self):

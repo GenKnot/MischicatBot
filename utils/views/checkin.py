@@ -1,6 +1,7 @@
 import discord
 from utils.checkin import do_checkin
 from utils.equipment import format_equipment
+from utils.views.base import TimedView
 
 
 def _checkin_result_embed(result: dict, player: dict) -> discord.Embed:
@@ -39,18 +40,12 @@ def _checkin_result_embed(result: dict, player: dict) -> discord.Embed:
     return embed
 
 
-class CheckinView(discord.ui.View):
+class CheckinView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="签到", style=discord.ButtonStyle.success, emoji="🎁")
     async def checkin_btn(self, interaction: discord.Interaction, button: discord.ui.Button):

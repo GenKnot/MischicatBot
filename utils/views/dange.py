@@ -1,5 +1,9 @@
 import discord
+from sqlalchemy import func, update
+
+from utils.atomic import spend_stones
 from utils.db_async import AsyncSessionLocal, Player, Inventory
+from utils.views.base import TimedView
 
 EXAM_COST = 500
 MATERIAL_COST = 300
@@ -83,19 +87,13 @@ async def _give_materials(uid: str, session):
         await session.execute(stmt)
 
 
-class DangeView(discord.ui.View):
+class DangeView(TimedView):
     def __init__(self, author, cog, player: dict, paid: bool = False):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
         self.paid = paid
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="缴费参加考核（500灵石）", style=discord.ButtonStyle.success, row=0)
     async def pay_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -106,14 +104,30 @@ class DangeView(discord.ui.View):
                 return await interaction.response.send_message("角色不存在。", ephemeral=True)
             if player.alchemy_level > 0:
                 return await interaction.response.send_message("你已经是炼丹师了，无需再考核。", ephemeral=True)
-            if player.spirit_stones < EXAM_COST:
+            # exam_attempts_left > 0 就是已缴费。只有从 0 翻到 1 那次收费。
+            claimed = await session.execute(
+                update(Player)
+                .where(
+                    Player.discord_id == uid,
+                    Player.alchemy_level == 0,
+                    func.coalesce(Player.exam_attempts_left, 0) == 0,
+                )
+                .values(exam_attempts_left=1)
+            )
+            if claimed.rowcount != 1:
+                return await interaction.response.send_message(
+                    "*「你已经交过钱了，材料用完再来找我补。」*", ephemeral=True)
+
+            # rollback 会让 ORM 对象过期，之后再读属性会触发同步 IO，
+            # 所以先把要显示的余额取成普通变量
+            stones_now = player.spirit_stones
+            if not await spend_stones(session, uid, EXAM_COST):
+                await session.rollback()      # 连带退回刚打上的缴费标记
                 return await interaction.response.send_message(
                     f"*「灵石不够就别来凑热闹了，{EXAM_COST} 灵石，一个子儿都不能少。」*\n\n"
-                    f"当前灵石：**{player.spirit_stones}**",
+                    f"当前灵石：**{stones_now}**",
                     ephemeral=True,
                 )
-            player.spirit_stones -= EXAM_COST
-            player.exam_attempts_left = 1
             await _give_materials(uid, session)
             await session.commit()
 
@@ -132,12 +146,11 @@ class DangeView(discord.ui.View):
             player = await session.get(Player, uid)
             if not player:
                 return await interaction.response.send_message("角色不存在。", ephemeral=True)
-            if player.spirit_stones < MATERIAL_COST:
+            if not await spend_stones(session, uid, MATERIAL_COST):
                 return await interaction.response.send_message(
                     f"*「{MATERIAL_COST} 灵石都拿不出来？」*\n\n当前灵石：**{player.spirit_stones}**",
                     ephemeral=True,
                 )
-            player.spirit_stones -= MATERIAL_COST
             await _give_materials(uid, session)
             await session.commit()
         await interaction.response.send_message(

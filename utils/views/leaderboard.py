@@ -2,6 +2,7 @@ import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.realms import get_realm_index
+from utils.views.base import TimedView
 
 
 MEDALS = ["🥇", "🥈", "🥉"]
@@ -113,17 +114,11 @@ _BOARDS = {
 }
 
 
-class LeaderboardView(discord.ui.View):
+class LeaderboardView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     async def _show(self, interaction: discord.Interaction, key: str):
         embed = await _BOARDS[key]()

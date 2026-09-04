@@ -9,6 +9,7 @@ from utils.forging import (
 from utils.equipment import QUALITY_COLOR, QUALITY_ORDER, STAT_NAMES, TIER_NAMES, format_equipment
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
+from utils.views.base import TimedView
 
 
 async def _get_player(uid: str) -> dict | None:
@@ -62,9 +63,9 @@ def _forging_main_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class ForgingMainView(discord.ui.View):
+class ForgingMainView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
@@ -73,12 +74,6 @@ class ForgingMainView(discord.ui.View):
             self.reforge_btn.disabled = True
         else:
             self.exam_btn.disabled = True
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="📋 参加入门考核", style=discord.ButtonStyle.success, row=0)
     async def exam_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -92,10 +87,12 @@ class ForgingMainView(discord.ui.View):
             cities_str = "、".join(FORGING_CITIES)
             await interaction.response.send_message(f"需前往铸造坊城市（{cities_str}）才能参加考核。", ephemeral=True)
             return
-        inventory = await _get_inventory(uid)
-        has_exam_mats = any(inventory.get(k, 0) > 0 for k in EXAM_MATERIALS)
-        if has_exam_mats:
-            await interaction.response.send_message("你手上还有考核材料，直接前往技艺→锻造开始锻造即可。若材料已用完，可花 300 灵石补充。", ephemeral=True)
+        # 是否已缴费以 forging_exam_paid 为准。原先是看"背包里有没有考核材料"，
+        # 那样玩家自己挖到铜矿石就会被误判成已缴费、永远无法参加考核。
+        if player.get("forging_exam_paid"):
+            await interaction.response.send_message(
+                "你已缴过考核费，直接前往技艺→锻造开始锻造即可。材料用完可花 300 灵石补充。",
+                ephemeral=True)
             return
         result = await start_forging_exam(uid)
         if not result["ok"]:
@@ -149,19 +146,13 @@ def _forge_slot_embed() -> discord.Embed:
     )
 
 
-class ForgeSlotSelectView(discord.ui.View):
+class ForgeSlotSelectView(TimedView):
     def __init__(self, author, player: dict, inventory: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.inventory = inventory
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="⚔️ 武器", style=discord.ButtonStyle.primary)
     async def weapon_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -204,9 +195,9 @@ def _forge_ore_embed(slot: str, inventory: dict) -> discord.Embed:
     return embed
 
 
-class ForgeOreSelectView(discord.ui.View):
+class ForgeOreSelectView(TimedView):
     def __init__(self, author, player: dict, inventory: dict, slot: str, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.inventory = inventory
@@ -218,12 +209,6 @@ class ForgeOreSelectView(discord.ui.View):
             self.add_item(OreButton(ore, qty >= needed))
 
         self.add_item(BackToSlotButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class OreButton(discord.ui.Button):
@@ -280,9 +265,9 @@ def _forge_quality_embed(slot: str, ore: str, player: dict) -> discord.Embed:
     return embed
 
 
-class ForgeQualitySelectView(discord.ui.View):
+class ForgeQualitySelectView(TimedView):
     def __init__(self, author, player: dict, inventory: dict, slot: str, ore: str, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.inventory = inventory
@@ -294,12 +279,6 @@ class ForgeQualitySelectView(discord.ui.View):
         for q in available:
             self.add_item(QualityButton(q))
         self.add_item(BackToOreButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class QualityButton(discord.ui.Button):
@@ -363,9 +342,9 @@ def _forge_aux_embed(slot: str, ore: str, quality: str, inventory: dict) -> disc
     return embed
 
 
-class ForgeAuxSelectView(discord.ui.View):
+class ForgeAuxSelectView(TimedView):
     def __init__(self, author, player: dict, inventory: dict, slot: str, ore: str, quality: str, aux_wood: str | None = None, aux_herb: str | None = None, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.inventory = inventory
@@ -396,12 +375,6 @@ class ForgeAuxSelectView(discord.ui.View):
 
         self.add_item(ForgeConfirmButton())
         self.add_item(BackToQualityButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class AuxSelect(discord.ui.Select):
@@ -517,9 +490,9 @@ def _reforge_select_embed(equip_list: list[dict]) -> discord.Embed:
     return embed
 
 
-class ReforgeSelectView(discord.ui.View):
+class ReforgeSelectView(TimedView):
     def __init__(self, author, player: dict, inventory: dict, equip_list: list[dict], cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.inventory = inventory
@@ -536,12 +509,6 @@ class ReforgeSelectView(discord.ui.View):
         ]
         self.add_item(ReforgeEquipSelect(options))
         self.add_item(BackFromReforgeButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class ReforgeEquipSelect(discord.ui.Select):

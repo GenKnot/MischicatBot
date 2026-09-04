@@ -4,6 +4,7 @@ import discord
 
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
+from utils.views.base import TimedView
 
 WANBAO_DESC = (
     "每日北美东部时间 **20:00**，万宝楼将举办大型拍卖会。\n\n"
@@ -32,9 +33,9 @@ WANBAO_DESC = (
 WANBAO_TRIGGER_HOUR = 20
 
 
-class WanbaoPublicView(discord.ui.View):
+class WanbaoPublicView(TimedView):
     def __init__(self, author, pe_cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.pe_cog = pe_cog
 
@@ -70,18 +71,12 @@ class _WanbaoEventButton(discord.ui.Button):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-class _WanbaoDetailView(discord.ui.View):
+class _WanbaoDetailView(TimedView):
     def __init__(self, author, pe_cog=None, auction=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.pe_cog = pe_cog
         self.auction = auction
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="前往万宝楼", style=discord.ButtonStyle.success)
     async def travel(self, interaction: discord.Interaction, button: discord.ui.Button):

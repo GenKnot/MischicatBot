@@ -13,3 +13,12 @@ game.db
 PROGRESS.md
 requirement.md
 New.md
+game.db-wal
+game.db-shm
+.pytest_cache/
+/.gk
+cookies.txt
+.coverage
+coverage.xml
+htmlcov/
+game.db.backup-*

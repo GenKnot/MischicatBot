@@ -9,6 +9,7 @@ from utils.market import (
     list_item, list_equipment, buy_listing, delist,
 )
 from utils.items import ITEMS
+from utils.views.base import TimedView
 
 ITEM_TYPE_LABELS = {
     "all": "全部",
@@ -80,9 +81,9 @@ def _my_listings_embed(player: dict, listings: list[dict], expired: list[dict]) 
     return embed
 
 
-class MarketMainView(discord.ui.View):
+class MarketMainView(TimedView):
     def __init__(self, author, player: dict, listings: list[dict], page: int = 0, filter_type: str = "all", cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.listings = listings
@@ -100,12 +101,6 @@ class MarketMainView(discord.ui.View):
         self.add_item(MarketMyStallButton())
         self.add_item(MarketListButton())
         self.add_item(MarketBackButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class MarketFilterSelect(discord.ui.Select):
@@ -270,17 +265,11 @@ async def _equipment_list_embed(uid: str) -> discord.Embed:
     return embed
 
 
-class ListTypeView(discord.ui.View):
+class ListTypeView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="🌿 查看背包", style=discord.ButtonStyle.success, row=0)
     async def view_inv_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -305,17 +294,11 @@ class ListTypeView(discord.ui.View):
         )
 
 
-class ListItemView(discord.ui.View):
+class ListItemView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="📤 上架物品", style=discord.ButtonStyle.success, row=0)
     async def list_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -326,17 +309,11 @@ class ListItemView(discord.ui.View):
         await interaction.response.edit_message(embed=_list_type_embed(), view=ListTypeView(self.author, self.cog))
 
 
-class ListEquipView(discord.ui.View):
+class ListEquipView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="📤 上架装备", style=discord.ButtonStyle.primary, row=0)
     async def list_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -413,20 +390,14 @@ class ListEquipModal(discord.ui.Modal, title="上架装备"):
         )
 
 
-class MyStallView(discord.ui.View):
+class MyStallView(TimedView):
     def __init__(self, author, player: dict, listings: list[dict], expired: list[dict], cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.listings = listings
         self.expired = expired
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="❌ 下架", style=discord.ButtonStyle.danger, row=0)
     async def delist_btn(self, interaction: discord.Interaction, button: discord.ui.Button):

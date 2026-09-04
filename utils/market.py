@@ -2,8 +2,10 @@ import time
 import uuid
 import json
 
-from sqlalchemy import select
-from utils.db_async import AsyncSessionLocal, Player, Inventory, Equipment, MarketListing
+from sqlalchemy import delete, select, update
+
+from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
+from utils.db_async import AsyncSessionLocal, Equipment, MarketListing
 
 MARKET_CITIES = ["灵虚城", "丹阁", "落云城", "碧波城", "天工城"]
 MAX_LISTINGS = 5
@@ -53,18 +55,16 @@ async def list_item(discord_id: str, item_id: str, quantity: int, price: int) ->
         if len(active_result.scalars().all()) >= MAX_LISTINGS:
             return {"ok": False, "reason": f"最多同时上架 {MAX_LISTINGS} 件。"}
 
-        row = await session.get(Inventory, (discord_id, item_id))
-        if not row or row.quantity < quantity:
-            return {"ok": False, "reason": "背包物品不足。"}
         if price <= 0:
             return {"ok": False, "reason": "价格必须大于 0。"}
+        if quantity <= 0:
+            return {"ok": False, "reason": "数量必须大于 0。"}
+        # 先原子扣背包再建挂单：并发上架同一批物品时只有一次能扣到
+        if not await consume_item(session, discord_id, item_id, quantity):
+            return {"ok": False, "reason": "背包物品不足。"}
 
         item_info = ITEMS.get(item_id, {})
         item_name = item_info.get("name", item_id)
-
-        row.quantity -= quantity
-        if row.quantity <= 0:
-            await session.delete(row)
 
         listing_id = str(uuid.uuid4())[:8]
         session.add(MarketListing(
@@ -128,7 +128,17 @@ async def list_equipment(discord_id: str, equip_id: str, price: int) -> dict:
             status="active",
             eq_data=eq_data,
         ))
-        await session.delete(eq)
+        # 原子占用装备：并发上架同一件时只有一次能删掉，另一次挂单被回滚
+        removed = await session.execute(
+            delete(Equipment).where(
+                Equipment.equip_id == equip_id,
+                Equipment.discord_id == discord_id,
+                Equipment.equipped == False,  # noqa: E712 — SQL 比较，不能用 `is not`
+            )
+        )
+        if removed.rowcount != 1:
+            await session.rollback()
+            return {"ok": False, "reason": "装备不存在。"}
         await session.commit()
         return {"ok": True, "listing_id": listing_id}
 
@@ -147,28 +157,34 @@ async def buy_listing(discord_id: str, listing_id: str) -> dict:
             await session.commit()
             return {"ok": False, "reason": "该商品已过期。"}
 
-        buyer = await session.get(Player, discord_id)
-        if not buyer:
-            return {"ok": False, "reason": "角色不存在。"}
-        if buyer.spirit_stones < listing.price:
-            return {"ok": False, "reason": f"灵石不足，需要 {listing.price:,}。"}
+        # 原子占单：只有把 active 改成 sold 的那一次点击才算买到，
+        # 并发的第二次点击 rowcount 为 0，不会重复发货。
+        claimed = await session.execute(
+            update(MarketListing)
+            .where(MarketListing.listing_id == listing_id,
+                   MarketListing.status == "active")
+            .values(status="sold")
+        )
+        if claimed.rowcount != 1:
+            return {"ok": False, "reason": "该商品已下架或不存在。"}
 
-        fee = max(1, int(listing.price * FEE_RATE))
-        seller_gets = listing.price - fee
+        # rollback 会让 ORM 对象过期，之后再读属性会触发同步 IO，
+        # 所以这里先把要用到的值取成普通变量。
+        price, seller_id = listing.price, listing.seller_id
+        item_type, item_id, quantity = listing.item_type, listing.item_id, listing.quantity
+        item_name, eq_data = listing.item_name, listing.eq_data
+        fee = max(1, int(price * FEE_RATE))
+        seller_gets = price - fee
 
-        buyer.spirit_stones -= listing.price
-        seller = await session.get(Player, listing.seller_id)
-        if seller:
-            seller.spirit_stones += seller_gets
+        if not await spend_stones(session, discord_id, price):
+            await session.rollback()          # 连带撤销上面的占单
+            return {"ok": False, "reason": f"灵石不足，需要 {price:,}。"}
+        await grant_stones(session, seller_id, seller_gets)
 
-        if listing.item_type == "item":
-            inv = await session.get(Inventory, (discord_id, listing.item_id))
-            if inv:
-                inv.quantity += listing.quantity
-            else:
-                session.add(Inventory(discord_id=discord_id, item_id=listing.item_id, quantity=listing.quantity))
+        if item_type == "item":
+            await grant_item(session, discord_id, item_id, quantity)
         else:
-            eq_info = json.loads(listing.eq_data)
+            eq_info = json.loads(eq_data)
             session.add(Equipment(
                 equip_id=eq_info["equip_id"],
                 discord_id=discord_id,
@@ -182,9 +198,8 @@ async def buy_listing(discord_id: str, listing_id: str) -> dict:
                 equipped=False,
             ))
 
-        listing.status = "sold"
         await session.commit()
-        return {"ok": True, "item_name": listing.item_name, "price": listing.price, "fee": fee}
+        return {"ok": True, "item_name": item_name, "price": price, "fee": fee}
 
 
 async def delist(discord_id: str, listing_id: str) -> dict:
@@ -196,11 +211,7 @@ async def delist(discord_id: str, listing_id: str) -> dict:
             return {"ok": False, "reason": "该商品已售出。"}
 
         if listing.item_type == "item":
-            inv = await session.get(Inventory, (discord_id, listing.item_id))
-            if inv:
-                inv.quantity += listing.quantity
-            else:
-                session.add(Inventory(discord_id=discord_id, item_id=listing.item_id, quantity=listing.quantity))
+            await grant_item(session, discord_id, listing.item_id, listing.quantity)
         else:
             eq_info = json.loads(listing.eq_data)
             session.add(Equipment(

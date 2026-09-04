@@ -1,9 +1,13 @@
+import logging
 import discord
 from utils.party import (
     get_party, get_party_members, create_party, add_to_party,
     remove_from_party, disband_party,
 )
 from utils.player import get_player
+from utils.views.base import TimedView
+
+log = logging.getLogger(__name__)
 
 
 def party_info_embed(members: list, leader_id: str) -> discord.Embed:
@@ -30,21 +34,16 @@ async def disband_party_func(uid: str, client) -> str:
             user = await client.fetch_user(int(mid))
             await user.send("队长已解散队伍，你已退出。")
         except Exception:
-            pass
+            # 对方关了私信是常态
+            log.debug("私信发送失败 uid=%s", mid, exc_info=True)
     return msg
 
 
-class PartyView(discord.ui.View):
+class PartyView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class PartyInviteButton(discord.ui.Button):
@@ -79,9 +78,10 @@ class PartyInviteButton(discord.ui.Button):
             await interaction.response.send_message("无法发送邀请，对方可能关闭了私信。", ephemeral=True)
 
 
-class PartyInviteResponseView(discord.ui.View):
+class PartyInviteResponseView(TimedView):
+    public = True          # 归属校验在按钮回调里（比对 self.target）
     def __init__(self, inviter: dict, target: dict, inviter_user):
-        super().__init__(timeout=60)
+        super().__init__()
         self.inviter = inviter
         self.target = target
         self.inviter_user = inviter_user

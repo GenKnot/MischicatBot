@@ -10,7 +10,12 @@ permissions:
   contents: write
 
 jobs:
+  # 测试不过就不构建 / 不发版。
+  test:
+    uses: ./.github/workflows/test.yml
+
   build:
+    needs: test
     strategy:
       fail-fast: false
       matrix:

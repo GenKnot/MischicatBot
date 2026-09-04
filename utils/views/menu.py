@@ -1,26 +1,62 @@
+import logging
+
 import discord
+
 from utils.config import COMMAND_PREFIX
 from utils.sects import SECTS, check_requirements
+from utils.views.base import TimedView
+
+log = logging.getLogger(__name__)
+
+
+_DEFAULT_EVENT_HINT = "每日 22:00（北美东部时间）触发，天下修士皆可参与"
+
+# 这个提示对所有人都一样，而且几分钟才变一次，但主菜单是最常打开的界面。
+# 缓存一下，把每次开菜单一次查询降到每 20 秒一次。
+_EVENT_HINT_TTL = 20.0
+_event_hint_cache: tuple[float, str] | None = None
 
 
 def _get_event_hint() -> str:
-    import sqlite3, os, time as _time
-    db_path = os.getenv("DB_PATH", "game.db")
+    """公共事件的一句话提示。
+
+    这里是同步查询，跑在事件循环上 —— 实测 0.19ms，为它做异步改造不划算
+    （`_build_menu_embed` 有 8 个同步调用点）。但要防住最坏情况：
+    `sqlite3.connect` 默认 timeout 是 5 秒，拿不到锁时会把整个 bot 冻住那么久。
+    所以显式给一个很短的超时，宁可显示默认文案也不卡住。
+    """
+    import sqlite3
+    import time as _time
+
+    from utils.config import DB_PATH
+
+    global _event_hint_cache
+    now = _time.time()
+    if _event_hint_cache and now - _event_hint_cache[0] < _EVENT_HINT_TTL:
+        return _event_hint_cache[1]
+
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(DB_PATH, timeout=0.2)
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT title, status, ends_at FROM public_events WHERE status IN ('active', 'pending') ORDER BY started_at DESC LIMIT 1"
+            "SELECT title, status, ends_at FROM public_events "
+            "WHERE status IN ('active', 'pending') ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
         conn.close()
     except Exception:
-        return "每日 22:00（北美东部时间）触发，天下修士皆可参与"
+        log.debug("读取公共事件提示失败", exc_info=True)
+        return _DEFAULT_EVENT_HINT
+
     if not row:
-        return "每日 22:00（北美东部时间）触发，天下修士皆可参与"
-    if row["status"] == "active":
-        remaining = max(0, row["ends_at"] - _time.time())
-        return f"「{row['title']}」进行中，还剩 {remaining/60:.0f} 分钟"
-    return f"「{row['title']}」即将开始，敬请关注公告频道"
+        hint = _DEFAULT_EVENT_HINT
+    elif row["status"] == "active":
+        remaining = max(0, row["ends_at"] - now)
+        hint = f"「{row['title']}」进行中，还剩 {remaining/60:.0f} 分钟"
+    else:
+        hint = f"「{row['title']}」即将开始，敬请关注公告频道"
+
+    _event_hint_cache = (now, hint)
+    return hint
 
 
 def _build_gameplay_description(has_dual: bool = False, event_hint: str = "") -> str:
@@ -175,9 +211,9 @@ def _get_joinable_sects(player: dict) -> list[str]:
     return result
 
 
-class MainMenuView(discord.ui.View):
+class MainMenuView(TimedView):
     def __init__(self, author, has_player: bool, can_breakthrough: bool, cog, player=None, city_players=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         self._city_players = city_players or []
@@ -218,12 +254,6 @@ class MainMenuView(discord.ui.View):
             self.add_item(MenuButton("万宝楼", discord.ButtonStyle.primary, "wanbao"))
         if player and player.get("current_city") == "丹阁" and player.get("alchemy_level", 0) == 0:
             self.add_item(MenuButton("丹阁考核", discord.ButtonStyle.success, "dange_exam"))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class MenuButton(discord.ui.Button):
@@ -524,9 +554,9 @@ class MenuButton(discord.ui.Button):
             await interaction.followup.send(f"出错了：{e}", ephemeral=True)
 
 
-class ProfileView(discord.ui.View):
+class ProfileView(TimedView):
     def __init__(self, author, can_breakthrough: bool, is_cultivating: bool, cog, player=None, city_players=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -538,8 +568,3 @@ class ProfileView(discord.ui.View):
             self.add_item(MenuButton("突破", discord.ButtonStyle.danger, "breakthrough"))
         self.add_item(MenuButton("返回主菜单", discord.ButtonStyle.secondary, "back_to_menu"))
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True

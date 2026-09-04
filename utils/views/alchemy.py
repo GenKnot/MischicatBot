@@ -5,7 +5,14 @@ from utils.alchemy import (
     get_mastery_count, get_mastery_label, calc_success_rate,
     get_known_recipes, get_known_recipes_with_choices,
 )
+from utils.atomic import consume_item
 from utils.db_async import AsyncSessionLocal, Inventory
+
+import logging
+from utils.views.base import TimedView
+
+log = logging.getLogger(__name__)
+
 
 
 async def _get_inventory(discord_id: str) -> dict:
@@ -79,21 +86,15 @@ def _auto_match_recipe(qty_map: dict[str, int], alchemy_level: int) -> tuple[dic
     return None, []
 
 
-class AlchemyMainView(discord.ui.View):
+class AlchemyMainView(TimedView):
     def __init__(self, author: discord.User, player: dict, has_yanhuo: bool, known_ids: set[str], cog=None, known_choices: dict = None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
         self.known_ids = known_ids
         self.known_choices = known_choices or {}
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="已知丹方", style=discord.ButtonStyle.primary, emoji="📜")
     async def known_recipes_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -131,9 +132,9 @@ class AlchemyMainView(discord.ui.View):
         )
 
 
-class _KnownRecipeSelectView(discord.ui.View):
+class _KnownRecipeSelectView(TimedView):
     def __init__(self, author, player, has_yanhuo, known_recipes, known_choices: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
@@ -148,12 +149,6 @@ class _KnownRecipeSelectView(discord.ui.View):
         ]
         self.add_item(_KnownRecipeSelect(options))
         self.add_item(_BackToMainButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _KnownRecipeSelect(discord.ui.Select):
@@ -219,9 +214,9 @@ def _qty_content(qty_map: dict, inventory: dict) -> str:
     return "\n".join(lines)
 
 
-class _FreeMixSelectView(discord.ui.View):
+class _FreeMixSelectView(TimedView):
     def __init__(self, author, player, has_yanhuo, inventory, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
@@ -236,12 +231,6 @@ class _FreeMixSelectView(discord.ui.View):
         if options:
             self.add_item(_FreeMixHerbSelect(options))
         self.add_item(_BackToMainButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _FreeMixHerbSelect(discord.ui.Select):
@@ -264,9 +253,9 @@ class _FreeMixHerbSelect(discord.ui.Select):
         )
 
 
-class _FreeMixQtyView(discord.ui.View):
+class _FreeMixQtyView(TimedView):
     def __init__(self, author, player, has_yanhuo, inventory, qty_map: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
@@ -279,12 +268,6 @@ class _FreeMixQtyView(discord.ui.View):
             self.add_item(_PlusOneButton(item, row=i % 4))
         self.add_item(_ConfirmFreeMixButton(row=4))
         self.add_item(_BackToMainButton(row=4))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _PlusOneButton(discord.ui.Button):
@@ -328,7 +311,10 @@ class _ConfirmFreeMixButton(discord.ui.Button):
                 all_items.extend([item] * qty)
 
             if recipe is None:
-                await _consume_free_mix(uid, all_items, v.inventory)
+                if not await _consume_free_mix(uid, all_items, v.inventory):
+                    await interaction.edit_original_response(
+                        content="药材不足，丹炉未能点燃。", embed=None, view=None)
+                    return
                 await interaction.edit_original_response(
                     content="丹炉轰鸣，烟雾散尽，炉中只剩一堆灰烬。\n继续摸索吧！",
                     embed=None,
@@ -351,7 +337,7 @@ class _ConfirmFreeMixButton(discord.ui.Button):
                 await interaction.edit_original_response(content=result["reason"], embed=None, view=None)
                 return
 
-            await _consume_ingredients(uid, recipe, aux_choices)
+            # 材料已由 attempt_alchemy 在掷骰前原子扣掉，这里不能再扣一次
 
             if result["success"]:
                 await _give_pill(uid, result["pill"], result["quality_name"])
@@ -368,30 +354,24 @@ class _ConfirmFreeMixButton(discord.ui.Button):
             embed = _result_embed(result, recipe, v.inventory)
             fail_view = None if result["success"] else _FailView(v.author, v.player, v.has_yanhuo, cog=getattr(v, "cog", None))
             await interaction.edit_original_response(embed=embed, view=fail_view)
-            print(f"[alchemy error] {e}")
-            import traceback; traceback.print_exc()
+            log.exception("炼丹出错 uid=%s", uid)
             try:
                 await interaction.edit_original_response(content=f"炼丹出错：{e}", embed=None, view=None)
             except Exception:
-                pass
+                # 交互过期就发不出去了，没别的办法
+                log.debug("炼丹报错消息发送失败", exc_info=True)
         finally:
             v._firing = False
 
 
-class _AshView(discord.ui.View):
+class _AshView(TimedView):
     def __init__(self, author, player, has_yanhuo, inventory, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
         self.inventory = inventory
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="继续炼丹", style=discord.ButtonStyle.primary)
     async def continue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -410,19 +390,13 @@ class _AshView(discord.ui.View):
         await interaction.response.edit_message(content="炼丹台：", embed=None, view=view)
 
 
-class _FailView(discord.ui.View):
+class _FailView(TimedView):
     def __init__(self, author, player, has_yanhuo, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="继续炼丹", style=discord.ButtonStyle.primary)
     async def continue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -436,9 +410,9 @@ class _FailView(discord.ui.View):
         await interaction.response.edit_message(content=None, embed=_crafting_overview_embed(), view=CraftingMenuView(self.author, self.cog))
 
 
-class _AuxSelectView(discord.ui.View):
+class _AuxSelectView(TimedView):
     def __init__(self, author, player, has_yanhuo, recipe, inventory, choices_so_far):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
@@ -460,12 +434,6 @@ class _AuxSelectView(discord.ui.View):
             self.add_item(_AuxSelect(group["desc"], options, group_idx))
         self.add_item(_BackToMainButton())
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
-
 
 class _AuxSelect(discord.ui.Select):
     def __init__(self, desc, options, group_idx):
@@ -485,9 +453,9 @@ class _AuxSelect(discord.ui.Select):
             await interaction.response.edit_message(content=None, embed=embed, view=confirm_view)
 
 
-class _ConfirmView(discord.ui.View):
+class _ConfirmView(TimedView):
     def __init__(self, author, player, has_yanhuo, recipe, inventory, choices, cog=None):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.player = player
         self.has_yanhuo = has_yanhuo
@@ -495,12 +463,6 @@ class _ConfirmView(discord.ui.View):
         self.inventory = inventory
         self.choices = choices
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="开炉炼丹", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -521,7 +483,7 @@ class _ConfirmView(discord.ui.View):
             self.stop()
             return
 
-        await _consume_ingredients(uid, self.recipe, self.choices)
+        # 材料已由 attempt_alchemy 在掷骰前原子扣掉，这里不能再扣一次
 
         if result["success"]:
             await _give_pill(uid, result["pill"], result["quality_name"])
@@ -649,35 +611,26 @@ def _result_embed(result: dict, recipe: dict, inventory: dict = None) -> discord
     return embed
 
 
-async def _consume_ingredients(discord_id: str, recipe: dict, choices: list[int]):
+async def _consume_all(discord_id: str, to_consume: dict[str, int]) -> bool:
+    """在同一事务里把一组材料扣净。任一不足则整体不扣，返回 False。
+
+    原先的写法是 `if row: row.quantity -= qty` —— 背包里没有这味药时直接
+    跳过，等于不花材料也能开炉；数量不够时还会把库存扣成负数。
+    """
     async with AsyncSessionLocal() as session:
-        to_consume: dict[str, int] = {}
-        for ing in recipe["main_ingredients"]:
-            to_consume[ing["item"]] = to_consume.get(ing["item"], 0) + ing["qty"]
-        for i, group in enumerate(recipe["aux_groups"]):
-            opt = group["options"][choices[i]]
-            to_consume[opt["item"]] = to_consume.get(opt["item"], 0) + opt["qty"]
         for item_id, qty in to_consume.items():
-            row = await session.get(Inventory, (discord_id, item_id))
-            if row:
-                row.quantity -= qty
-                if row.quantity <= 0:
-                    await session.delete(row)
+            if not await consume_item(session, discord_id, item_id, qty):
+                await session.rollback()
+                return False
         await session.commit()
+        return True
 
 
-async def _consume_free_mix(discord_id: str, all_items: list[str], inventory: dict):
-    async with AsyncSessionLocal() as session:
-        to_consume: dict[str, int] = {}
-        for item in all_items:
-            to_consume[item] = to_consume.get(item, 0) + 1
-        for item_id, qty in to_consume.items():
-            row = await session.get(Inventory, (discord_id, item_id))
-            if row:
-                row.quantity -= qty
-                if row.quantity <= 0:
-                    await session.delete(row)
-        await session.commit()
+async def _consume_free_mix(discord_id: str, all_items: list[str], inventory: dict) -> bool:
+    to_consume: dict[str, int] = {}
+    for item in all_items:
+        to_consume[item] = to_consume.get(item, 0) + 1
+    return await _consume_all(discord_id, to_consume)
 
 
 async def _give_pill(discord_id: str, pill_name: str, quality_name: str):

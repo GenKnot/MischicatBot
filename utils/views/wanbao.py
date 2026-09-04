@@ -3,6 +3,7 @@ import time
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.player import get_player
+from utils.views.base import TimedView
 from utils.events.public.wanbao import (
     get_active_auction, get_lots, get_current_lot,
     place_bid, list_item, can_list_item,
@@ -136,17 +137,11 @@ def build_lots_list_embed(auction: dict, lots: list[dict]) -> discord.Embed:
     return embed
 
 
-class WanbaoMainView(discord.ui.View):
+class WanbaoMainView(TimedView):
     def __init__(self, author: discord.User, pe_cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.pe_cog = pe_cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="查看拍品", style=discord.ButtonStyle.primary)
     async def view_lots(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -211,9 +206,10 @@ class WanbaoMainView(discord.ui.View):
         await _send_main_menu(interaction, cog)
 
 
-class PublicBidView(discord.ui.View):
+class PublicBidView(TimedView):
+    public = True          # 拍卖会公开竞价，人人可出价
     def __init__(self, auction_id: str, lot_index: int, total: int):
-        super().__init__(timeout=LOT_DURATION + 10)
+        super().__init__(timeout=LOT_DURATION)
         self.auction_id = auction_id
         self.lot_index = lot_index
         self.total = total
@@ -282,9 +278,9 @@ class PublicBidView(discord.ui.View):
         await self._do_bid(interaction, 1000)
 
 
-class BidView(discord.ui.View):
+class BidView(TimedView):
     def __init__(self, author, auction_id: str, lot: dict, ends_at: float, lot_index: int, total: int, pe_cog=None):
-        super().__init__(timeout=LOT_DURATION + 10)
+        super().__init__(timeout=LOT_DURATION)
         self.author = author
         self.auction_id = auction_id
         self.lot = lot
@@ -292,12 +288,6 @@ class BidView(discord.ui.View):
         self.lot_index = lot_index
         self.total = total
         self.pe_cog = pe_cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     async def _do_bid(self, interaction: discord.Interaction, increment: int):
         uid = str(interaction.user.id)

@@ -9,6 +9,7 @@ from utils.bank import (
     deposit_demand, withdraw_demand, deposit_term, withdraw_term, transfer,
 )
 from utils.character import seconds_to_years
+from utils.views.base import TimedView
 
 
 async def _get_player(uid: str) -> dict | None:
@@ -56,20 +57,14 @@ def _bank_main_embed(player: dict, account: dict, deposits: list[dict]) -> disco
     return embed
 
 
-class BankMainView(discord.ui.View):
+class BankMainView(TimedView):
     def __init__(self, author, player: dict, account: dict, deposits: list[dict], cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.account = account
         self.deposits = deposits
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="💰 存入活期", style=discord.ButtonStyle.success, row=0)
     async def demand_deposit_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -194,9 +189,9 @@ def _term_select_embed() -> discord.Embed:
     return embed
 
 
-class TermDepositSelectView(discord.ui.View):
+class TermDepositSelectView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         options = [
@@ -209,12 +204,6 @@ class TermDepositSelectView(discord.ui.View):
         ]
         self.add_item(TermSelect(options))
         self.add_item(BackToBankButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class TermSelect(discord.ui.Select):
@@ -271,9 +260,9 @@ def _term_withdraw_embed(deposits: list[dict]) -> discord.Embed:
     return embed
 
 
-class TermWithdrawSelectView(discord.ui.View):
+class TermWithdrawSelectView(TimedView):
     def __init__(self, author, deposits: list[dict], cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         now = time.time()
@@ -287,12 +276,6 @@ class TermWithdrawSelectView(discord.ui.View):
             ))
         self.add_item(TermWithdrawSelect(options))
         self.add_item(BackToBankButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class TermWithdrawSelect(discord.ui.Select):

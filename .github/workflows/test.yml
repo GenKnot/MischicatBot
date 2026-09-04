@@ -1,0 +1,47 @@
+name: Tests
+
+# 测试是所有其它 workflow 的前置条件：构建与发版都要等它通过。
+# 背景：测试写完后长期没有任何 workflow 运行它，写了也会腐烂。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:        # 供 docker-build / release 复用
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 与 Dockerfile 的 python:3.12-slim 保持一致，
+          # 免得"本地/CI 能过、镜像里挂掉"
+          python-version: '3.12'
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # 锁文件必须和 .in 对得上，否则改了 .in 忘了重新 compile，
+      # CI 装的还是旧依赖，问题要到镜像构建后才暴露
+      - name: 检查锁文件是否最新
+        run: |
+          pip install pip-tools
+          pip-compile -q --strip-extras --output-file=/tmp/req.lock requirements.in
+          diff <(grep -v "^#" requirements.txt) <(grep -v "^#" /tmp/req.lock) \
+            || { echo "requirements.txt 与 requirements.in 不一致，请重新跑 pip-compile"; exit 1; }
+
+      - name: 跑测试并检查覆盖率门槛
+        # --cov-fail-under 是棘轮：只许升不许降。
+        # 每次实质性提升覆盖率后，把这个数字一起调高。
+        # 刻意比实测值（约 22.2%）低 1 个百分点：部分用例带随机分支，
+        # 覆盖率会小幅抖动，贴边设置会变成随机失败的 CI。
+        run: |
+          pytest tests/ -q \
+            --cov=utils --cov=cogs --cov=web \
+            --cov-report=term-missing:skip-covered \
+            --cov-fail-under=21

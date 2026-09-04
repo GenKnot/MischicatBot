@@ -1,13 +1,11 @@
 import discord
 from discord.ext import commands
 
-from utils.config import COMMAND_PREFIX
+from utils.config import COMMAND_PREFIX, is_master
 from utils.db_async import AsyncSessionLocal, Player, Inventory
 from utils.alchemy import PILLS, RECIPES, QUALITY_NAMES, list_available_recipes, get_mastery_count, get_mastery_label
 from utils.views.alchemy import AlchemyMainView
-
-ADMIN_ID = "304758476448595970"
-
+from utils.logging_setup import audit
 
 async def _get_player(discord_id: str):
     async with AsyncSessionLocal() as session:
@@ -180,7 +178,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
 
     @commands.command(name="调试炼丹")
     async def debug_alchemy(self, ctx: commands.Context, level: int = 5):
-        if str(ctx.author.id) != ADMIN_ID:
+        if not is_master(ctx.author.id):
             return
         uid = str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -194,7 +192,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
 
     @commands.command(name="重置炼丹次数")
     async def reset_alchemy_count(self, ctx: commands.Context):
-        if str(ctx.author.id) != ADMIN_ID:
+        if not is_master(ctx.author.id):
             return
         uid = str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -202,11 +200,12 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             if p:
                 p.alchemy_daily_count = 0
                 await session.commit()
+        audit("reset_alchemy_count", ctx.author, target=uid)
         await ctx.send("今日炼丹次数已重置。")
 
     @commands.command(name="重置炼丹")
     async def reset_alchemy(self, ctx: commands.Context, target_id: str = None):
-        if str(ctx.author.id) != ADMIN_ID:
+        if not is_master(ctx.author.id):
             return
         uid = target_id or str(ctx.author.id)
         from sqlalchemy import delete
@@ -223,6 +222,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await session.execute(delete(KnownRecipe).where(KnownRecipe.discord_id == uid))
             await session.execute(delete(AlchemyMastery).where(AlchemyMastery.discord_id == uid))
             await session.commit()
+        audit("reset_alchemy", ctx.author, target=uid)
         await ctx.send(f"已重置 {uid} 的炼丹数据（等级/经验/次数/丹方/熟练度全清）。")
 
 

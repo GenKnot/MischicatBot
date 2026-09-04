@@ -1,11 +1,13 @@
 import json
 
 import discord
+from utils.views.base import TimedView
 
 
-class PublicEventOverviewView(discord.ui.View):
+class PublicEventOverviewView(TimedView):
+    public = True          # 公共事件面板，人人可看
     def __init__(self, active: dict | None, pending: dict | None, auction: dict | None = None, pe_cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.active = active
         self.pending = pending
         self.pe_cog = pe_cog

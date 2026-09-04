@@ -4,7 +4,7 @@ import time
 import discord
 from discord.ext import commands
 
-from utils.config import COMMAND_PREFIX
+from utils.config import COMMAND_PREFIX, is_master
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 from utils.player import get_player
@@ -13,6 +13,7 @@ from utils.events import get_event_pool
 from utils.character import seconds_to_years, get_explore_limit_bonus
 from utils.adventure_chain import get_chain_progress, get_available_chains, get_trigger_chance
 from utils.events.adventure_chains import ALL_CHAINS
+from utils.logging_setup import audit
 
 EXPLORE_LIMIT = 8
 EXPLORE_RESET_YEARS = 5
@@ -512,8 +513,7 @@ class ExploreCog(commands.Cog, name="Explore"):
     
     @commands.command(name="重置探险")
     async def reset_explore(self, ctx, target_id: str = None):
-        ADMIN_ID = "304758476448595970"
-        if str(ctx.author.id) != ADMIN_ID:
+        if not is_master(ctx.author.id):
             return
         
         uid = target_id or str(ctx.author.id)
@@ -525,6 +525,7 @@ class ExploreCog(commands.Cog, name="Explore"):
             )
             await session.commit()
 
+        audit("reset_explore", ctx.author, target=uid)
         player = await get_player(uid)
         if player:
             await ctx.send(f"已重置 **{player['name']}** 的探险次数。")

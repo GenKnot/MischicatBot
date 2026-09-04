@@ -4,10 +4,19 @@ on:
   push:
     branches:
       - main
+  # 每周一 04:00 UTC 重建一次。代码没变，但会装上最新的 yt-dlp ——
+  # YouTube 的播放器和签名方案变得快，几个月不更新就失效。
+  schedule:
+    - cron: "0 4 * * 1"
   workflow_dispatch:
 
 jobs:
+  # 测试不过就不构建 / 不发版。
+  test:
+    uses: ./.github/workflows/test.yml
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,9 +42,10 @@ jobs:
       - name: Set lowercase image name
         run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/mischicat-bot" >> $GITHUB_ENV
 
+      # 带上 commit sha，排查时能直接对上线上跑的是哪个提交
       - name: Get timestamp tag
         id: get_tag
-        run: echo "tag=alpha$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+        run: echo "tag=alpha$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -50,8 +60,10 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.get_tag.outputs.tag }}
 
+      # 定时构建也要走这一步，否则镜像出了却到不了线上，
+      # 每周重建就白做了。手动触发不自动部署。
       - name: Update image tags in GitOps repo
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'schedule'
         run: |
           # Clone the GitOps repository
           git clone https://x-access-token:${{ secrets.GITOPS_PAT }}@github.com/yulexun/flux.git gitops

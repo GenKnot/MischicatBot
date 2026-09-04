@@ -6,6 +6,7 @@ from utils.items.fish import FISH
 from utils.items.herbs import HERBS
 from utils.world import SPECIAL_REGIONS, get_region
 from utils.realms import get_realm_index
+from utils.views.base import TimedView
 
 
 GATHER_OPTIONS = [
@@ -97,9 +98,9 @@ def roll_gathering_rewards(years: float, realm_idx: int, region_name: str, gathe
     return sorted(results.items(), key=lambda x: x[1], reverse=True)
 
 
-class GatherView(discord.ui.View):
+class GatherView(TimedView):
     def __init__(self, author, cog, player: dict, gather_type: str, region_name: str):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -109,12 +110,6 @@ class GatherView(discord.ui.View):
         for years, label, hint in GATHER_OPTIONS:
             disabled = player["lifespan"] < years
             self.add_item(GatherButton(years, f"{emoji} {label}（{hint}）", disabled))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class GatherButton(discord.ui.Button):
@@ -170,6 +165,7 @@ class GatherButton(discord.ui.Button):
         new_lifespan = player["lifespan"] - lifespan_cost
 
         active_buffs_raw = player.get("active_buffs") or "{}"
+        old_buffs_raw = active_buffs_raw      # CAS 用：写回前 buff 表的原值
         buffs_changed = False
         if gather_bonus > 0:
             _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_bonus_once")
@@ -178,17 +174,35 @@ class GatherButton(discord.ui.Button):
             _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_cooldown_reduction")
             buffs_changed = True
 
+        # 上面的检查是先读再判断，连点会两次都通过、把一次性 buff 用两遍。
+        # 条件写进 UPDATE 里。
+        conditions = ("WHERE discord_id = :uid "
+                      "AND (gathering_until IS NULL OR gathering_until <= :now) "
+                      "AND lifespan >= :cost")
+        params = {"gu": gathering_until, "gt": view.gather_type, "cost": lifespan_cost,
+                  "la": now, "now": now, "gb": gather_bonus, "uid": uid}
         async with AsyncSessionLocal() as session:
             if buffs_changed:
-                await session.execute(
-                    text("UPDATE players SET gathering_until = :gu, gathering_type = :gt, lifespan = :ls, last_active = :la, active_buffs = :ab, gathering_bonus = :gb WHERE discord_id = :uid"),
-                    {"gu": gathering_until, "gt": view.gather_type, "ls": new_lifespan, "la": now, "ab": active_buffs_raw, "gb": gather_bonus, "uid": uid}
+                params.update({"ab": active_buffs_raw, "old_ab": old_buffs_raw})
+                result = await session.execute(
+                    text("UPDATE players SET gathering_until = :gu, gathering_type = :gt, "
+                         "lifespan = lifespan - :cost, last_active = :la, "
+                         "active_buffs = :ab, gathering_bonus = :gb "
+                         + conditions + " AND COALESCE(active_buffs, '{}') = :old_ab"),
+                    params
                 )
             else:
-                await session.execute(
-                    text("UPDATE players SET gathering_until = :gu, gathering_type = :gt, lifespan = :ls, last_active = :la, gathering_bonus = :gb WHERE discord_id = :uid"),
-                    {"gu": gathering_until, "gt": view.gather_type, "ls": new_lifespan, "la": now, "gb": gather_bonus, "uid": uid}
+                result = await session.execute(
+                    text("UPDATE players SET gathering_until = :gu, gathering_type = :gt, "
+                         "lifespan = lifespan - :cost, last_active = :la, gathering_bonus = :gb "
+                         + conditions),
+                    params
                 )
+            if result.rowcount != 1:
+                await session.rollback()
+                await interaction.followup.send("状态已变化，请重新操作。", ephemeral=True)
+                view.stop()
+                return
             await session.commit()
 
         real_time = actual_years * 2

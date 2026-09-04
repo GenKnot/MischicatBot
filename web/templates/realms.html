@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}境界体系 · Mischicat{% endblock %}
+{% block content %}
+
+<div class="stats-grid" style="margin-bottom:32px">
+  <div class="stat-card"><div class="num">{{ major_count }}</div><div class="label">大境</div></div>
+  <div class="stat-card"><div class="num" style="color:var(--accent2)">{{ realm_count }}</div><div class="label">小境</div></div>
+  <div class="stat-card"><div class="num" style="color:var(--success)">{{ living_total }}</div><div class="label">在世修士</div></div>
+  <div class="stat-card"><div class="num" style="color:var(--muted)">{{ dead_total }}</div><div class="label">已坐化</div></div>
+</div>
+
+{% if highest %}
+<div class="realm-highest">当前最高境界：<strong>{{ highest }}</strong></div>
+{% endif %}
+
+{% for g in groups %}
+<div class="world-section {% if g.total == 0 %}realm-section--empty{% endif %}">
+  <div class="world-section-header">
+    <span class="world-region-tag">{{ g.major }}</span>
+    <span class="world-section-count">
+      {{ g.stages | length }} 个小境
+      {% if g.total > 0 %}· <strong style="color:var(--success)">{{ g.total }} 人</strong>{% endif %}
+    </span>
+  </div>
+  <div class="realm-grid">
+    {% for item in g.stages %}
+    <div class="realm-cell {% if item.count > 0 %}realm-cell--occupied{% endif %}">
+      <div class="realm-cell-name">{{ item.name }}</div>
+      <div class="realm-cell-meta">寿元上限 {{ "{:,}".format(item.lifespan) }}</div>
+      <div class="realm-cell-count">
+        {% if item.count > 0 %}{{ item.count }} 人{% else %}—{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% if unknown %}
+<div class="section-title" style="margin-top:32px">未归入体系的境界</div>
+<div class="world-section">
+  <p style="color:var(--muted);font-size:13px;margin:0 0 12px">
+    这些境界值不在 <code>utils/realms.py</code> 的 REALMS 里，通常是历史数据。
+  </p>
+  <div class="realm-grid">
+    {% for u in unknown %}
+    <div class="realm-cell realm-cell--unknown">
+      <div class="realm-cell-name">{{ u.name }}</div>
+      <div class="realm-cell-count">{{ u.count }} 人</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

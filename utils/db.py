@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.getenv("DB_PATH", "game.db")
+from utils.config import DB_PATH
 
 
 def get_conn():
@@ -14,6 +14,12 @@ def get_conn():
 
 
 def _migrate(conn):
+    """遗留迁移。**已冻结，不要再往这里加东西。**
+
+    从 alembic/versions/0001_baseline.py 之后，所有 schema 变更都写成
+    alembic revision。这里留着只是为了让还没升级过的老库能补齐字段，
+    等确认线上没有老库了就可以整个删掉。
+    """
     existing = {row[1] for row in conn.execute("PRAGMA table_info(players)")}
     migrations = [
         ("rebirth_count",        "INTEGER NOT NULL DEFAULT 0"),
@@ -56,6 +62,7 @@ def _migrate(conn):
         ("forging_mastery_count","INTEGER NOT NULL DEFAULT 0"),
         ("roulette_daily_count", "INTEGER NOT NULL DEFAULT 0"),
         ("roulette_daily_reset", "REAL NOT NULL DEFAULT 0"),
+        ("forging_exam_paid",     "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col, definition in migrations:
         if col not in existing:
@@ -104,7 +111,7 @@ def _migrate(conn):
             discord_id  TEXT NOT NULL,
             joined_at   REAL NOT NULL,
             contribution INTEGER NOT NULL DEFAULT 0,
-            activity    TEXT,
+            activity    TEXT NOT NULL DEFAULT '',
             PRIMARY KEY (event_id, discord_id, activity)
         )
     """)
@@ -120,7 +127,7 @@ def _migrate(conn):
                 discord_id   TEXT NOT NULL,
                 joined_at    REAL NOT NULL,
                 contribution INTEGER NOT NULL DEFAULT 0,
-                activity     TEXT,
+                activity     TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (event_id, discord_id, activity)
             )
         """)
@@ -208,6 +215,10 @@ def _migrate(conn):
             updated_at  REAL NOT NULL DEFAULT 0
         )
     """)
+    # 一次性数据订正：早期新建的角色境界写成了"炼气期一层"（中文数字），
+    # 不在 utils/realms.py::REALMS 里。幂等，跑多少次都一样。
+    conn.execute("UPDATE players SET realm = '炼气期1层' WHERE realm = '炼气期一层'")
+
     conn.commit()
 
 
@@ -228,7 +239,7 @@ def init_db():
                 lifespan      INTEGER NOT NULL,
                 lifespan_max  INTEGER NOT NULL,
                 cultivation   INTEGER NOT NULL DEFAULT 0,
-                realm         TEXT NOT NULL DEFAULT '炼气期一层',
+                realm         TEXT NOT NULL DEFAULT '炼气期1层',
                 spirit_stones INTEGER NOT NULL DEFAULT 0,
                 reputation    INTEGER NOT NULL DEFAULT 0,
                 created_at    REAL NOT NULL,
@@ -288,176 +299,3 @@ def init_db():
             )
         """)
         conn.commit()
-
-
-def get_residences(discord_id: str) -> list:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT city FROM residences WHERE discord_id = ?", (discord_id,)
-        ).fetchall()
-    return [r["city"] for r in rows]
-
-
-def has_residence(discord_id: str, city: str) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT 1 FROM residences WHERE discord_id = ? AND city = ?", (discord_id, city)
-        ).fetchone()
-    return row is not None
-
-
-def get_inventory(discord_id: str) -> dict:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT item_id, quantity FROM inventory WHERE discord_id = ?", (discord_id,)
-        ).fetchall()
-    return {r["item_id"]: r["quantity"] for r in rows}
-
-
-def add_item(discord_id: str, item_id: str, quantity: int = 1):
-    with get_conn() as conn:
-        conn.execute("""
-            INSERT INTO inventory (discord_id, item_id, quantity)
-            VALUES (?, ?, ?)
-            ON CONFLICT(discord_id, item_id) DO UPDATE SET quantity = quantity + ?
-        """, (discord_id, item_id, quantity, quantity))
-        conn.commit()
-
-
-def remove_item(discord_id: str, item_id: str, quantity: int = 1) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT quantity FROM inventory WHERE discord_id = ? AND item_id = ?",
-            (discord_id, item_id)
-        ).fetchone()
-        if not row or row["quantity"] < quantity:
-            return False
-        new_qty = row["quantity"] - quantity
-        if new_qty <= 0:
-            conn.execute(
-                "DELETE FROM inventory WHERE discord_id = ? AND item_id = ?",
-                (discord_id, item_id)
-            )
-        else:
-            conn.execute(
-                "UPDATE inventory SET quantity = ? WHERE discord_id = ? AND item_id = ?",
-                (new_qty, discord_id, item_id)
-            )
-        conn.commit()
-    return True
-
-
-def has_item(discord_id: str, item_id: str) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT quantity FROM inventory WHERE discord_id = ? AND item_id = ? AND quantity > 0",
-            (discord_id, item_id)
-        ).fetchone()
-    return row is not None
-
-
-def give_equipment(discord_id: str, eq: dict):
-    import json
-    with get_conn() as conn:
-        conn.execute("""
-            INSERT INTO equipment (equip_id, discord_id, name, slot, quality, tier, tier_req, stats, flavor, equipped)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-        """, (
-            eq["equip_id"], discord_id, eq["name"], eq["slot"],
-            eq["quality"], eq["tier"], eq["tier_req"],
-            json.dumps(eq["stats"], ensure_ascii=False), eq["flavor"]
-        ))
-        conn.commit()
-
-
-def get_equipment_list(discord_id: str) -> list[dict]:
-    import json
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM equipment WHERE discord_id = ? ORDER BY equipped DESC, tier DESC, quality DESC",
-            (discord_id,)
-        ).fetchall()
-    result = []
-    for r in rows:
-        d = dict(r)
-        d["stats"] = json.loads(d["stats"])
-        result.append(d)
-    return result
-
-
-def get_equipped(discord_id: str) -> list[dict]:
-    import json
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM equipment WHERE discord_id = ? AND equipped = 1",
-            (discord_id,)
-        ).fetchall()
-    result = []
-    for r in rows:
-        d = dict(r)
-        d["stats"] = json.loads(d["stats"])
-        result.append(d)
-    return result
-
-
-def equip_item(discord_id: str, equip_id: str, player_tier: int) -> tuple[bool, str]:
-    import json
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM equipment WHERE equip_id = ? AND discord_id = ?",
-            (equip_id, discord_id)
-        ).fetchone()
-        if not row:
-            return False, "装备不存在。"
-        eq = dict(row)
-        eq["stats"] = json.loads(eq["stats"])
-        if player_tier < eq["tier_req"]:
-            from utils.equipment import TIER_NAMES
-            req_name = TIER_NAMES[min(eq["tier_req"], len(TIER_NAMES) - 1)]
-            return False, f"需要达到 **{req_name}期** 才能装备此物。"
-        already_equipped = conn.execute(
-            "SELECT equip_id FROM equipment WHERE discord_id = ? AND slot = ? AND equipped = 1",
-            (discord_id, eq["slot"])
-        ).fetchone()
-        if already_equipped:
-            conn.execute(
-                "UPDATE equipment SET equipped = 0 WHERE equip_id = ?",
-                (already_equipped["equip_id"],)
-            )
-        conn.execute(
-            "UPDATE equipment SET equipped = 1 WHERE equip_id = ?",
-            (equip_id,)
-        )
-        conn.commit()
-    return True, f"已装备 **{eq['name']}**。"
-
-
-def unequip_item(discord_id: str, equip_id: str) -> tuple[bool, str]:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT name FROM equipment WHERE equip_id = ? AND discord_id = ? AND equipped = 1",
-            (equip_id, discord_id)
-        ).fetchone()
-        if not row:
-            return False, "该装备未装备或不存在。"
-        conn.execute(
-            "UPDATE equipment SET equipped = 0 WHERE equip_id = ?",
-            (equip_id,)
-        )
-        conn.commit()
-    return True, f"已卸下 **{row['name']}**。"
-
-
-def discard_equipment(discord_id: str, equip_id: str) -> tuple[bool, str]:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT name, equipped FROM equipment WHERE equip_id = ? AND discord_id = ?",
-            (equip_id, discord_id)
-        ).fetchone()
-        if not row:
-            return False, "装备不存在。"
-        if row["equipped"]:
-            return False, "请先卸下装备再丢弃。"
-        conn.execute("DELETE FROM equipment WHERE equip_id = ?", (equip_id,))
-        conn.commit()
-    return True, f"已丢弃 **{row['name']}**。"

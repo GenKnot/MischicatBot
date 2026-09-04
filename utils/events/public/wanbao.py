@@ -3,6 +3,7 @@ import random
 import time
 import uuid
 
+from utils.atomic import consume_item, spend_stones
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 
@@ -245,18 +246,14 @@ async def list_item(auction_id: str, discord_id: str, item_name: str, quantity: 
         row = inv_r.fetchone()
         if not row or row[0] < quantity:
             return False, f"背包中「{item_name}」数量不足。"
-        await session.execute(
-            text("UPDATE inventory SET quantity = quantity - :qty WHERE discord_id = :uid AND item_id = :iid"),
-            {"qty": quantity, "uid": discord_id, "iid": item_name}
-        )
-        await session.execute(
-            text("DELETE FROM inventory WHERE discord_id = :uid AND item_id = :iid AND quantity <= 0"),
-            {"uid": discord_id, "iid": item_name}
-        )
-        await session.execute(
-            text("UPDATE players SET spirit_stones = spirit_stones - :fee WHERE discord_id = :uid"),
-            {"fee": LISTING_FEE, "uid": discord_id}
-        )
+        # 物品与手续费一起原子扣：原先两条裸 UPDATE 都没有"够不够"的条件，
+        # 能把库存和灵石都扣成负数。
+        if not await consume_item(session, discord_id, item_name, quantity):
+            await session.rollback()
+            return False, f"「{item_name}」数量不足。"
+        if not await spend_stones(session, discord_id, LISTING_FEE):
+            await session.rollback()
+            return False, f"灵石不足，寄售需缴纳 {LISTING_FEE} 灵石手续费。"
         lot_id = str(uuid.uuid4())[:8]
         total_r = await session.execute(
             text("SELECT COUNT(*) FROM wanbao_lots WHERE auction_id = :aid"), {"aid": auction_id}
@@ -269,6 +266,25 @@ async def list_item(auction_id: str, discord_id: str, item_name: str, quantity: 
         )
         await session.commit()
     return True, f"已上架「{item_name}」×{quantity}，起拍价 {start_price} 灵石。"
+
+
+
+async def claim_highest_bid(session, lot_id: str, seen_bid: int,
+                            amount: int, bidder_id: str) -> bool:
+    """原子抢占最高价。current_bid 仍等于 seen_bid 时才生效，否则本次出价作废。
+
+    单抽出来是为了能直接测：走 place_bid 整条路去撞时序很难稳定复现，
+    这里传个过期的 seen_bid 就行。
+    """
+    result = await session.execute(
+        text(
+            "UPDATE wanbao_lots SET current_bid = :amt, bidder_id = :uid "
+            "WHERE lot_id = :lid AND status = 'active' "
+            "AND COALESCE(current_bid, 0) = :seen"
+        ),
+        {"amt": amount, "uid": bidder_id, "lid": lot_id, "seen": seen_bid},
+    )
+    return result.rowcount == 1
 
 
 async def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool, str]:
@@ -307,6 +323,12 @@ async def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool
         if player._mapping["spirit_stones"] < amount:
             return False, f"可用灵石不足（当前 {player._mapping['spirit_stones']}，出价需 {amount}）。"
 
+        # 原子抢占最高价，此时尚未动过任何冻结额度，失败可以直接返回
+        if not await claim_highest_bid(
+            session, lot["lot_id"], lot["current_bid"] or 0, amount, discord_id
+        ):
+            return False, "已有更高出价，请重新出价。"
+
         prev_bidder = lot["bidder_id"]
         if prev_bidder and prev_bidder != discord_id:
             prev_bid = lot["current_bid"]
@@ -326,10 +348,6 @@ async def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool
             text("INSERT INTO wanbao_frozen (discord_id, auction_id, amount) VALUES (:uid,:aid,:amt) ON CONFLICT(discord_id, auction_id) DO UPDATE SET amount = :amt"),
             {"uid": discord_id, "aid": auction_id, "amt": amount}
         )
-        await session.execute(
-            text("UPDATE wanbao_lots SET current_bid = :amt, bidder_id = :uid WHERE lot_id = :lid"),
-            {"amt": amount, "uid": discord_id, "lid": lot["lot_id"]}
-        )
         await session.commit()
     return True, ""
 
@@ -343,8 +361,10 @@ async def settle_lot(lot: dict) -> dict:
                 {"lid": lot["lot_id"]}
             )
             if lot["seller_id"]:
+                # 流拍罚金：扣到 0 为止，不允许把灵石扣成负数
                 await session.execute(
-                    text("UPDATE players SET spirit_stones = spirit_stones - :fee WHERE discord_id = :uid"),
+                    text("UPDATE players SET spirit_stones = MAX(0, spirit_stones - :fee) "
+                         "WHERE discord_id = :uid"),
                     {"fee": LISTING_FEE, "uid": lot["seller_id"]}
                 )
             await session.commit()

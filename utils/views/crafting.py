@@ -1,6 +1,7 @@
 import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
+from utils.views.base import TimedView
 
 
 def _crafting_overview_embed() -> discord.Embed:
@@ -60,17 +61,11 @@ def _crafting_overview_embed() -> discord.Embed:
     return embed
 
 
-class CraftingMenuView(discord.ui.View):
+class CraftingMenuView(TimedView):
     def __init__(self, author, cog):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="🔥 炼丹", style=discord.ButtonStyle.primary, row=0)
     async def alchemy_btn(self, interaction: discord.Interaction, button: discord.ui.Button):

@@ -1,11 +1,15 @@
+import logging
 import random
 import discord
 from utils.views.party import PartyInviteButton
+from utils.views.base import TimedView
+
+log = logging.getLogger(__name__)
 
 
-class PlayerActionView(discord.ui.View):
+class PlayerActionView(TimedView):
     def __init__(self, author, viewer: dict, target: dict, in_pvp_zone: bool):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.viewer = viewer
         self.target = target
@@ -30,12 +34,6 @@ class PlayerActionView(discord.ui.View):
             if name == "双修功法":
                 return True
         return False
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     async def _dual_cultivate_callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -180,9 +178,9 @@ class PlayerActionView(discord.ui.View):
                 await interaction.followup.send(embed=result_embed, view=VictoryActionView(interaction.user, dfn, atk), ephemeral=True)
 
 
-class VictoryActionView(discord.ui.View):
+class VictoryActionView(TimedView):
     def __init__(self, author, winner: dict, loser: dict):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.winner = winner
         self.loser = loser
@@ -194,7 +192,8 @@ class VictoryActionView(discord.ui.View):
             loop = asyncio.get_running_loop()
             loop.create_task(self._check_lifespan_restore(player))
         except RuntimeError:
-            pass
+            # 没有运行中的事件循环，回血只能跳过
+            log.debug("拿不到事件循环，跳过战斗回血")
 
     async def _check_lifespan_restore(self, player: dict):
         from sqlalchemy import text
@@ -212,21 +211,18 @@ class VictoryActionView(discord.ui.View):
         restore_amount = int(lifespan_max * restore_pct / 100)
         if restore_amount <= 0:
             return
-        raw = player.get("active_buffs") or "{}"
-        _, raw = consume_once_buff(raw, "combat_lifespan_restore")
+        old_raw = player.get("active_buffs") or "{}"
+        _, raw = consume_once_buff(old_raw, "combat_lifespan_restore")
         uid = player.get("discord_id", "")
         async with AsyncSessionLocal() as session:
+            # buff 表 CAS。原先无条件覆盖，两场战斗同时结算会各回一次血。
             await session.execute(
-                text("UPDATE players SET lifespan = MIN(lifespan_max, lifespan + :amt), active_buffs = :raw WHERE discord_id = :uid"),
-                {"amt": restore_amount, "raw": raw, "uid": uid}
+                text("UPDATE players SET lifespan = MIN(lifespan_max, lifespan + :amt), "
+                     "active_buffs = :raw "
+                     "WHERE discord_id = :uid AND COALESCE(active_buffs, '{}') = :old_raw"),
+                {"amt": restore_amount, "raw": raw, "old_raw": old_raw, "uid": uid}
             )
             await session.commit()
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="💰 打劫灵石", style=discord.ButtonStyle.danger)
     async def rob(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -241,8 +237,13 @@ class VictoryActionView(discord.ui.View):
             if not row:
                 return await interaction.followup.send("对方数据异常。", ephemeral=True)
             loot = max(1, int(row._mapping["spirit_stones"] * random.uniform(0.3, 0.6)))
-            await session.execute(text("UPDATE players SET spirit_stones = spirit_stones - :amt WHERE discord_id = :uid"), {"amt": loot, "uid": def_uid})
-            await session.execute(text("UPDATE players SET spirit_stones = spirit_stones + :amt WHERE discord_id = :uid"), {"amt": loot, "uid": atk_uid})
+            # 按刚读到的余额算出的 loot，可能在此期间已被对方花掉；
+            # 扣不动就说明对方已经没那么多灵石了，本次搜刮落空。
+            from utils.atomic import grant_stones, spend_stones
+            if not await spend_stones(session, def_uid, loot):
+                await session.rollback()
+                return await interaction.followup.send("对方身上已经没什么油水了。", ephemeral=True)
+            await grant_stones(session, atk_uid, loot)
             await session.commit()
         for item in self.children:
             item.disabled = True

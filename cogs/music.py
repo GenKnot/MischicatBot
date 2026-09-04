@@ -1,11 +1,16 @@
 import asyncio
+import logging
 import os
 from collections import deque
 
 import discord
 from discord.ext import commands
 
-from utils.ytdlp_helper import build_ffmpeg_options, get_ytdl
+from utils.ytdlp_helper import (build_ffmpeg_options, check_media_dependencies,
+                                check_pot_provider, get_ytdl, is_allowed_host,
+                                is_youtube_playlist_link, parse_media_url)
+
+log = logging.getLogger(__name__)
 
 PLAYLIST_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "playlist.txt")
 
@@ -74,7 +79,7 @@ class MusicCog(commands.Cog, name="Music"):
 
     async def _after_play(self, ctx, error):
         if error:
-            print(f"playback error: {error}")
+            log.error("播放出错: %s", error)
         self.current = None
         self._play_next(ctx)
 
@@ -103,10 +108,13 @@ class MusicCog(commands.Cog, name="Music"):
         if not await self._ensure_voice(ctx):
             return
 
-        is_yt_playlist_link = (
-            "list=" in query
-            and ("youtube.com" in query or "youtu.be" in query)
-        )
+        parsed = parse_media_url(query)
+        if parsed is not None and not is_allowed_host(parsed.hostname):
+            return await ctx.send(
+                f"{ctx.author.mention} 只支持 YouTube / 哔哩哔哩 / SoundCloud 的链接，"
+                "其它站点请直接给歌名。")
+
+        is_yt_playlist_link = is_youtube_playlist_link(query)
 
         async with ctx.typing():
             loop = asyncio.get_event_loop()
@@ -395,4 +403,9 @@ class MusicCog(commands.Cog, name="Music"):
 
 
 async def setup(bot):
+    # 启动时就把缺失的外部依赖喊出来，而不是等玩家点播才发现放不出声
+    check_media_dependencies()
+    # provider 探活是网络调用，丢到线程里做，不阻塞事件循环
+    await asyncio.to_thread(check_pot_provider)
+
     await bot.add_cog(MusicCog(bot))

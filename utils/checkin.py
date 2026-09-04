@@ -3,6 +3,9 @@ import os
 import random
 import time
 
+from sqlalchemy import or_, update
+
+from utils.atomic import grant_item, grant_stones
 from utils.db_async import AsyncSessionLocal, Player
 
 _config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkin_config.json")
@@ -16,8 +19,7 @@ def _weighted_choice(tiers: list[dict]) -> dict:
 
 
 async def do_checkin(uid: str) -> dict:
-    from utils.inventory import add_item
-    from utils.equipment_db import give_equipment
+    from utils.equipment_db import new_equipment_row
     from utils.equipment import generate_equipment
     from utils.sects import TECHNIQUES
 
@@ -28,7 +30,18 @@ async def do_checkin(uid: str) -> dict:
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
 
-        if (player.checkin_last_date or "") == today:
+        # 原子占用今日签到名额：连点时只有一次能把日期改成今天，
+        # 后续点击 rowcount 为 0，不会重复发奖。
+        claimed = await session.execute(
+            update(Player)
+            .where(
+                Player.discord_id == uid,
+                or_(Player.checkin_last_date.is_(None),
+                    Player.checkin_last_date != today),
+            )
+            .values(checkin_last_date=today)
+        )
+        if claimed.rowcount != 1:
             return {"ok": False, "reason": "今日已签到，明日再来。"}
 
         cats = CONFIG["category_weights"]
@@ -40,14 +53,14 @@ async def do_checkin(uid: str) -> dict:
             amount = random.randint(tier["min"], tier["max"])
             result["spirit_stones"] = amount
             result["tier_label"] = tier["label"]
-            player.spirit_stones += amount
+            await grant_stones(session, uid, amount)
 
         elif category == "material":
             tier = _weighted_choice(CONFIG["material"]["tiers"])
             item_name = random.choice(tier["pool"])
             result["item_name"] = item_name
             result["tier_label"] = tier["label"]
-            await add_item(uid, item_name, 1)
+            await grant_item(session, uid, item_name, 1)
 
         elif category == "technique":
             tier = _weighted_choice(CONFIG["technique"]["tiers"])
@@ -67,11 +80,10 @@ async def do_checkin(uid: str) -> dict:
         elif category == "equipment":
             tier = _weighted_choice(CONFIG["equipment"]["tiers"])
             eq = generate_equipment(quality=tier["quality"])
-            await give_equipment(uid, eq)
+            session.add(new_equipment_row(uid, eq))
             result["equipment"] = eq
             result["tier_label"] = tier["label"]
 
-        player.checkin_last_date = today
         await session.commit()
 
     return result

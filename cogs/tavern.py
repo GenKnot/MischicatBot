@@ -1,3 +1,4 @@
+import logging
 import json
 import time
 import random
@@ -5,12 +6,15 @@ import random
 import discord
 from discord.ext import commands, tasks
 
-from utils.config import COMMAND_PREFIX
+from utils.config import COMMAND_PREFIX, is_master
 from utils.db_async import AsyncSessionLocal, Player
 from utils.quests import get_tavern_quests, get_quest
 from utils.combat import calc_power
 from utils.character import years_to_seconds, seconds_to_years
 from utils import quest_logic
+from utils.logging_setup import audit
+
+log = logging.getLogger(__name__)
 
 
 QUALITY_EMOJI = {"普通": "⬜", "精良": "🟩", "稀有": "🟦", "史诗": "🟪", "传说": "🟨"}
@@ -74,7 +78,7 @@ class TavernCog(commands.Cog, name="Tavern"):
             user = await self.bot.fetch_user(int(uid))
             await user.send(embed=embed)
         except Exception:
-            pass
+            log.debug("私信发送失败 uid=%s", uid, exc_info=True)
 
     @tasks.loop(minutes=1)
     async def _quest_notifier(self):
@@ -271,7 +275,7 @@ class TavernCog(commands.Cog, name="Tavern"):
 
     @commands.command(name="重置打工", hidden=True)
     async def reset_job(self, ctx, target_id: str = None):
-        if str(ctx.author.id) != "304758476448595970":
+        if not is_master(ctx.author.id):
             return
         uid = target_id or str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -282,11 +286,12 @@ class TavernCog(commands.Cog, name="Tavern"):
                 p.job_daily_reset = 0
                 await session.commit()
             name = p.name if p else uid
+        audit("reset_job", ctx.author, target=uid)
         await ctx.send(f"已重置 **{name}** 的打工冷却与次数。", ephemeral=True)
 
     @commands.command(name="重置签到", hidden=True)
     async def reset_checkin(self, ctx, target_id: str = None):
-        if str(ctx.author.id) != "304758476448595970":
+        if not is_master(ctx.author.id):
             return
         uid = target_id or str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -295,11 +300,12 @@ class TavernCog(commands.Cog, name="Tavern"):
                 p.checkin_last_date = None
                 await session.commit()
             name = p.name if p else uid
+        audit("reset_checkin", ctx.author, target=uid)
         await ctx.send(f"已重置 **{name}** 的每日签到。", ephemeral=True)
 
     @commands.command(name="重置赌坊", hidden=True)
     async def reset_gamble(self, ctx, target_id: str = None):
-        if str(ctx.author.id) != "304758476448595970":
+        if not is_master(ctx.author.id):
             return
         uid = target_id or str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -309,11 +315,12 @@ class TavernCog(commands.Cog, name="Tavern"):
                 p.gamble_daily_reset = 0
                 await session.commit()
             name = p.name if p else uid
+        audit("reset_gamble", ctx.author, target=uid)
         await ctx.send(f"已重置 **{name}** 的赌坊次数。", ephemeral=True)
 
     @commands.command(name="重置轮盘", hidden=True)
     async def reset_roulette(self, ctx, target_id: str = None):
-        if str(ctx.author.id) != "304758476448595970":
+        if not is_master(ctx.author.id):
             return
         uid = target_id or str(ctx.author.id)
         async with AsyncSessionLocal() as session:
@@ -323,6 +330,7 @@ class TavernCog(commands.Cog, name="Tavern"):
                 p.roulette_daily_reset = 0
                 await session.commit()
             name = p.name if p else uid
+        audit("reset_roulette", ctx.author, target=uid)
         await ctx.send(f"已重置 **{name}** 的轮盘次数。")
 
 

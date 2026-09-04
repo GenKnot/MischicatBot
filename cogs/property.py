@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 
 from utils.config import COMMAND_PREFIX
+from utils.atomic import spend_stones
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 from utils.player import get_player
@@ -55,13 +56,14 @@ class PropertyCog(commands.Cog, name="Property"):
                 f"（当前：{player['spirit_stones']}）"
             )
 
-        await add_residence(uid, city)
+        # 先扣钱再落产权：原先顺序相反且分处两个事务，扣款失败会白送一处居所
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET spirit_stones = spirit_stones - :price WHERE discord_id = :uid"),
-                {"price": price, "uid": uid}
-            )
+            if not await spend_stones(session, uid, price):
+                return await ctx.send(
+                    f"{ctx.author.mention} 灵石不足。在 **{city}** 置业需要 **{price}** 灵石。"
+                )
             await session.commit()
+        await add_residence(uid, city)
 
         embed = discord.Embed(
             title=f"✦ 喜迁新居 · {city} ✦",
@@ -114,10 +116,17 @@ class PropertyCog(commands.Cog, name="Property"):
             )
 
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET cave = :cave, spirit_stones = spirit_stones - :price WHERE discord_id = :uid"),
+            # 把"灵石够不够"写进 WHERE，连点开辟不会把灵石扣成负数
+            result = await session.execute(
+                text("UPDATE players SET cave = :cave, spirit_stones = spirit_stones - :price "
+                     "WHERE discord_id = :uid AND spirit_stones >= :price"),
                 {"cave": region_name, "price": CAVE_PRICE, "uid": uid}
             )
+            if result.rowcount != 1:
+                await session.rollback()
+                return await ctx.send(
+                    f"{ctx.author.mention} 灵石不足。开辟洞府需要 **{CAVE_PRICE}** 灵石。"
+                )
             await session.commit()
 
         embed = discord.Embed(

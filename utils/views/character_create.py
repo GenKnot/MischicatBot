@@ -10,6 +10,7 @@ from utils.character import QUESTIONS, calc_stats, roll_spirit_root, REALM_LIFES
 from utils.db_async import AsyncSessionLocal, Player
 from utils.player import get_player
 from utils.world import CITIES
+from utils.views.base import TimedView
 
 
 def _speed_label(root_type: str) -> str:
@@ -75,7 +76,7 @@ class CharacterNameModal(discord.ui.Modal, title="赐下道号"):
         await self._view.finalize(interaction, str(self.name.value).strip())
 
 
-class CharacterCreateView(discord.ui.View):
+class CharacterCreateView(TimedView):
     """
     Button-UI character creation flow:
     - Choose gender
@@ -84,7 +85,7 @@ class CharacterCreateView(discord.ui.View):
     """
 
     def __init__(self, author: discord.User, char_cog):
-        super().__init__(timeout=180)
+        super().__init__()
         self.author = author
         self.char_cog = char_cog
         self.uid = str(author.id)
@@ -103,6 +104,8 @@ class CharacterCreateView(discord.ui.View):
             self._text_task = asyncio.create_task(self._text_listener())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的创建面板。", ephemeral=True)
             return False

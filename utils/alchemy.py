@@ -1,12 +1,17 @@
 import json
 import os
 import random
-import time
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from utils.atomic import claim_daily_quota, consume_item, peek_daily_used
 from utils.db_async import AsyncSessionLocal, AlchemyMastery, Player, KnownRecipe
+
+import logging
+
+log = logging.getLogger(__name__)
+
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
@@ -113,13 +118,6 @@ def roll_failure_consequence() -> tuple[str, int]:
         return "丹毒反噬", random.randint(5, 15)
 
 
-def is_daily_reset_needed(reset_ts: float) -> bool:
-    now = time.time()
-    reset_date = time.gmtime(reset_ts)
-    now_date = time.gmtime(now)
-    return (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday)
-
-
 async def get_mastery_count(discord_id: str, pill_name: str) -> int:
     async with AsyncSessionLocal() as session:
         row = await session.get(AlchemyMastery, (discord_id, pill_name))
@@ -176,18 +174,17 @@ async def increment_mastery(discord_id: str, pill_name: str) -> int:
 
 
 async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
+    """占用今日一次炼丹次数。返回 (是否成功, 占用后的今日次数)。"""
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if not player:
-            return False, 0
-        if is_daily_reset_needed(player.alchemy_daily_reset):
-            player.alchemy_daily_count = 0
-            player.alchemy_daily_reset = time.time()
-        if player.alchemy_daily_count >= DAILY_LIMIT:
-            return False, player.alchemy_daily_count
-        player.alchemy_daily_count += 1
+        used = await claim_daily_quota(
+            session, discord_id, Player.alchemy_daily_count, Player.alchemy_daily_reset, DAILY_LIMIT
+        )
+        if used is None:
+            return False, await peek_daily_used(
+                session, discord_id, Player.alchemy_daily_count, Player.alchemy_daily_reset
+            )
         await session.commit()
-        return True, player.alchemy_daily_count
+        return True, used
 
 
 async def add_alchemy_exp(discord_id: str, exp: int) -> tuple[int, int, bool]:
@@ -216,10 +213,8 @@ async def attempt_alchemy(
     has_yanhuo: bool = False,
     free_mix: bool = False,
 ) -> dict:
-    allowed, count = await check_and_consume_daily(discord_id)
-    if not allowed:
-        return {"ok": False, "reason": f"今日炼丹次数已达上限（{DAILY_LIMIT}次），明日再来。", "daily_count": DAILY_LIMIT}
-
+    # 顺序：校验 → 扣料 → 占次数 → 掷骰。原先先占次数再掷骰，材料不足会白丢一次。
+    # 这一段只校验，为的是给准确提示；真正的扣减在下面。
     for ing in recipe["main_ingredients"]:
         have = inventory.get(ing["item"], 0)
         if have < ing["qty"]:
@@ -239,10 +234,27 @@ async def attempt_alchemy(
         aux_quality_bonus += opt.get("quality_bonus", 0)
         consumed[opt["item"]] = consumed.get(opt["item"], 0) + opt["qty"]
 
+    async with AsyncSessionLocal() as session:
+        for item_id, qty in consumed.items():
+            if not await consume_item(session, discord_id, item_id, qty):
+                await session.rollback()
+                return {"ok": False, "reason": f"药材不足：「{item_id}」需要 {qty} 个。"}
+        count = await claim_daily_quota(
+            session, discord_id,
+            Player.alchemy_daily_count, Player.alchemy_daily_reset, DAILY_LIMIT,
+        )
+        if count is None:
+            await session.rollback()          # 连带退回刚扣的药材
+            return {"ok": False,
+                    "reason": f"今日炼丹次数已达上限（{DAILY_LIMIT}次），明日再来。",
+                    "daily_count": DAILY_LIMIT}
+        await session.commit()
+
     mastery_count = await get_mastery_count(discord_id, recipe["pill"])
     success_rate = calc_success_rate(recipe, alchemy_level, mastery_count, free_mix=free_mix)
     success = random.randint(1, 100) <= success_rate
-    print(f"[alchemy] {discord_id} recipe={recipe['recipe_id']} rate={success_rate}% free_mix={free_mix} success={success}")
+    log.debug("炼丹 %s recipe=%s rate=%s%% free_mix=%s success=%s",
+              discord_id, recipe["recipe_id"], success_rate, free_mix, success)
 
     if not success:
         consequence, lifespan_loss = roll_failure_consequence()

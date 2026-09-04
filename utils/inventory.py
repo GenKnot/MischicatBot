@@ -1,4 +1,6 @@
 from sqlalchemy import select
+
+from utils.atomic import consume_item, grant_item
 from utils.db_async import AsyncSessionLocal, Inventory
 
 
@@ -18,21 +20,14 @@ async def has_item(discord_id: str, item_id: str) -> bool:
 
 async def add_item(discord_id: str, item_id: str, quantity: int = 1):
     async with AsyncSessionLocal() as session:
-        row = await session.get(Inventory, (discord_id, item_id))
-        if row:
-            row.quantity += quantity
-        else:
-            session.add(Inventory(discord_id=discord_id, item_id=item_id, quantity=quantity))
+        await grant_item(session, discord_id, item_id, quantity)
         await session.commit()
 
 
 async def remove_item(discord_id: str, item_id: str, quantity: int = 1) -> bool:
+    """扣减物品。数量不足返回 False，且不会扣掉任何东西。"""
     async with AsyncSessionLocal() as session:
-        row = await session.get(Inventory, (discord_id, item_id))
-        if not row or row.quantity < quantity:
-            return False
-        row.quantity -= quantity
-        if row.quantity <= 0:
-            await session.delete(row)
-        await session.commit()
-    return True
+        ok = await consume_item(session, discord_id, item_id, quantity)
+        if ok:
+            await session.commit()
+        return ok

@@ -1,9 +1,11 @@
 import discord
+from utils.views.base import TimedView
 
 
-class DualCultivateInviteView(discord.ui.View):
+class DualCultivateInviteView(TimedView):
+    public = True          # 归属人是被邀请者 self.target，校验写在下面的 interaction_check 里
     def __init__(self, cog, inviter: discord.User, target: discord.User, multiplier: float, both_virgin: bool):
-        super().__init__(timeout=60)
+        super().__init__()
         self.cog = cog
         self.inviter = inviter
         self.target = target
@@ -11,6 +13,8 @@ class DualCultivateInviteView(discord.ui.View):
         self.both_virgin = both_virgin
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.target:
             await interaction.response.send_message("这不是发给你的邀请。", ephemeral=True)
             return False

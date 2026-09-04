@@ -1,10 +1,11 @@
 import discord
 from utils.adventure_chain import apply_chain_rewards, advance_stage, mark_completed
+from utils.views.base import TimedView
 
 
-class ChainStageView(discord.ui.View):
+class ChainStageView(TimedView):
     def __init__(self, author, chain: dict, stage_idx: int, player: dict, cog):
-        super().__init__(timeout=180)
+        super().__init__()
         self.author = author
         self.chain = chain
         self.stage_idx = stage_idx
@@ -21,6 +22,8 @@ class ChainStageView(discord.ui.View):
             self.add_item(ChainChoiceButton(label, i, cog))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的奇遇。", ephemeral=True)
             return False

@@ -1,0 +1,8 @@
+# 开发/测试依赖，不进生产镜像。
+-r requirements.in
+
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+pyflakes==3.4.0
+httpx==0.28.1                      # fastapi.testclient 需要

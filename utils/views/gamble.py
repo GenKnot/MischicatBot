@@ -1,5 +1,6 @@
 import discord
 from utils.gamble import do_gamble, BET_OPTIONS, DAILY_LIMIT, OUTCOME_PROBS
+from utils.views.base import TimedView
 
 
 def _gamble_overview_embed(player: dict) -> discord.Embed:
@@ -29,9 +30,9 @@ def _gamble_overview_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class GambleView(discord.ui.View):
+class GambleView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
@@ -101,12 +102,6 @@ class GambleView(discord.ui.View):
 
     async def _back(self, interaction: discord.Interaction):
         await _go_back(interaction, self.author, self.player, self.cog)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 def _back_only_view(author, player, cog):

@@ -2,8 +2,10 @@ import discord
 import json
 import time
 from sqlalchemy import text
-from utils.db_async import AsyncSessionLocal
+from utils.atomic import cas_player_field, consume_item
+from utils.db_async import AsyncSessionLocal, Player
 from utils.player import get_player
+from utils.views.base import TimedView
 from utils.sects import (
     TECHNIQUES, TECHNIQUE_STAGES, calc_technique_stat_bonus,
     get_technique_cost, next_stage,
@@ -21,13 +23,21 @@ def _parse_techniques(raw) -> list:
     return result
 
 
-async def _save_techniques(uid: str, techniques: list):
+async def _save_techniques(uid: str, techniques: list, expected_raw: str) -> bool:
+    """写回功法列表（CAS）。期间被别处改过则放弃本次写入并返回 False。
+
+    功法列表是一整块 JSON，无法用增量表达，直接覆盖会把并发的另一次修改
+    （例如同时学会的另一本功法）冲掉。
+
+    `expected_raw` 是必填的 —— 刻意不提供"不校验直接覆盖"的选项，
+    否则那条路迟早会被人用上。
+    """
     async with AsyncSessionLocal() as session:
-        await session.execute(
-            text("UPDATE players SET techniques = :t WHERE discord_id = :uid"),
-            {"t": json.dumps(techniques, ensure_ascii=False), "uid": uid},
-        )
+        payload = json.dumps(techniques, ensure_ascii=False)
+        if not await cas_player_field(session, uid, Player.techniques, expected_raw, payload):
+            return False
         await session.commit()
+        return True
 
 
 def _build_techniques_embed(player: dict) -> discord.Embed:
@@ -131,17 +141,11 @@ def _build_stats_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class TechniquesView(discord.ui.View):
+class TechniquesView(TimedView):
     def __init__(self, author: discord.User, cog):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="装备/卸下", style=discord.ButtonStyle.primary, row=0)
     async def toggle_equip(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -269,17 +273,11 @@ class TechniquesView(discord.ui.View):
         await interaction.response.send_message(embed=_build_menu_embed(has_dual), view=view)
 
 
-class ToggleEquipView(discord.ui.View):
+class ToggleEquipView(TimedView):
     def __init__(self, author: discord.User, cog):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择功法...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -313,7 +311,9 @@ class ToggleEquipView(discord.ui.View):
                         ephemeral=True
                     )
             target["equipped"] = False
-            await _save_techniques(uid, techniques)
+            if not await _save_techniques(uid, techniques, player["techniques"]):
+                return await interaction.response.send_message(
+                    "功法列表在此期间有变动，请重新操作。", ephemeral=True)
             msg = f"已卸下功法「**{name}**」。"
         else:
             from utils.realms import get_technique_slot_limit
@@ -322,7 +322,9 @@ class ToggleEquipView(discord.ui.View):
             if equipped_count >= slot_limit:
                 return await interaction.response.send_message(f"当前境界（{player['realm']}）最多装备 {slot_limit} 本功法，请先卸下一本。", ephemeral=True)
             target["equipped"] = True
-            await _save_techniques(uid, techniques)
+            if not await _save_techniques(uid, techniques, player["techniques"]):
+                return await interaction.response.send_message(
+                    "功法列表在此期间有变动，请重新操作。", ephemeral=True)
             msg = f"已装备功法「**{name}**」。"
 
         player = await get_player(uid)
@@ -335,17 +337,11 @@ class ToggleEquipView(discord.ui.View):
         await interaction.response.send_message(msg, ephemeral=True)
 
 
-class TrainSelectView(discord.ui.View):
+class TrainSelectView(TimedView):
     def __init__(self, author: discord.User, cog):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择功法...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -404,9 +400,9 @@ class TrainSelectView(discord.ui.View):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-class TrainConfirmView(discord.ui.View):
+class TrainConfirmView(TimedView):
     def __init__(self, author, cog, tech_name, current_stage, next_stage, stones_cost, years_cost):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.tech_name = tech_name
@@ -414,12 +410,6 @@ class TrainConfirmView(discord.ui.View):
         self.next_stage_name = next_stage
         self.stones_cost = stones_cost
         self.years_cost = years_cost
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="确认修炼", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -451,21 +441,33 @@ class TrainConfirmView(discord.ui.View):
         new_lifespan = player["lifespan"] - self.years_cost
 
         async with AsyncSessionLocal() as session:
-            await session.execute(
+            # 灵石/寿元用增量扣并校验余额，功法列表做 CAS。
+            # 原先写的是绝对值，连点两次只付一次钱却升两阶。
+            result = await session.execute(
                 text(
-                    "UPDATE players SET techniques = :t, spirit_stones = :s, lifespan = :l, "
-                    "cultivating_until = :cu, cultivating_years = :cy, last_active = :la WHERE discord_id = :uid"
+                    "UPDATE players SET techniques = :t, "
+                    "spirit_stones = spirit_stones - :cost, lifespan = lifespan - :years, "
+                    "cultivating_until = :cu, cultivating_years = :cy, last_active = :la "
+                    "WHERE discord_id = :uid "
+                    "AND spirit_stones >= :cost AND lifespan >= :years "
+                    "AND techniques = :old_t"
                 ),
                 {
                     "t": json.dumps(techniques, ensure_ascii=False),
-                    "s": new_stones,
-                    "l": new_lifespan,
+                    "old_t": player["techniques"],
+                    "cost": self.stones_cost,
+                    "years": self.years_cost,
                     "cu": cultivating_until,
                     "cy": self.years_cost,
                     "la": now,
                     "uid": uid,
                 },
             )
+            if result.rowcount != 1:
+                await session.rollback()
+                return await interaction.response.send_message(
+                    "状态已变化（灵石/寿元不足，或功法在此期间被改动），请重新操作。",
+                    ephemeral=True)
             await session.commit()
 
         info = TECHNIQUES.get(self.tech_name, {})
@@ -490,17 +492,11 @@ class TrainConfirmView(discord.ui.View):
         await interaction.response.edit_message(content="已取消修炼。", embed=None, view=None)
 
 
-class LearnSelectView(discord.ui.View):
+class LearnSelectView(TimedView):
     def __init__(self, author: discord.User, cog):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择功法书...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -538,18 +534,20 @@ class LearnSelectView(discord.ui.View):
         })
 
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET techniques = :t WHERE discord_id = :uid"),
-                {"t": json.dumps(techniques, ensure_ascii=False), "uid": uid},
-            )
-            await session.execute(
-                text("UPDATE inventory SET quantity = quantity - 1 WHERE discord_id = :uid AND item_id = :name"),
-                {"uid": uid, "name": name},
-            )
-            await session.execute(
-                text("DELETE FROM inventory WHERE discord_id = :uid AND item_id = :name AND quantity <= 0"),
-                {"uid": uid, "name": name},
-            )
+            # 先原子扣掉功法书：原先是无条件 `quantity - 1`，能扣成负数，
+            # 连点还会一本书学两次
+            if not await consume_item(session, uid, name, 1):
+                await session.rollback()
+                return await interaction.response.send_message(
+                    f"背包中没有「{name}」。", ephemeral=True)
+            # 功法列表 CAS，期间被改过则整体作废（连同上面的扣书一起回滚）
+            if not await cas_player_field(
+                session, uid, Player.techniques,
+                player["techniques"], json.dumps(techniques, ensure_ascii=False)
+            ):
+                await session.rollback()
+                return await interaction.response.send_message(
+                    "功法列表在此期间有变动，请重新操作。", ephemeral=True)
             await session.commit()
 
         grade = info.get("grade", "?")

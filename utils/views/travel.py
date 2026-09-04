@@ -1,23 +1,18 @@
 import discord
 from utils.world import cities_by_region, SPECIAL_REGIONS
 from utils.realms import get_realm_index
+from utils.views.base import TimedView
 
 
-class TravelRegionView(discord.ui.View):
+class TravelRegionView(TimedView):
     def __init__(self, author, cog):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         for region in ["东域", "南域", "西域", "北域", "中州"]:
             self.add_item(TravelRegionButton(region))
         self.add_item(TravelRegionButton("秘地", style=discord.ButtonStyle.danger))
         self.add_item(_BackToMenuButton(row=1))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class TravelRegionButton(discord.ui.Button):
@@ -54,9 +49,9 @@ class TravelRegionButton(discord.ui.Button):
         await interaction.response.edit_message(embed=embed, view=TravelCityView(self.view.author, self.view.cog, cities))
 
 
-class TravelCityView(discord.ui.View):
+class TravelCityView(TimedView):
     def __init__(self, author, cog, cities: list):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         for c in cities:
@@ -64,12 +59,6 @@ class TravelCityView(discord.ui.View):
         self.add_item(_BackToTravelRegionButton())
         # Keep a direct escape hatch to main menu as well.
         self.add_item(_BackToMenuButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class TravelCityButton(discord.ui.Button):
@@ -87,9 +76,9 @@ class TravelCityButton(discord.ui.Button):
         await travel_cog.travel(ctx, city_name=self.city_name)
 
 
-class TravelSecretView(discord.ui.View):
+class TravelSecretView(TimedView):
     def __init__(self, author, cog, player_realm_idx: int):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         for r in SPECIAL_REGIONS:
@@ -98,12 +87,6 @@ class TravelSecretView(discord.ui.View):
             self.add_item(TravelSecretButton(r["name"], r["type"], disabled))
         self.add_item(_BackToTravelRegionButton())
         self.add_item(_BackToMenuButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class TravelSecretButton(discord.ui.Button):
@@ -126,21 +109,15 @@ class TravelSecretButton(discord.ui.Button):
         await travel_cog.travel(ctx, city_name=self.secret_name)
 
 
-class CityRegionView(discord.ui.View):
+class CityRegionView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         for region in ["东域", "南域", "西域", "北域", "中州"]:
             self.add_item(CityRegionButton(region))
         self.add_item(_BackToWorldButton(row=1))
         self.add_item(_BackToMenuButton(row=1))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class CityRegionButton(discord.ui.Button):
@@ -157,19 +134,13 @@ class CityRegionButton(discord.ui.Button):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
-class CityListView(discord.ui.View):
+class CityListView(TimedView):
     def __init__(self, author, cog=None, cities: list = None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.add_item(_BackToWorldButton(row=1))
         self.add_item(_BackToMenuButton(row=1))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _BackToWorldButton(discord.ui.Button):
@@ -198,19 +169,13 @@ class _BackToMenuButton(discord.ui.Button):
         await _send_main_menu(interaction, cog)
 
 
-class TravelAfterMoveView(discord.ui.View):
+class TravelAfterMoveView(TimedView):
     def __init__(self, author, cog):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.add_item(_BackToTravelRegionButton())
         self.add_item(_BackToMenuButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _BackToTravelRegionButton(discord.ui.Button):

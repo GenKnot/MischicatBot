@@ -1,9 +1,10 @@
 import discord
+from utils.views.base import TimedView
 
 
-class YinYangView(discord.ui.View):
+class YinYangView(TimedView):
     def __init__(self, author, event: dict, finale_event: dict, player, cog, uid: str):
-        super().__init__(timeout=300)
+        super().__init__()
         self.author = author
         self.event = event
         self.finale_event = finale_event
@@ -18,6 +19,8 @@ class YinYangView(discord.ui.View):
             self.add_item(YinYangButton(choice["label"], i))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的奇遇。", ephemeral=True)
             return False
@@ -47,9 +50,9 @@ class YinYangButton(discord.ui.Button):
             await _send_yinyang_finale(interaction, self.view.finale_event, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 
-class YinYangNextView(discord.ui.View):
+class YinYangNextView(TimedView):
     def __init__(self, author, original_event, next_event, finale_event, player, cog, uid):
-        super().__init__(timeout=300)
+        super().__init__()
         self.author = author
         self.original_event = original_event
         self.next_event = next_event
@@ -65,6 +68,8 @@ class YinYangNextView(discord.ui.View):
             self.add_item(YinYangNextButton(choice["label"], i))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的奇遇。", ephemeral=True)
             return False
@@ -104,9 +109,9 @@ async def _send_yinyang_finale(interaction, finale_event, player, cog, uid, prev
     await interaction.followup.send(embed=embed, view=YinYangFinaleView(interaction.user, finale_event, player, cog, uid))
 
 
-class YinYangFinaleView(discord.ui.View):
+class YinYangFinaleView(TimedView):
     def __init__(self, author, event, player, cog, uid):
-        super().__init__(timeout=300)
+        super().__init__()
         self.author = author
         self.event = event
         self.player = player
@@ -120,6 +125,8 @@ class YinYangFinaleView(discord.ui.View):
             self.add_item(YinYangFinaleButton(choice["label"], i))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的奇遇。", ephemeral=True)
             return False
@@ -150,9 +157,9 @@ class YinYangFinaleButton(discord.ui.Button):
         await _do_yinyang_rebirth(interaction, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 
-class YinYangFinaleSubView(discord.ui.View):
+class YinYangFinaleSubView(TimedView):
     def __init__(self, author, original_event, next_event, player, cog, uid):
-        super().__init__(timeout=300)
+        super().__init__()
         self.author = author
         self.original_event = original_event
         self.next_event = next_event
@@ -167,6 +174,8 @@ class YinYangFinaleSubView(discord.ui.View):
             self.add_item(YinYangFinaleSubButton(choice["label"], i))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.message is not None:
+            self.message = interaction.message   # 供超时提示编辑
         if interaction.user != self.author:
             await interaction.response.send_message("这不是你的奇遇。", ephemeral=True)
             return False
@@ -208,9 +217,9 @@ async def _do_yinyang_rebirth(interaction, player, cog, uid, final_flavor):
                     rebirth_count = rebirth_count + 1,
                     has_bahongchen = 1, escape_rate = 50,
                     last_active = :now
-                WHERE discord_id = :uid
+                WHERE discord_id = :uid AND rebirth_count = :old_rebirth
             """),
-            {"ls": new_lifespan, "now": now, "uid": uid},
+            {"ls": new_lifespan, "now": now, "uid": uid, "old_rebirth": player["rebirth_count"]},
         )
         await session.commit()
     embed = discord.Embed(

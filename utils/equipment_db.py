@@ -9,20 +9,29 @@ def _row_to_dict(row: Equipment) -> dict:
     return d
 
 
+def new_equipment_row(discord_id: str, eq: dict) -> Equipment:
+    """构造一条装备记录，由调用方的 session 落库。
+
+    调用方已经开着 session 时用这个，不要再调 `give_equipment` ——
+    嵌套开 session 在外层已有未提交写入的情况下会互相等锁。
+    """
+    return Equipment(
+        equip_id=eq["equip_id"],
+        discord_id=discord_id,
+        name=eq["name"],
+        slot=eq["slot"],
+        quality=eq["quality"],
+        tier=eq["tier"],
+        tier_req=eq["tier_req"],
+        stats=json.dumps(eq["stats"], ensure_ascii=False),
+        flavor=eq["flavor"],
+        equipped=False,
+    )
+
+
 async def give_equipment(discord_id: str, eq: dict):
     async with AsyncSessionLocal() as session:
-        session.add(Equipment(
-            equip_id=eq["equip_id"],
-            discord_id=discord_id,
-            name=eq["name"],
-            slot=eq["slot"],
-            quality=eq["quality"],
-            tier=eq["tier"],
-            tier_req=eq["tier_req"],
-            stats=json.dumps(eq["stats"], ensure_ascii=False),
-            flavor=eq["flavor"],
-            equipped=False,
-        ))
+        session.add(new_equipment_row(discord_id, eq))
         await session.commit()
 
 

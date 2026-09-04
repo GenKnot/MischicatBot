@@ -6,10 +6,14 @@ services:
     restart: unless-stopped
 
   mischicat-bot:
-    image: mischicat-bot:latest
+    # CI 发布到 GHCR 的镜像。若想用本地源码构建，把 image 换成 `build: .`
+    image: ghcr.io/genknot/mischicat-bot/mischicat-bot:latest
     container_name: mischicat-bot
     env_file:
       - .env
+    environment:
+      # 告诉 yt-dlp 插件去哪里取 PO token（服务名来自上面的 pot-provider）
+      POT_PROVIDER_URL: http://pot-provider:4416
     ports:
       - "8080:8080"
     volumes:

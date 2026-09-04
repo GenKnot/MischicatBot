@@ -11,6 +11,10 @@ import subprocess
 import uvicorn
 from dotenv import load_dotenv
 
+from utils.logging_setup import configure_logging
+
+configure_logging()
+
 ENV_TEMPLATE = """DISCORD_TOKEN=
 DISCORD_GUILD_ID=
 COMMAND_PREFIX=cat!
@@ -19,6 +23,9 @@ DB_PATH=/app/sqlite-data/game.db
 # 本地 Web 服务端口，不填则默认 8080
 WEB_PORT=8080
 PUBLIC_EVENT_CHANNEL_ID=
+# Web 面板鉴权：留空则本地不鉴权、在 Kubernetes 里则停用面板
+WEB_USER=admin
+WEB_PASS=
 """
 
 
@@ -73,13 +80,17 @@ def _run_git(*args: str, cwd: str | None = None) -> str:
     return (res.stdout or "").strip()
 
 
+# 仓库根目录。git 命令统一带上它，免得进程 cwd 不是仓库时行为不一致。
+_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def _get_git_root() -> str | None:
-    out = _run_git("rev-parse", "--show-toplevel")
+    out = _run_git("rev-parse", "--show-toplevel", cwd=_REPO_DIR)
     return out if out else None
 
 
 def _get_current_commit() -> str | None:
-    return _run_git("rev-parse", "HEAD") or None
+    return _run_git("rev-parse", "HEAD", cwd=_REPO_DIR) or None
 
 
 def _resolve_target_commit(channel: str) -> str | None:
@@ -89,20 +100,20 @@ def _resolve_target_commit(channel: str) -> str | None:
     """
     channel = (channel or "").strip().lower()
     if channel == "stable":
-        _run_git("fetch", "origin", "--tags")
-        tags = _run_git("tag", "--sort=-v:refname", "v*").splitlines()
+        _run_git("fetch", "origin", "--tags", cwd=_REPO_DIR)
+        tags = _run_git("tag", "--sort=-v:refname", "--list", "v*", cwd=_REPO_DIR).splitlines()
         if not tags:
             return None
         tag = tags[0].strip()
-        commit = _run_git("rev-list", "-n", "1", tag)
+        commit = _run_git("rev-list", "-n", "1", tag, cwd=_REPO_DIR)
         return commit or None
 
-    _run_git("fetch", "origin")
-    origin_head_ref = _run_git("symbolic-ref", "-q", "refs/remotes/origin/HEAD")
+    _run_git("fetch", "origin", cwd=_REPO_DIR)
+    origin_head_ref = _run_git("symbolic-ref", "-q", "refs/remotes/origin/HEAD", cwd=_REPO_DIR)
     if origin_head_ref:
-        commit = _run_git("rev-parse", origin_head_ref.strip())
+        commit = _run_git("rev-parse", origin_head_ref.strip(), cwd=_REPO_DIR)
         return commit or None
-    commit = _run_git("rev-parse", "origin/HEAD")
+    commit = _run_git("rev-parse", "origin/HEAD", cwd=_REPO_DIR)
     return commit or None
 
 
@@ -147,6 +158,12 @@ def maybe_update_repo_once() -> bool:
     return True
 
 
+def _restart():
+    """原地重启。frozen 下 sys.argv[0] 就是 exe 本身，不能再传一次。"""
+    args = sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv
+    os.execv(sys.executable, [sys.executable, *args])
+
+
 async def auto_update_loop():
 
     # Disable autoupdate if running in Kubernetes
@@ -176,26 +193,27 @@ async def auto_update_loop():
         _log_update(f"Startup: cannot read git info: {e!r}")
 
     try:
-        updated = maybe_update_repo_once()
+        # git fetch 是同步阻塞的，网络慢会卡住整个 bot，丢到线程里跑
+        updated = await asyncio.to_thread(maybe_update_repo_once)
     except Exception as e:
         _log_update(f"Startup check failed: {e!r}")
         updated = False
 
     if updated:
         _log_update("Restarting after update...")
-        os.execv(sys.executable, [sys.executable, *sys.argv])
+        _restart()
 
     while True:
         await asyncio.sleep(interval_s)
         try:
-            updated = maybe_update_repo_once()
+            updated = await asyncio.to_thread(maybe_update_repo_once)
         except Exception as e:
             _log_update(f"Update check failed: {e!r}")
             continue
 
         if updated:
             _log_update("Restarting after update...")
-            os.execv(sys.executable, [sys.executable, *sys.argv])
+            _restart()
 
 
 async def main():
@@ -209,6 +227,11 @@ async def main():
     server = uvicorn.Server(config)
 
     async with MischicatBot() as bot:
+        # 让 /ready 探针能看到 bot 的真实状态（uvicorn 以 "web.main:app"
+        # 字符串加载，与这里 import 的是同一个模块对象）
+        from web.main import set_bot
+        set_bot(bot)
+
         await asyncio.gather(
             bot.start(token),
             server.serve(),

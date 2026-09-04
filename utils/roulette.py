@@ -1,6 +1,6 @@
 import random
-import time
 
+from utils.atomic import claim_daily_quota, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player
 
 BET = 500
@@ -42,28 +42,21 @@ async def do_roulette(uid: str) -> dict:
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
 
-        now = time.time()
-        daily_count = player.roulette_daily_count or 0
-        daily_reset = player.roulette_daily_reset or 0
-
-        reset_date = time.gmtime(daily_reset)
-        now_date = time.gmtime(now)
-        if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
-            daily_count = 0
-
-        if daily_count >= DAILY_LIMIT:
+        daily_count = await claim_daily_quota(
+            session, uid, Player.roulette_daily_count, Player.roulette_daily_reset, DAILY_LIMIT
+        )
+        if daily_count is None:
             return {"ok": False, "reason": f"今日轮转次数已达上限（{DAILY_LIMIT}次），明日再来。"}
 
-        if player.spirit_stones < BET:
+        if not await spend_stones(session, uid, BET):
+            await session.rollback()          # 连带退回刚占用的配额
             return {"ok": False, "reason": f"灵石不足，轮转需要 **{BET}** 灵石。"}
 
         result_slot = spin_wheel()
         payout = int(BET * result_slot["multiplier"])
         net = payout - BET
 
-        player.spirit_stones += net
-        player.roulette_daily_count = daily_count + 1
-        player.roulette_daily_reset = now
+        await grant_stones(session, uid, payout)
         await session.commit()
 
     return {
@@ -72,6 +65,6 @@ async def do_roulette(uid: str) -> dict:
         "bet": BET,
         "payout": payout,
         "net": net,
-        "daily_count": daily_count + 1,
+        "daily_count": daily_count,
         "daily_limit": DAILY_LIMIT,
     }

@@ -1,8 +1,8 @@
 import json
 import os
 import random
-import time
 
+from utils.atomic import claim_daily_quota, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player
 
 _config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "gamble_config.json")
@@ -22,19 +22,18 @@ async def do_gamble(uid: str, bet: int) -> dict:
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
 
-        now = time.time()
-        daily_count = player.gamble_daily_count or 0
-        daily_reset = player.gamble_daily_reset or 0
+        if bet <= 0:
+            return {"ok": False, "reason": "押注金额必须大于 0。"}
 
-        reset_date = time.gmtime(daily_reset)
-        now_date = time.gmtime(now)
-        if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
-            daily_count = 0
-
-        if daily_count >= DAILY_LIMIT:
+        # 先原子占掉今日一次配额，再原子扣灵石；任一步不满足都不会留下副作用
+        daily_count = await claim_daily_quota(
+            session, uid, Player.gamble_daily_count, Player.gamble_daily_reset, DAILY_LIMIT
+        )
+        if daily_count is None:
             return {"ok": False, "reason": f"今日赌注已达上限（{DAILY_LIMIT}次），明日再来。"}
 
-        if player.spirit_stones < bet:
+        if not await spend_stones(session, uid, bet):
+            await session.rollback()          # 连带退回刚占用的配额
             return {"ok": False, "reason": "灵石不足，无法押注。"}
 
         outcomes = CONFIG["outcomes"]
@@ -45,9 +44,7 @@ async def do_gamble(uid: str, bet: int) -> dict:
         net = payout - bet
         message = random.choice(outcome["messages"])
 
-        player.spirit_stones += net
-        player.gamble_daily_count = daily_count + 1
-        player.gamble_daily_reset = now
+        await grant_stones(session, uid, payout)
         await session.commit()
 
     return {
@@ -57,6 +54,6 @@ async def do_gamble(uid: str, bet: int) -> dict:
         "payout": payout,
         "net": net,
         "message": message,
-        "daily_count": daily_count + 1,
+        "daily_count": daily_count,
         "daily_limit": DAILY_LIMIT,
     }

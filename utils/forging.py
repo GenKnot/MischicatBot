@@ -1,9 +1,12 @@
 import random
-import time
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy import select
 
+from sqlalchemy import update
+
+from utils.atomic import (claim_daily_quota, consume_item, grant_item,
+                          peek_daily_used, spend_stones)
 from utils.db_async import AsyncSessionLocal, Player
 from utils.equipment import generate_equipment, QUALITY_ORDER
 
@@ -131,13 +134,6 @@ def roll_forge_failure() -> tuple[str, int]:
         return "走火", random.randint(1, 5)
 
 
-def is_daily_reset_needed(reset_ts: float) -> bool:
-    now = time.time()
-    reset_date = time.gmtime(reset_ts)
-    now_date = time.gmtime(now)
-    return (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday)
-
-
 async def get_forging_mastery_count(discord_id: str) -> int:
     async with AsyncSessionLocal() as session:
         player = await session.get(Player, discord_id)
@@ -171,18 +167,17 @@ async def increment_forging_mastery(discord_id: str) -> int:
 
 
 async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
+    """占用今日一次锻造次数。返回 (是否成功, 占用后的今日次数)。"""
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if not player:
-            return False, 0
-        if is_daily_reset_needed(player.forging_daily_reset or 0):
-            player.forging_daily_count = 0
-            player.forging_daily_reset = time.time()
-        if (player.forging_daily_count or 0) >= DAILY_LIMIT:
-            return False, player.forging_daily_count
-        player.forging_daily_count = (player.forging_daily_count or 0) + 1
+        used = await claim_daily_quota(
+            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, DAILY_LIMIT
+        )
+        if used is None:
+            return False, await peek_daily_used(
+                session, discord_id, Player.forging_daily_count, Player.forging_daily_reset
+            )
         await session.commit()
-        return True, player.forging_daily_count
+        return True, used
 
 
 async def attempt_forge(
@@ -224,9 +219,13 @@ async def attempt_forge(
     if aux_herb:
         consumed[aux_herb] = 1
 
-    from utils.inventory import remove_item
-    for item_name, qty in consumed.items():
-        await remove_item(discord_id, item_name, qty)
+    # 材料一次性在同一事务里扣净：逐个扣时中途失败会留下"扣了一半"的背包
+    async with AsyncSessionLocal() as session:
+        for item_name, qty in consumed.items():
+            if not await consume_item(session, discord_id, item_name, qty):
+                await session.rollback()
+                return {"ok": False, "reason": f"「{item_name}」不足，需要 {qty} 个。"}
+        await session.commit()
 
     if not success:
         consequence, lifespan_loss = roll_forge_failure()
@@ -298,7 +297,6 @@ async def attempt_reforge(
 ) -> dict:
     from utils.equipment_db import get_equipment_by_id
     from utils.equipment import generate_equipment, QUALITY_ORDER
-    from utils.inventory import remove_item
     import json
 
     eq = await get_equipment_by_id(equip_id, discord_id)
@@ -317,15 +315,16 @@ async def attempt_reforge(
         return {"ok": False, "reason": f"「{ore_name}」不足，需要 {ore_qty} 个。"}
 
     stone_cost = 200 * RELIQUARY_COST_MULTIPLIER[quality]
-    if spirit_stones < stone_cost:
-        return {"ok": False, "reason": f"灵石不足，淬炼需要 {stone_cost} 灵石。"}
 
-    await remove_item(discord_id, ore_name, ore_qty)
+    # 矿石与灵石在同一事务里一起扣：原先先扣矿石、再另开事务扣灵石，
+    # 中途失败会白吞矿石。
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if player:
-            player.spirit_stones -= stone_cost
-            await session.commit()
+        if not await consume_item(session, discord_id, ore_name, ore_qty):
+            return {"ok": False, "reason": f"「{ore_name}」不足，需要 {ore_qty} 个。"}
+        if not await spend_stones(session, discord_id, stone_cost):
+            await session.rollback()
+            return {"ok": False, "reason": f"灵石不足，淬炼需要 {stone_cost} 灵石。"}
+        await session.commit()
 
     new_eq = generate_equipment(tier=eq["tier"], quality=quality, slot=eq["slot"])
 
@@ -348,19 +347,38 @@ EXAM_MATERIALS = {"铜矿石": 6, "铁矿石": 3}
 
 
 async def start_forging_exam(discord_id: str) -> dict:
-    from utils.inventory import add_item
+    """缴费参加炼器入门考核。**幂等**：重复调用不会重复收费。
+
+    幂等靠 `forging_exam_paid` 这个状态位的原子占用实现，而不是靠调用方
+    先查一遍。原先没有任何保护，连点四次就真的付四次考核费。
+    """
     async with AsyncSessionLocal() as session:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
         if player.forging_level > 0:
             return {"ok": False, "reason": "你已经是炼器师了。"}
-        if player.spirit_stones < EXAM_COST:
+
+        # 原子占用考核名额：只有从未缴费的那一次能把标记翻成 True
+        claimed = await session.execute(
+            update(Player)
+            .where(
+                Player.discord_id == discord_id,
+                Player.forging_level == 0,
+                Player.forging_exam_paid == False,  # noqa: E712 — SQL 比较
+            )
+            .values(forging_exam_paid=True)
+        )
+        if claimed.rowcount != 1:
+            return {"ok": False, "reason": "你已缴过考核费，材料用完可花 300 灵石补充。"}
+
+        if not await spend_stones(session, discord_id, EXAM_COST):
+            await session.rollback()          # 连带退回刚打上的缴费标记
             return {"ok": False, "reason": f"灵石不足，考核需缴纳 {EXAM_COST} 灵石。"}
-        player.spirit_stones -= EXAM_COST
+
+        for item, qty in EXAM_MATERIALS.items():
+            await grant_item(session, discord_id, item, qty)
         await session.commit()
-    for item, qty in EXAM_MATERIALS.items():
-        await add_item(discord_id, item, qty)
     return {"ok": True}
 
 

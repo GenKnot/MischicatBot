@@ -1,6 +1,9 @@
+import base64
+import binascii
 import json
+import logging
 import os
-import sqlite3
+import secrets
 import sys
 import time
 from datetime import datetime
@@ -11,11 +14,31 @@ except ImportError:
     _APP_VERSION = "dev"
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               PlainTextResponse, RedirectResponse, Response)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-DB_PATH = os.getenv("DB_PATH", "game.db")
+from utils.config import DB_PATH
+from utils.db import get_conn
+from utils.items import ITEMS
+from utils.sects import (
+    PCT_STATS,
+    SECTS,
+    STAGE_PCT_MULTIPLIER,
+    STAGE_STAT_MULTIPLIER,
+    TECHNIQUE_STAGES,
+    TECHNIQUES,
+)
+from utils.equipment import (
+    QUALITY_ORDER,
+    SLOTS,
+    STAT_NAMES as EQ_STAT_NAMES,
+    TIER_NAMES,
+    generate_equipment,
+)
+from utils.realms import REALM_GROUPS, lifespan_max_for_realm
+from utils.world import CITIES, SPECIAL_REGIONS
 
 # PyInstaller onefile: 资源在 sys._MEIPASS；main.py 会设置 MISCHICAT_BASE 供子进程
 _base = os.environ.get("MISCHICAT_BASE")
@@ -30,6 +53,68 @@ _templates_dir = os.path.normpath(os.path.join(_base, "web", "templates"))
 app = FastAPI(title="Mischicat Admin")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
+log = logging.getLogger("mischicat.web")
+
+# 面板会显示每个玩家的 discord_id 和作息，默认要挡住。
+# 设了 WEB_PASS 强制鉴权；没设时本地放行、k8s 里直接停用（生产不能裸奔）。
+WEB_USER = os.getenv("WEB_USER", "admin")
+WEB_PASS = os.getenv("WEB_PASS") or ""
+IN_KUBERNETES = os.getenv("KUBERNETES_SERVICE_HOST") is not None
+
+# 探针必须在未鉴权状态下可访问，否则 k8s 会一直判定 pod 不健康
+_OPEN_PATHS = frozenset({"/health", "/ready", "/robots.txt", "/sw.js"})
+
+if not WEB_PASS:
+    if IN_KUBERNETES:
+        log.error("未设置 WEB_PASS，Web 面板已停用（生产环境不允许无鉴权对外暴露）")
+    else:
+        log.warning("未设置 WEB_PASS，Web 面板当前无鉴权；若要对公网暴露请先设置")
+
+
+def _basic_auth_ok(header: str | None) -> bool:
+    """校验 Authorization: Basic 头。用固定时间比较，避免时序侧信道。"""
+    if not header or not header.lower().startswith("basic "):
+        return False
+    try:
+        decoded = base64.b64decode(header.split(" ", 1)[1], validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError, IndexError):
+        return False
+    user, sep, password = decoded.partition(":")
+    if not sep:
+        return False
+    # 两个比较都要跑完，不能短路，否则用户名是否正确会从耗时上泄露
+    user_ok = secrets.compare_digest(user, WEB_USER)
+    pass_ok = secrets.compare_digest(password, WEB_PASS)
+    return user_ok and pass_ok
+
+
+@app.middleware("http")
+async def access_control(request: Request, call_next):
+    path = request.url.path
+    if path in _OPEN_PATHS or path.startswith("/static/"):
+        return await call_next(request)
+
+    if not WEB_PASS:
+        if IN_KUBERNETES:
+            return PlainTextResponse(
+                "Web 面板未配置 WEB_PASS，已停用。", status_code=503)
+    elif not _basic_auth_ok(request.headers.get("authorization")):
+        return Response(
+            status_code=401,
+            headers={"WWW-Authenticate": 'Basic realm="Mischicat"'},
+        )
+
+    response = await call_next(request)
+    # 即便鉴权被关掉，也不希望玩家数据进搜索引擎索引
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots():
+    """明确拒绝所有爬虫。面板每一页都从导航链得到，否则会被整站抓取。"""
+    return PlainTextResponse("User-agent: *\nDisallow: /\n")
+
 
 @app.get("/sw.js", include_in_schema=False)
 async def service_worker():
@@ -41,16 +126,57 @@ async def service_worker():
     )
 
 
+# 模板缓存开着。曾经因为 Jinja2 3.1+ 配 Python 3.14 报错而被禁用过，
+# 现在 3.12 和 3.14 上都验证正常，上游早就修了。
 templates = Jinja2Templates(directory=_templates_dir)
-# Disable cache to fix compatibility issue with Jinja2 3.1+ and Python 3.14
-templates.env.cache = None
-templates.env.auto_reload = True
 
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Discord bot 的运行时引用由 main.py 注入。web 与 bot 跑在同一进程的
+# 同一个事件循环里（见 main.py 的 asyncio.gather），因此这里能直接读到状态。
+_bot = None
+
+
+def set_bot(bot) -> None:
+    """由 main.py 在 bot 实例创建后调用，供 /ready 探针判断真实可用性。"""
+    global _bot
+    _bot = bot
+
+
+@app.get("/health")
+async def health():
+    """K8s liveness probe：进程还能提供服务就算活着。
+
+    刻意**不**检查 Discord 连接 —— discord.py 会自动重连，网络抖动期间
+    重启 pod 只会让情况更糟。真实可用性交给 /ready。
+    """
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    """K8s readiness probe：Discord 已连接时才算可对外服务。
+
+    只配 liveness 是不够的：bot 掉线而 uvicorn 仍在响应时，
+    /health 照样返回 200，pod 永远不会被替换。
+    """
+    connected = _bot is not None and _bot.is_ready() and not _bot.is_closed()
+    if not connected:
+        return JSONResponse({"status": "starting", "discord": False}, status_code=503)
+    return {"status": "ok", "discord": True}
+
+
+# 排序参数 → 列名。值是代码里的常量，用户传什么都只能命中这张表的键。
+PLAYER_SORT_COLUMNS = {
+    name: name for name in
+    ("cultivation", "lifespan", "spirit_stones", "realm", "name", "last_active")
+}
+
+STATS_SORT_COLUMNS = {
+    name: name for name in
+    ("cultivation", "lifespan", "spirit_stones", "reputation", "comprehension",
+     "physique", "fortune", "bone", "soul", "name", "realm", "rebirth_count")
+}
+STATS_SORT_COLUMNS["stat_total"] = "stat_total"   # SELECT 里的计算列
 
 
 def ts(val):
@@ -79,8 +205,19 @@ templates.env.globals["now"] = time.time
 templates.env.globals["app_version"] = _APP_VERSION
 
 
+# 下面这些页面路由刻意写成同步 def 而不是 async def。
+#
+# bot 和 uvicorn 共用一个事件循环（见 main.py 的 asyncio.gather），路由要是
+# async 的，函数体就跑在事件循环上 —— 5000 名玩家时 /players 实测 243ms，
+# 这段时间 Discord 那边完全无响应。而这里面 SQL 只占 108ms，剩下的是模板渲染
+# 和行转换，改成异步查询也搬不走。
+#
+# FastAPI 对同步 def 会自动丢进线程池，整个函数体（含模板渲染）都不占事件循环。
+# 代价是每个请求占一个线程，对这种只读面板完全够用。
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+def index(request: Request):
     with get_conn() as conn:
         now = time.time()
         total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0").fetchone()[
@@ -141,23 +278,18 @@ async def index(request: Request):
 
 
 @app.get("/players", response_class=HTMLResponse)
-async def players(
+def players(
     request: Request,
     q: str = "",
     city: str = "",
     realm: str = "",
     sort: str = "cultivation",
 ):
-    allowed_sorts = {
-        "cultivation",
-        "lifespan",
-        "spirit_stones",
-        "realm",
-        "name",
-        "last_active",
-    }
-    if sort not in allowed_sorts:
-        sort = "cultivation"
+    # 用参数查表拿列名，进 SQL 的永远是这里的常量，不是用户传来的字符串。
+    # 原先是校验完直接把 sort 拼进去，校验和拼接隔着十几行，改动时容易漏。
+    sort_column = PLAYER_SORT_COLUMNS.get(sort)
+    if sort_column is None:
+        sort, sort_column = "cultivation", PLAYER_SORT_COLUMNS["cultivation"]
     with get_conn() as conn:
         where = ["is_dead = 0"]
         params = []
@@ -170,7 +302,7 @@ async def players(
         if realm:
             where.append("realm LIKE ?")
             params.append(f"%{realm}%")
-        sql = f"SELECT * FROM players WHERE {' AND '.join(where)} ORDER BY {sort} DESC"
+        sql = f"SELECT * FROM players WHERE {' AND '.join(where)} ORDER BY {sort_column} DESC"
         rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
         cities = [
             r[0]
@@ -193,7 +325,7 @@ async def players(
 
 
 @app.get("/players/{discord_id}", response_class=HTMLResponse)
-async def player_detail(request: Request, discord_id: str):
+def player_detail(request: Request, discord_id: str):
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM players WHERE discord_id = ?", (discord_id,)
@@ -231,7 +363,7 @@ async def player_detail(request: Request, discord_id: str):
 
 
 @app.get("/events", response_class=HTMLResponse)
-async def events(request: Request, page: int = 1):
+def events(request: Request, page: int = 1):
     PAGE_SIZE = 10
     with get_conn() as conn:
         rows = conn.execute(
@@ -301,15 +433,9 @@ async def events(request: Request, page: int = 1):
 
 
 @app.get("/items", response_class=HTMLResponse)
-async def items_page(
+def items_page(
     request: Request, type_filter: str = "", rarity: str = "", q: str = ""
 ):
-    import os
-    import sys
-
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.items import ITEMS
-
     TYPE_LABEL = {
         "pill": "丹药",
         "ore": "矿石",
@@ -355,36 +481,16 @@ async def items_page(
 
 
 @app.get("/stats", response_class=HTMLResponse)
-async def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
-    allowed = {
-        "cultivation",
-        "lifespan",
-        "spirit_stones",
-        "reputation",
-        "comprehension",
-        "physique",
-        "fortune",
-        "bone",
-        "soul",
-        "name",
-        "realm",
-        "rebirth_count",
-        "stat_total",
-    }
-    if sort not in allowed:
-        sort = "cultivation"
+def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
+    sort_column = STATS_SORT_COLUMNS.get(sort)
+    if sort_column is None:
+        sort, sort_column = "cultivation", STATS_SORT_COLUMNS["cultivation"]
     direction = "DESC" if order != "asc" else "ASC"
     with get_conn() as conn:
-        if sort == "stat_total":
-            rows = conn.execute(
-                "SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
-                f"FROM players WHERE is_dead=0 ORDER BY stat_total {direction}"
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                f"SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
-                f"FROM players WHERE is_dead=0 ORDER BY {sort} {direction}"
-            ).fetchall()
+        rows = conn.execute(
+            "SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
+            f"FROM players WHERE is_dead=0 ORDER BY {sort_column} {direction}"
+        ).fetchall()
     return templates.TemplateResponse(
         request=request,
         name="stats.html",
@@ -397,22 +503,9 @@ async def stats(request: Request, sort: str = "cultivation", order: str = "desc"
 
 
 @app.get("/techniques", response_class=HTMLResponse)
-async def techniques_page(
+def techniques_page(
     request: Request, type_filter: str = "", grade: str = "", q: str = ""
 ):
-    import os
-    import sys
-
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.sects import (
-        PCT_STATS,
-        SECTS,
-        STAGE_PCT_MULTIPLIER,
-        STAGE_STAT_MULTIPLIER,
-        TECHNIQUE_STAGES,
-        TECHNIQUES,
-    )
-
     tech_to_sect = {}
     for sect_name, sect_info in SECTS.items():
         for t in sect_info["techniques"]:
@@ -511,21 +604,9 @@ async def techniques_page(
 
 
 @app.get("/equipment-preview", response_class=HTMLResponse)
-async def equipment_preview(
+def equipment_preview(
     request: Request, slot: str = "", quality: str = "", tier: int = 0, count: int = 1
 ):
-    import os
-    import sys
-
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from utils.equipment import (
-        QUALITY_ORDER,
-        SLOTS,
-        STAT_NAMES,
-        TIER_NAMES,
-        generate_equipment,
-    )
-
     QUALITY_COLORS = {
         "普通": "#888888",
         "精良": "#2ecc71",
@@ -575,13 +656,13 @@ async def equipment_preview(
             "quality": quality,
             "tier": tier,
             "count": count,
-            "stat_names": STAT_NAMES,
+            "stat_names": EQ_STAT_NAMES,
         },
     )
 
 
 @app.get("/dead", response_class=HTMLResponse)
-async def dead_players(request: Request):
+def dead_players(request: Request):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM players WHERE is_dead=1 ORDER BY last_active DESC"
@@ -595,21 +676,67 @@ async def dead_players(request: Request):
     )
 
 
-@app.get("/world", response_class=HTMLResponse)
-async def world_page(request: Request):
-    import os
-    import sys
+@app.get("/realms", response_class=HTMLResponse)
+def realms_page(request: Request):
+    """境界体系：13 个大境逐层展开，并统计各境界在世人数。"""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT realm, COUNT(*) AS cnt FROM players WHERE is_dead = 0 GROUP BY realm"
+        ).fetchall()
+        dead_total = conn.execute(
+            "SELECT COUNT(*) FROM players WHERE is_dead = 1"
+        ).fetchone()[0]
+    counts = {r["realm"]: r["cnt"] for r in rows}
 
-    _utils = (
-        os.path.normpath(os.path.join(_base, ".."))
-        if _base != os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    groups = []
+    for major, subs in REALM_GROUPS:
+        # 键名刻意不叫 items：Jinja2 里 `g.items` 会解析成 dict 的 .items 方法
+        # 而不是这个键，模板会静默拿到一个方法对象。
+        stages = [
+            {
+                "name": name,
+                "count": counts.get(name, 0),
+                "lifespan": lifespan_max_for_realm(name),
+            }
+            for name in subs
+        ]
+        groups.append({
+            "major": major,
+            "stages": stages,
+            "total": sum(st["count"] for st in stages),
+        })
+
+    living_total = sum(counts.values())
+    # 落在体系之外的境界值（历史数据或写错的字面量）单独列出，不要静默吞掉
+    known = {name for _m, subs in REALM_GROUPS for name in subs}
+    unknown = [{"name": k, "count": v} for k, v in counts.items() if k not in known]
+
+    highest = None
+    for group in reversed(groups):
+        for item in reversed(group["stages"]):
+            if item["count"]:
+                highest = item["name"]
+                break
+        if highest:
+            break
+
+    return templates.TemplateResponse(
+        request=request,
+        name="realms.html",
+        context={
+            "groups": groups,
+            "living_total": living_total,
+            "dead_total": dead_total,
+            "major_count": len(REALM_GROUPS),
+            "realm_count": sum(len(g["stages"]) for g in groups),
+            "highest": highest,
+            "unknown": unknown,
+        },
     )
-    if _utils not in sys.path:
-        sys.path.insert(0, _utils)
-    from utils.sects import SECTS
-    from utils.world import CITIES, SPECIAL_REGIONS
 
+
+@app.get("/world", response_class=HTMLResponse)
+def world_page(request: Request):
     regions_order = ["中州", "东域", "南域", "西域", "北域"]
     cities_by_region = {}
     for r in regions_order:

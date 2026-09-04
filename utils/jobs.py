@@ -297,36 +297,33 @@ def get_job_list() -> list[dict]:
 
 async def do_job(player: dict, job: dict) -> dict:
     from utils.inventory import add_item
-    from sqlalchemy import text
-    from utils.db_async import AsyncSessionLocal
     import time
+
+    from sqlalchemy import select, text
+
+    from utils.atomic import claim_cooldown, claim_daily_quota
+    from utils.db_async import AsyncSessionLocal, Player
 
     uid = player["discord_id"]
     now = time.time()
 
+    # 冷却和今日次数一次性占掉再掷奖励。原先分两个事务，连点能绕过；
+    # 而且计数只加不跨日归零，第二天起每天只剩一次。
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            text("SELECT job_cooldown_until, job_daily_count, job_daily_reset FROM players WHERE discord_id = :uid"),
-            {"uid": uid}
-        )
-        row = result.fetchone()
-
-    if row:
-        cooldown_until = row[0] or 0
-        daily_count = row[1] or 0
-        daily_reset = row[2] or 0
-
-        if now < cooldown_until:
-            remaining = int(cooldown_until - now)
+        if not await claim_cooldown(session, uid, Player.job_cooldown_until, COOLDOWN_SECONDS, now=now):
+            remaining = int((await session.scalar(
+                select(Player.job_cooldown_until).where(Player.discord_id == uid)
+            ) or 0) - now)
+            remaining = max(remaining, 0)
             return {"ok": False, "reason": f"打工冷却中，还需 **{remaining // 60} 分 {remaining % 60} 秒**。"}
 
-        reset_date = time.gmtime(daily_reset)
-        now_date = time.gmtime(now)
-        if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
-            daily_count = 0
-
-        if daily_count >= JOB_DAILY_LIMIT:
+        daily_used = await claim_daily_quota(
+            session, uid, Player.job_daily_count, Player.job_daily_reset, JOB_DAILY_LIMIT, now=now
+        )
+        if daily_used is None:
+            await session.rollback()          # 连带退回刚打上的冷却
             return {"ok": False, "reason": f"今日打工次数已达上限（{JOB_DAILY_LIMIT}次），明日再来。"}
+        await session.commit()
 
     stones_min, stones_max = job["reward"]["spirit_stones"]
     stones = random.randint(stones_min, stones_max)
@@ -356,13 +353,8 @@ async def do_job(player: dict, job: dict) -> dict:
             loss_min, loss_max = job["risk"]["lifespan_loss"]
             lifespan_loss = random.randint(loss_min, loss_max)
 
-    updates = [
-        "spirit_stones = spirit_stones + :stones",
-        "job_cooldown_until = :cooldown",
-        "job_daily_count = COALESCE(job_daily_count, 0) + 1",
-        "job_daily_reset = :reset",
-    ]
-    params: dict = {"stones": stones, "cooldown": now + COOLDOWN_SECONDS, "reset": now, "uid": uid}
+    updates = ["spirit_stones = spirit_stones + :stones"]
+    params: dict = {"stones": stones, "uid": uid}
     if rep_gain:
         updates.append("reputation = reputation + :rep")
         params["rep"] = rep_gain

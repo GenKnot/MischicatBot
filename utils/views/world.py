@@ -4,6 +4,7 @@ from utils.db_async import AsyncSessionLocal
 from utils.player import get_player, apply_updates, settle_time
 from utils.world import SPECIAL_REGIONS, cities_by_region
 from utils.sects import SECTS
+from utils.views.base import TimedView
 
 
 def _world_overview_embed() -> discord.Embed:
@@ -57,17 +58,11 @@ async def _send_main_menu(interaction: discord.Interaction, cog):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
-class WorldMenuView(discord.ui.View):
+class WorldMenuView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="城市", style=discord.ButtonStyle.primary)
     async def cities_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -114,17 +109,11 @@ class WorldMenuView(discord.ui.View):
 WorldView = WorldMenuView
 
 
-class _BackToWorldView(discord.ui.View):
+class _BackToWorldView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="返回世界", style=discord.ButtonStyle.secondary)
     async def back_world(self, interaction: discord.Interaction, button: discord.ui.Button):

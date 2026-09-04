@@ -503,3 +503,48 @@ tr:hover td { background: rgba(124,106,247,.05); }
   }
 }
 
+
+/* ---- 境界体系页 ---- */
+.realm-highest {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.realm-highest strong { color: var(--accent2); font-size: 15px; }
+
+.realm-section--empty { opacity: .55; }
+
+.realm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.realm-cell {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: border-color .15s;
+}
+.realm-cell:hover { border-color: var(--accent); }
+
+.realm-cell--occupied {
+  border-color: var(--accent);
+  background: rgba(124,106,247,.08);
+}
+.realm-cell--unknown { border-left: 3px solid var(--warning); }
+
+.realm-cell-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.realm-cell-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.realm-cell-count {
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--muted);
+}
+.realm-cell--occupied .realm-cell-count { color: var(--success); font-weight: 700; }

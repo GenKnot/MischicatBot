@@ -1,6 +1,7 @@
 import discord
 from utils.equipment_db import get_equipment_list, equip_item, unequip_item, discard_equipment
 from utils.equipment import QUALITY_COLOR, STAT_NAMES, TIER_NAMES, get_player_tier, equip_stat_bonus
+from utils.views.base import TimedView
 
 
 def _build_equipment_embed(player: dict, equips: list[dict]) -> discord.Embed:
@@ -34,17 +35,11 @@ def _build_equipment_embed(player: dict, equips: list[dict]) -> discord.Embed:
     return embed
 
 
-class EquipmentManageView(discord.ui.View):
+class EquipmentManageView(TimedView):
     def __init__(self, author, cog):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="装备", style=discord.ButtonStyle.success, row=0)
     async def equip_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -127,18 +122,12 @@ class EquipmentManageView(discord.ui.View):
         await _send_main_menu(interaction, self.cog)
 
 
-class _EquipSelectView(discord.ui.View):
+class _EquipSelectView(TimedView):
     def __init__(self, author, cog, options):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.select.options = options
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择装备...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -157,18 +146,12 @@ class _EquipSelectView(discord.ui.View):
         await _go_equipment_panel(interaction, self.author, self.cog)
 
 
-class _UnequipSelectView(discord.ui.View):
+class _UnequipSelectView(TimedView):
     def __init__(self, author, cog, options):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.select.options = options
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择装备...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -184,18 +167,12 @@ class _UnequipSelectView(discord.ui.View):
         await _go_equipment_panel(interaction, self.author, self.cog)
 
 
-class _DiscardSelectView(discord.ui.View):
+class _DiscardSelectView(TimedView):
     def __init__(self, author, cog, options):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.select.options = options
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.select(placeholder="选择装备...", min_values=1, max_values=1)
     async def select(self, interaction: discord.Interaction, select: discord.ui.Select):

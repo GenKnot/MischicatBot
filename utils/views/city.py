@@ -2,6 +2,7 @@ import discord
 from sqlalchemy import text
 from utils.world import get_city, get_region
 from utils.db_async import AsyncSessionLocal
+from utils.views.base import TimedView
 
 
 async def _city_menu_embed(player: dict) -> discord.Embed:
@@ -44,9 +45,9 @@ async def _city_menu_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class CityMenuView(discord.ui.View):
+class CityMenuView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
@@ -63,12 +64,6 @@ class CityMenuView(discord.ui.View):
             self.add_item(CityMenuButton("交易坊", "market", discord.ButtonStyle.primary))
 
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class CityMenuButton(discord.ui.Button):

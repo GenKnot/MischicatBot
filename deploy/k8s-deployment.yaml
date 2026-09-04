@@ -1,9 +1,34 @@
+# SQLite 是单写者，且数据必须活过 pod 重建，因此这份 manifest 有两个
+# 不可改动的约束（详见 .gk/ISSUES.md D1）：
+#
+#   1. 数据卷必须是 PVC，不能是 emptyDir。emptyDir 只活到 pod 生命周期结束，
+#      滚动更新 / 节点驱逐 / OOM 重启都会让整个存档消失。
+#   2. 部署策略必须是 Recreate。默认的 RollingUpdate 会在旧 pod 还活着时
+#      拉起新 pod：ReadWriteOnce 下新 pod 挂不上卷会卡住，而且两个 bot
+#      实例同时在线会重复处理 Discord 事件。
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mischicat-sqlite
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  # storageClassName 留空表示用集群默认。数据库自 2026-09-03 起运行在 WAL
+  # 模式，依赖文件锁，请使用块存储类；NFS 等网络文件系统的锁实现可能不可靠。
+  # storageClassName: local-path
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mischicat-bot
 spec:
-  replicas: 1
+  replicas: 1          # SQLite 单写者 + Discord 单实例，不可扩容
+  strategy:
+    type: Recreate     # 见文件顶部说明，不要改成 RollingUpdate
   selector:
     matchLabels:
       app: mischicat-bot
@@ -18,14 +43,44 @@ spec:
           ports:
             - containerPort: 8080
           envFrom:
+            # 非敏感配置：DB_PATH / COMMAND_PREFIX / WEB_PORT / 各频道 ID 等
             - configMapRef:
                 name: mischicat-bot-config
+            # 敏感配置：DISCORD_TOKEN、WEB_PASS。
+            # 这两项**绝不能**放回 ConfigMap —— configmap 的读取权限在多数集群里
+            # 比 secret 宽得多，且 `kubectl describe` / 全量导出会把值直接打印出来。
+            # 详见 .gk/ISSUES.md D3。
+            - secretRef:
+                name: mischicat-bot-secret
+          env:
+            # 指向同命名空间的 pot-provider Service
+            - name: POT_PROVIDER_URL
+              value: http://pot-provider:4416
+          # 存活探针只看进程是否还在提供服务。刻意不检查 Discord 连接 ——
+          # discord.py 会自动重连，网络抖动时重启 pod 只会让情况更糟。
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          # 就绪探针看 Discord 是否真的连上了。只配 liveness 是不够的：
+          # bot 掉线而 uvicorn 仍在响应时，/health 照样返回 200。
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
             - name: sqlite-data
               mountPath: /app/sqlite-data
       volumes:
         - name: sqlite-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: mischicat-sqlite
 ---
 apiVersion: v1
 kind: Service
@@ -38,6 +93,47 @@ spec:
     - protocol: TCP
       port: 8080
       targetPort: 8080
+---
+# YouTube 的 proof-of-origin token 签发服务。
+# yt-dlp 插件通过 POT_PROVIDER_URL 环境变量找到它（见 utils/ytdlp_helper.py）。
+# 之前 docker-compose 里有这个服务但 k8s 里没有，且两边都没把地址告诉插件。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pot-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pot-provider
+  template:
+    metadata:
+      labels:
+        app: pot-provider
+    spec:
+      containers:
+        - name: pot-provider
+          image: brainicism/bgutil-ytdlp-pot-provider:latest
+          ports:
+            - containerPort: 4416
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4416
+            initialDelaySeconds: 20
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pot-provider
+spec:
+  selector:
+    app: pot-provider
+  ports:
+    - protocol: TCP
+      port: 4416
+      targetPort: 4416
 ---
 apiVersion: apps/v1
 kind: Deployment

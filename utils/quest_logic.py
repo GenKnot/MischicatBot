@@ -1,12 +1,16 @@
+import logging
 import time
 import random
 import json
 from sqlalchemy import select
+from utils.atomic import grant_item, increment_player
 from utils.db_async import AsyncSessionLocal, Player, Inventory, Equipment
 from utils.combat import calc_power
 from utils.equipment import generate_equipment
 from utils.character import years_to_seconds, seconds_to_years
 from utils.realms import get_realm_index
+
+log = logging.getLogger(__name__)
 
 
 async def get_active_quest(discord_id: str) -> dict | None:
@@ -22,7 +26,9 @@ async def get_active_quest(discord_id: str) -> dict | None:
                 "due": player.quest_due,
                 "player_dict": {c.key: getattr(player, c.key) for c in player.__table__.columns}
             }
-        except:
+        except Exception:
+            # active_quest 存的不是合法 JSON
+            log.warning("任务数据解析失败 uid=%s", discord_id)
             return None
 
 
@@ -313,27 +319,27 @@ async def _apply_quest_rewards(discord_id: str, rewards: dict, player_dict: dict
                     roll_results.append((member, roll))
                 roll_results.sort(key=lambda x: x[1], reverse=True)
                 winner = roll_results[0][0]
-                from utils.equipment_db import give_equipment
-                await give_equipment(winner.discord_id, equipment_drop)
+                from utils.equipment_db import new_equipment_row
+                session.add(new_equipment_row(winner.discord_id, equipment_drop))
 
             for member in party_members:
                 member_id = member.discord_id
-                
-                if rewards.get("spirit_stones"):
-                    member.spirit_stones += rewards["spirit_stones"]
-                if rewards.get("cultivation"):
-                    member.cultivation += rewards["cultivation"]
-                if rewards.get("reputation"):
-                    member.reputation += rewards["reputation"]
-                
-                if rewards.get("items"):
-                    from utils.inventory import add_item as _add_item
-                    for item_name in rewards["items"]:
-                        await _add_item(member_id, item_name, 1)
-                
+
+                # 原子累加，且与队友的发放共处同一事务：
+                # 逐个 `+=` 时并发结算会互相覆盖，队伍里有人拿不到奖励。
+                await increment_player(
+                    session, member_id,
+                    spirit_stones=rewards.get("spirit_stones") or 0,
+                    cultivation=rewards.get("cultivation") or 0,
+                    reputation=rewards.get("reputation") or 0,
+                )
+
+                for item_name in rewards.get("items") or []:
+                    await grant_item(session, member_id, item_name, 1)
+
                 member.active_quest = None
                 member.quest_due = None
-            
+
             await session.commit()
 
         if equipment_drop and roll_results:
@@ -349,22 +355,20 @@ async def _apply_quest_rewards(discord_id: str, rewards: dict, player_dict: dict
             if not player:
                 return
             
-            if rewards.get("spirit_stones"):
-                player.spirit_stones += rewards["spirit_stones"]
-            if rewards.get("cultivation"):
-                player.cultivation += rewards["cultivation"]
-            if rewards.get("reputation"):
-                player.reputation += rewards["reputation"]
-            
-            if rewards.get("items"):
-                from utils.inventory import add_item as _add_item
-                for item_name in rewards["items"]:
-                    await _add_item(discord_id, item_name, 1)
-            
+            await increment_player(
+                session, discord_id,
+                spirit_stones=rewards.get("spirit_stones") or 0,
+                cultivation=rewards.get("cultivation") or 0,
+                reputation=rewards.get("reputation") or 0,
+            )
+
+            for item_name in rewards.get("items") or []:
+                await grant_item(session, discord_id, item_name, 1)
+
             if equipment_drop:
-                from utils.equipment_db import give_equipment
-                await give_equipment(discord_id, equipment_drop)
-            
+                from utils.equipment_db import new_equipment_row
+                session.add(new_equipment_row(discord_id, equipment_drop))
+
             player.active_quest = None
             player.quest_due = None
             

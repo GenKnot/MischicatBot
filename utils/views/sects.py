@@ -1,5 +1,6 @@
 import discord
 from utils.sects import SECTS
+from utils.views.base import TimedView
 
 
 def _sects_embed(alignment: str) -> discord.Embed:
@@ -31,17 +32,11 @@ def _sects_embed(alignment: str) -> discord.Embed:
     return embed
 
 
-class SectAlignmentView(discord.ui.View):
+class SectAlignmentView(TimedView):
     def __init__(self, author, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="正道宗门", style=discord.ButtonStyle.primary)
     async def righteous(self, interaction: discord.Interaction, button: discord.ui.Button):

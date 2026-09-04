@@ -6,6 +6,7 @@ from utils.equipment_db import get_equipment_list, get_equipped, equip_item, une
 from utils.equipment import format_equipment, equip_stat_bonus, get_player_tier, QUALITY_COLOR, STAT_NAMES, SLOTS
 from utils.inventory import get_inventory, remove_item
 from utils.player import get_player
+from utils.atomic import consume_item
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 
@@ -310,10 +311,11 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             if not msg_parts:
                 return await ctx.send(f"{ctx.author.mention} 「{item_name_clean}」暂时无法直接使用。")
 
-            if inv.quantity <= 1:
-                await session.delete(inv)
-            else:
-                inv.quantity -= 1
+            # 先原子扣掉丹药再提交：连点服用时只有一次能扣到，
+            # 另一次连同已写入的 buff 一起回滚，不会"一颗丹药吃两次"。
+            if not await consume_item(session, uid, item_name_clean, 1):
+                await session.rollback()
+                return await ctx.send(f"{ctx.author.mention} 背包中没有「{item_name_clean}」。")
             await session.commit()
 
         await ctx.send(f"{ctx.author.mention} 服用「{item_name_clean}」：\n" + "\n".join(f"• {p}" for p in msg_parts))

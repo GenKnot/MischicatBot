@@ -1,7 +1,8 @@
 import discord
+from utils.views.base import TimedView
 
 
-class CultivateView(discord.ui.View):
+class CultivateView(TimedView):
     YEAR_OPTIONS = [
         (1, "1年",  "现实 2 小时"),
         (2, "2年",  "现实 4 小时"),
@@ -10,7 +11,7 @@ class CultivateView(discord.ui.View):
     ]
 
     def __init__(self, author, cog, player: dict):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -18,12 +19,6 @@ class CultivateView(discord.ui.View):
             disabled = player["lifespan"] < years
             self.add_item(CultivateButton(years, label, hint, disabled))
         self.add_item(_BackToMenuButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class CultivateButton(discord.ui.Button):
@@ -37,9 +32,10 @@ class CultivateButton(discord.ui.Button):
         self.view.stop()
 
 
-class ClaimCultivationView(discord.ui.View):
+class ClaimCultivationView(TimedView):
+    public = True          # 归属校验在按钮回调里（比对 self.uid）
     def __init__(self, cog, uid: str):
-        super().__init__(timeout=300)
+        super().__init__()
         self.cog = cog
         self.uid = uid
 
@@ -50,9 +46,9 @@ class ClaimCultivationView(discord.ui.View):
         self.stop()
 
 
-class ZhujiBreakthroughView(discord.ui.View):
+class ZhujiBreakthroughView(TimedView):
     def __init__(self, author, cog, player: dict, has_pill: bool, uid: str):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -65,12 +61,6 @@ class ZhujiBreakthroughView(discord.ui.View):
         if has_pill:
             self.add_item(_ZhujiButton("服用筑基丹冲关", use_pill=True))
         self.add_item(_ZhujiButton("直接冲关", use_pill=False))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _ZhujiButton(discord.ui.Button):
@@ -111,10 +101,18 @@ class _ZhujiButton(discord.ui.Button):
             lifespan_gain = max(0, new_lifespan_max - player["lifespan_max"])
             new_lifespan = player["lifespan"] + lifespan_gain
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, cultivation = 0, last_active = :la WHERE discord_id = :uid"),
-                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid}
+                # 带上读到的境界和修为当条件，连点的第二次就匹配不到行。
+                # 否则同一份状态会被判定两遍，可能连升两级。
+                result = await session.execute(
+                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, "
+                         "cultivation = 0, last_active = :la "
+                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
+                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid,
+                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
                 )
+                if result.rowcount != 1:
+                    await session.rollback()
+                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
                 await session.commit()
             pill_note = "（服用筑基丹）" if self.use_pill else ""
             await interaction.followup.send(
@@ -127,10 +125,16 @@ class _ZhujiButton(discord.ui.Button):
             _, outcome = roll_breakthrough(player["realm"], player["physique"], player["bone"], player["cultivation"])
             new_cultivation, new_lifespan, fail_msg = apply_failure(player["cultivation"], player["lifespan"], outcome)
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la WHERE discord_id = :uid"),
-                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid}
+                # 同上，失败惩罚也只能结算一次
+                result = await session.execute(
+                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la "
+                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
+                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid,
+                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
                 )
+                if result.rowcount != 1:
+                    await session.rollback()
+                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
                 await session.commit()
             pill_note = "（筑基丹已消耗）" if self.use_pill else ""
             await interaction.followup.send(
@@ -182,9 +186,9 @@ class _BackToMenuButton(discord.ui.Button):
         )
 
 
-class NingdanBreakthroughView(discord.ui.View):
+class NingdanBreakthroughView(TimedView):
     def __init__(self, author, cog, player: dict, has_pill: bool, uid: str):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -193,16 +197,10 @@ class NingdanBreakthroughView(discord.ui.View):
             self.add_item(_MajorBreakthroughButton("服用凝丹丹冲关", "凝丹丹", use_pill=True))
         self.add_item(_MajorBreakthroughButton("直接冲关", "凝丹丹", use_pill=False))
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
-
-class HuayingBreakthroughView(discord.ui.View):
+class HuayingBreakthroughView(TimedView):
     def __init__(self, author, cog, player: dict, has_pill: bool, uid: str):
-        super().__init__(timeout=60)
+        super().__init__()
         self.author = author
         self.cog = cog
         self.player = player
@@ -210,12 +208,6 @@ class HuayingBreakthroughView(discord.ui.View):
         if has_pill:
             self.add_item(_MajorBreakthroughButton("服用化婴丹冲关", "化婴丹", use_pill=True))
         self.add_item(_MajorBreakthroughButton("直接冲关", "化婴丹", use_pill=False))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class _MajorBreakthroughButton(discord.ui.Button):
@@ -267,10 +259,18 @@ class _MajorBreakthroughButton(discord.ui.Button):
             lifespan_gain = max(0, new_lifespan_max - player["lifespan_max"])
             new_lifespan = player["lifespan"] + lifespan_gain
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, cultivation = 0, last_active = :la WHERE discord_id = :uid"),
-                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid}
+                # 带上读到的境界和修为当条件，连点的第二次就匹配不到行。
+                # 否则同一份状态会被判定两遍，可能连升两级。
+                result = await session.execute(
+                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, "
+                         "cultivation = 0, last_active = :la "
+                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
+                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid,
+                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
                 )
+                if result.rowcount != 1:
+                    await session.rollback()
+                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
                 await session.commit()
             await interaction.followup.send(
                 f"🎉 **{player['name']}** {from_realm_label}{pill_note_win}！\n"
@@ -282,10 +282,16 @@ class _MajorBreakthroughButton(discord.ui.Button):
             _, outcome = roll_breakthrough(player["realm"], player["physique"], player["bone"], player["cultivation"])
             new_cultivation, new_lifespan, fail_msg = apply_failure(player["cultivation"], player["lifespan"], outcome)
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la WHERE discord_id = :uid"),
-                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid}
+                # 同上，失败惩罚也只能结算一次
+                result = await session.execute(
+                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la "
+                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
+                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid,
+                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
                 )
+                if result.rowcount != 1:
+                    await session.rollback()
+                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
                 await session.commit()
             await interaction.followup.send(
                 f"💔 **{player['name']}** 突破失败{pill_note_fail}！{fail_msg}\n"

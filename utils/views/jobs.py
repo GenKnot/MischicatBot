@@ -1,5 +1,6 @@
 import discord
 from utils.jobs import JOBS, get_available_jobs, get_locked_jobs, _req_desc, JOB_DAILY_LIMIT
+from utils.views.base import TimedView
 
 TIER_LABELS = {1: "入门", 2: "普通", 3: "进阶", 4: "高级", 5: "顶端"}
 TIER_COLORS = {
@@ -77,9 +78,9 @@ async def _jobs_overview_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class JobsView(discord.ui.View):
+class JobsView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
@@ -87,12 +88,6 @@ class JobsView(discord.ui.View):
         for job in available:
             self.add_item(JobButton(job))
         self.add_item(BackToCityButton())
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
 
 class JobButton(discord.ui.Button):

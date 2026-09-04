@@ -1,5 +1,6 @@
 import discord
 from utils.roulette import BET, DAILY_LIMIT, SLOTS, WHEEL, do_roulette
+from utils.views.base import TimedView
 
 
 def _wheel_overview_embed(player: dict) -> discord.Embed:
@@ -33,9 +34,9 @@ def _wheel_overview_embed(player: dict) -> discord.Embed:
     return embed
 
 
-class RouletteView(discord.ui.View):
+class RouletteView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
@@ -53,12 +54,6 @@ class RouletteView(discord.ui.View):
         no_stones = player.get("spirit_stones", 0) < BET
 
         self.spin_btn.disabled = exhausted or no_stones
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="🎡 转动转盘（500 灵石）", style=discord.ButtonStyle.danger)
     async def spin_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -127,18 +122,12 @@ class RouletteView(discord.ui.View):
         await _go_back(interaction, self.author, self.cog)
 
 
-class RouletteResultView(discord.ui.View):
+class RouletteResultView(TimedView):
     def __init__(self, author, player: dict, cog=None):
-        super().__init__(timeout=120)
+        super().__init__()
         self.author = author
         self.player = player
         self.cog = cog
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的面板。", ephemeral=True)
-            return False
-        return True
 
     @discord.ui.button(label="🎡 再来一次", style=discord.ButtonStyle.danger)
     async def again_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
