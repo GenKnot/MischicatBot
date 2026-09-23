@@ -31,6 +31,9 @@ jobs:
       - name: 检查锁文件是否最新
         run: |
           pip install pip-tools
+          # 以现有锁文件为起点：pip-compile 会保留仍满足 .in 的已锁版本。
+          # 不这样做就是从零解析到最新版，上游一发补丁版本 CI 就红，与本次改动无关。
+          cp requirements.txt /tmp/req.lock
           pip-compile -q --strip-extras --output-file=/tmp/req.lock requirements.in
           diff <(grep -v "^#" requirements.txt) <(grep -v "^#" /tmp/req.lock) \
             || { echo "requirements.txt 与 requirements.in 不一致，请重新跑 pip-compile"; exit 1; }
