@@ -60,27 +60,6 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.get_tag.outputs.tag }}
 
-      # 定时构建也要走这一步，否则镜像出了却到不了线上，
-      # 每周重建就白做了。手动触发不自动部署。
-      - name: Update image tags in GitOps repo
-        if: github.event_name == 'push' || github.event_name == 'schedule'
-        run: |
-          # Clone the GitOps repository
-          git clone https://x-access-token:${{ secrets.GITOPS_PAT }}@github.com/yulexun/flux.git gitops
-          cd gitops
-
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Install yq for YAML manipulation
-          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          chmod +x /usr/local/bin/yq
-
-          # Update the Mischicat-Bot image tag in the correct deployment file
-          yq e '(select(.kind == "Deployment" and .metadata.name == "mischicat-bot") | .spec.template.spec.containers[] | select(.name == "mischicat-bot") | .image) = "${{ env.IMAGE }}:${{ steps.get_tag.outputs.tag }}"' -i clusters/home/mischicat/deployment.yaml
-
-          # Commit and push changes
-          git add clusters/home/mischicat/deployment.yaml
-          git commit -m "Update Mischicat-Bot image tag to ${{ steps.get_tag.outputs.tag }}" || exit 0
-          git push
+      # 原先这里还有一步「更新 GitOps 仓库（yulexun/flux）里的镜像 tag」，
+      # 由那边集群的 Flux 自动部署。该服务器已停用，2026-09-23 删除。
+      # 以后换新的部署目标时，在这里接上即可；镜像本身照常推到 ghcr。
