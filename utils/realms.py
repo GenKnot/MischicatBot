@@ -104,19 +104,29 @@ FAIL_HEAVY = "heavy"
 FAIL_DEVIATE = "deviate"
 
 
-def roll_breakthrough(realm: str, physique: int, bone: int, cultivation: int) -> tuple[bool, str | None]:
-    rate = breakthrough_success_rate(realm, physique, bone, cultivation)
-    if random.random() < rate:
-        return True, None
+def roll_failure_outcome(realm: str) -> str:
+    """突破**已经失败**之后，掷出失败的严重程度。
 
+    只管「怎么败」，不管「成不成」。需要失败类型时用这个，**不要**再调一次
+    `roll_breakthrough` 然后丢掉第一个返回值：那次掷骰自己也可能掷出成功，
+    outcome 就是 None，而 `apply_failure` 对未知类型一律按走火入魔处理 ——
+    修为高、成功率大的人反而最容易走火入魔（按钮突破曾因此踩坑，见 .gk/ISSUES.md B4）。
+    """
     idx = get_realm_index(realm)
     if idx < 20:
         weights = [0.70, 0.25, 0.05]
     else:
         weights = [0.30, 0.50, 0.20]
 
-    outcome = random.choices([FAIL_LIGHT, FAIL_HEAVY, FAIL_DEVIATE], weights=weights)[0]
-    return False, outcome
+    return random.choices([FAIL_LIGHT, FAIL_HEAVY, FAIL_DEVIATE], weights=weights)[0]
+
+
+def roll_breakthrough(realm: str, physique: int, bone: int, cultivation: int) -> tuple[bool, str | None]:
+    rate = breakthrough_success_rate(realm, physique, bone, cultivation)
+    if random.random() < rate:
+        return True, None
+
+    return False, roll_failure_outcome(realm)
 
 
 _TECHNIQUE_SLOTS = [
@@ -154,9 +164,12 @@ def apply_failure(cultivation: int, lifespan: int, outcome: str) -> tuple[int, i
         loss = max(1, lifespan // 10)
         new_lifespan = max(0, lifespan - loss)
         msg = f"突破失败，经脉受损，损耗寿元 {loss} 年。"
-    else:
+    elif outcome == FAIL_DEVIATE:
         new_cultivation = 0
         loss = max(1, lifespan // 4)
         new_lifespan = max(0, lifespan - loss)
         msg = f"走火入魔！修为尽散，寿元大损 {loss} 年，九死一生。"
+    else:
+        # 曾经这里是裸 else，None 之类的非法值会悄悄按最重的走火入魔处理。
+        raise ValueError(f"未知的突破失败类型：{outcome!r}")
     return new_cultivation, new_lifespan, msg

@@ -18,6 +18,10 @@ class FakeUser:
     def mention(self) -> str:
         return f"<@{self.id}>"
 
+    @property
+    def display_name(self) -> str:
+        return self.name
+
     def __str__(self) -> str:
         return self.name
 

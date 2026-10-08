@@ -14,6 +14,7 @@ from utils.character import seconds_to_years, get_explore_limit_bonus
 from utils.adventure_chain import get_chain_progress, get_available_chains, get_trigger_chance
 from utils.events.adventure_chains import ALL_CHAINS
 from utils.logging_setup import audit
+from utils.views.base import TimedView
 
 EXPLORE_LIMIT = 8
 EXPLORE_RESET_YEARS = 5
@@ -40,7 +41,9 @@ async def _apply_rewards(discord_id: str, rewards: dict):
         "soul": "soul",
         "reputation": "reputation",
     }
-    for key, val in rewards.items():
+    # 遍历快照：装备分支会往 rewards 里加 "_generated_equipment"，
+    # 直接遍历原字典会在下一轮抛 "dictionary changed size during iteration"。
+    for key, val in list(rewards.items()):
         if key == "discover_sect":
             import json
             async with AsyncSessionLocal() as session:
@@ -49,7 +52,7 @@ async def _apply_rewards(discord_id: str, rewards: dict):
                     {"uid": discord_id}
                 )
                 row = row.fetchone()
-                discovered = json.loads(row["discovered_sects"] or "[]") if row else []
+                discovered = json.loads(row._mapping["discovered_sects"] or "[]") if row else []
                 if val not in discovered:
                     discovered.append(val)
                     await session.execute(
@@ -70,7 +73,7 @@ async def _apply_rewards(discord_id: str, rewards: dict):
                         {"uid": discord_id}
                     )
                     p_row = p_row.fetchone()
-                tier = get_player_tier(p_row["realm"]) if p_row else 0
+                tier = get_player_tier(p_row._mapping["realm"]) if p_row else 0
                 quality_pool = eq_spec.get("quality_pool")
                 quality_weights = eq_spec.get("quality_weights")
                 if quality_pool and quality_weights:
@@ -107,23 +110,36 @@ async def _check_explore_limit(player) -> tuple[bool, str]:
     return False, f"探险次数已用尽（{limit}/{limit}），约 **{years_left:.1f} 游戏年**后刷新。"
 
 
-async def _increment_explore(discord_id: str, player):
-    now_years = time.time() / (2 * 3600)
-    reset_year = player["explore_reset_year"] or 0
-    count = player["explore_count"] or 0
+async def _increment_explore(discord_id: str, player) -> bool:
+    """占用一次探险次数。成功返回 True；次数已满（或被别的点击抢先用完）返回 False。
 
-    if now_years - reset_year >= EXPLORE_RESET_YEARS:
-        count = 1
-        reset_year = now_years
-    else:
-        count += 1
+    「判断没满 → 计数加一」写在**同一条 UPDATE** 里：以前是先 `_check_explore_limit`
+    再把计数写成绝对值，两次点击几乎同时到达时都读到旧计数，都通过检查、写同一个值 ——
+    两次探险只占一次次数，等于白送一次，上限形同虚设（CONVENTIONS #1）。
+
+    窗口过期（距上次重置满 EXPLORE_RESET_YEARS）时计数重置为 1。
+    SQLite 的 UPDATE 里右侧表达式读的都是更新前的行，所以 CASE 里引用旧值是安全的。
+    """
+    now_years = time.time() / (2 * 3600)
+    limit = await _get_explore_limit(player)
 
     async with AsyncSessionLocal() as session:
-        await session.execute(
-            text("UPDATE players SET explore_count = :count, explore_reset_year = :reset_year WHERE discord_id = :uid"),
-            {"count": count, "reset_year": reset_year, "uid": discord_id}
+        result = await session.execute(
+            text(
+                "UPDATE players SET "
+                " explore_count = CASE WHEN :now - COALESCE(explore_reset_year, 0) >= :reset "
+                "                      THEN 1 ELSE COALESCE(explore_count, 0) + 1 END, "
+                " explore_reset_year = CASE WHEN :now - COALESCE(explore_reset_year, 0) >= :reset "
+                "                           THEN :now ELSE COALESCE(explore_reset_year, 0) END "
+                "WHERE discord_id = :uid "
+                "  AND (:now - COALESCE(explore_reset_year, 0) >= :reset "
+                "       OR COALESCE(explore_count, 0) < :limit)"
+            ),
+            {"now": now_years, "reset": EXPLORE_RESET_YEARS, "limit": limit, "uid": discord_id},
         )
+        claimed = result.rowcount == 1
         await session.commit()
+    return claimed
 
 
 async def _consume_explore_buffs(discord_id: str, player: dict, rewards: dict):
@@ -200,17 +216,12 @@ def _pick_choice_result(choices, player):
     return choices[-1]
 
 
-class ExploreResultView(discord.ui.View):
-    def __init__(self, author, cog):
-        super().__init__(timeout=120)
-        self.author = author
-        self.cog = cog
+class ExploreResultView(TimedView):
+    not_owner_message = "这不是你的探险。"
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的探险。", ephemeral=True)
-            return False
-        return True
+    def __init__(self, author, cog):
+        super().__init__(author)
+        self.cog = cog
 
     @discord.ui.button(label="继续探险", style=discord.ButtonStyle.success)
     async def continue_explore(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -234,7 +245,8 @@ class ExploreResultView(discord.ui.View):
         from utils.events.public.wanbao import is_auction_locked
         if await is_auction_locked(uid):
             return await interaction.followup.send("拍卖会进行中，在万宝楼内无法探险。", ephemeral=True)
-        await _increment_explore(uid, player)
+        if not await _increment_explore(uid, player):
+            return await interaction.followup.send("探险次数已用尽，请稍后再试。", ephemeral=True)
         player = await get_player(uid)
 
         # 优先检查奇遇链
@@ -315,10 +327,11 @@ class ExploreResultView(discord.ui.View):
             await cult_cog.help_cmd(ctx)
 
 
-class ExploreView(discord.ui.View):
+class ExploreView(TimedView):
+    not_owner_message = "这不是你的探险。"
+
     def __init__(self, author, event: dict, player, cog):
-        super().__init__(timeout=120)
-        self.author = author
+        super().__init__(author)
         self.event = event
         self.player = player
         self.cog = cog
@@ -333,12 +346,6 @@ class ExploreView(discord.ui.View):
             )
             self.add_item(ExploreChoiceButton(choice["label"], i, has_next))
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的探险。", ephemeral=True)
-            return False
-        return True
-
 
 class ExploreChoiceButton(discord.ui.Button):
     def __init__(self, label: str, index: int, has_next: bool):
@@ -347,10 +354,10 @@ class ExploreChoiceButton(discord.ui.Button):
         self.has_next = has_next
 
     async def callback(self, interaction: discord.Interaction):
+        # 必须在第一个 await 之前占位，见 TimedView.try_claim；否则连点会发两遍奖励
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事件已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         cog = self.view.cog
         player = self.view.player
         uid = str(interaction.user.id)
@@ -384,10 +391,11 @@ class ExploreChoiceButton(discord.ui.Button):
             await interaction.followup.send(embed=embed, view=ExploreResultView(interaction.user, cog))
 
 
-class ExploreNextView(discord.ui.View):
+class ExploreNextView(TimedView):
+    not_owner_message = "这不是你的探险。"
+
     def __init__(self, author, original_event, next_event, player, cog):
-        super().__init__(timeout=120)
-        self.author = author
+        super().__init__(author)
         self.original_event = original_event
         self.next_event = next_event
         self.player = player
@@ -400,12 +408,6 @@ class ExploreNextView(discord.ui.View):
             seen.add(choice["label"])
             self.add_item(ExploreNextButton(choice["label"], i))
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的探险。", ephemeral=True)
-            return False
-        return True
-
 
 class ExploreNextButton(discord.ui.Button):
     def __init__(self, label: str, index: int):
@@ -413,10 +415,9 @@ class ExploreNextButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事件已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         uid = str(interaction.user.id)
         player = dict(self.view.player)
         choices = self.view.next_event["choices"]
@@ -474,7 +475,8 @@ class ExploreCog(commands.Cog, name="Explore"):
         if not ok:
             return await ctx.send(f"{ctx.author.mention} {msg}")
 
-        await _increment_explore(uid, player)
+        if not await _increment_explore(uid, player):
+            return await ctx.send(f"{ctx.author.mention} 探险次数已用尽，请稍后再试。")
         player = await get_player(uid)
 
         # 优先检查奇遇链

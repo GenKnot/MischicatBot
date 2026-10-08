@@ -13,6 +13,7 @@ from utils.combat import calc_power
 from utils.character import years_to_seconds, seconds_to_years
 from utils import quest_logic
 from utils.logging_setup import audit
+from utils.views.base import TimedView
 
 log = logging.getLogger(__name__)
 
@@ -416,25 +417,21 @@ class QuestButton(discord.ui.Button):
             )
 
 
-class QuestConfirmView(discord.ui.View):
+class QuestConfirmView(TimedView):
+    not_owner_message = "这不是你的任务。"
+
     def __init__(self, author, quest: dict, tier: str, cog):
-        super().__init__(timeout=60)
-        self.author = author
+        super().__init__(author)
         self.quest = quest
         self.tier = tier
         self.cog = cog
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.author:
-            await interaction.response.send_message("这不是你的任务。", ephemeral=True)
-            return False
-        return True
-
     @discord.ui.button(label="接取任务", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.try_claim():
+            return await interaction.response.send_message("这个任务已经接取过了。", ephemeral=True)
         await interaction.response.defer()
         uid = str(interaction.user.id)
-        self.stop()
 
         result = await quest_logic.start_quest(uid, self.quest, self.tier)
         if not result.get("success"):

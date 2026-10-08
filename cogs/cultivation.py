@@ -1,5 +1,4 @@
 import logging
-import random
 import time
 
 import discord
@@ -11,7 +10,7 @@ from utils.character import (
 )
 from utils.realms import cultivation_needed, lifespan_max_for_realm
 from utils.config import COMMAND_PREFIX
-from utils.views import MainMenuView, ProfileView, CultivateView, ClaimCultivationView, DualCultivateInviteView, YinYangView, _build_menu_embed
+from utils.views import MainMenuView, ProfileView, CultivateView, DualCultivateInviteView, YinYangView, _build_menu_embed
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.world import CITIES
@@ -29,19 +28,17 @@ from utils.breakthrough_logic import (
     handle_zhuji_breakthrough, handle_ningdan_breakthrough, handle_huaying_breakthrough
 )
 from utils.dual_cultivation_logic import (
-    check_dual_requirements, start_dual_cultivation
+    calculate_dual_multiplier, check_dual_requirements, start_dual_cultivation
 )
 from utils.cultivation_logic import (
     start_cultivation as async_start_cultivation,
     stop_cultivation as async_stop_cultivation,
-    claim_cultivation as async_claim_cultivation
 )
 
 
 class CultivationCog(commands.Cog, name="Cultivation"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._notified: set[str] = set()
 
     def _calc_rebirth_bonus(self, player: dict) -> dict:
         return calculate_rebirth_bonus(player)
@@ -77,9 +74,6 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 )
         
         return True
-
-    async def _handle_death(self, ctx, player, uid: str):
-        pass
 
     async def _try_yinyang(self, ctx, player, uid: str) -> bool:
         if not should_trigger_yinyang(player):
@@ -231,39 +225,13 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             f"闭关结束后将收到通知。"
         )
 
-    async def claim_cultivation(self, interaction: discord.Interaction, uid: str):
-        result = await async_claim_cultivation(uid)
-        
-        if not result["success"]:
-            return await interaction.response.send_message(result["message"])
-        
-        self._notified.discard(uid)
-        
-        can_bt = result["cultivation"] >= result["needed"]
-        
-        embed = discord.Embed(title="✦ 修炼成果已领取 ✦", description=f"**{result['name']}** 出关！", color=discord.Color.teal())
-        embed.add_field(name="修为获得", value=f"+{result['gain']}", inline=True)
-        embed.add_field(name="当前修为", value=f"{result['cultivation']} / {result['needed']}", inline=True)
-        embed.add_field(name="剩余寿元", value=f"{result['lifespan']} 年", inline=True)
-        if can_bt:
-            embed.add_field(name="提示", value="修为已圆满，可尝试突破！", inline=False)
-        await interaction.response.send_message(embed=embed)
+    async def _breakthrough_prompt(self, uid: str, player: dict, author) -> dict | None:
+        """大关卡的前置界面：炼气10层 / 筑基10层 / 结丹后期 出丹药面板，元婴后期被化神之壁拦住。
 
-    async def send_breakthrough(self, interaction: discord.Interaction):
-        uid = str(interaction.user.id)
-        player = await get_player(uid)
-        if not player:
-            return await interaction.followup.send("尚未踏入修仙之路。")
-        updates, _ = await settle_time(player)
-        await apply_updates(uid, updates)
-        player = await get_player(uid)
-        now = time.time()
-        if player["cultivating_until"] and now < player["cultivating_until"]:
-            return await interaction.followup.send("请先结束闭关再尝试突破。")
-        if not can_breakthrough(player):
-            needed = cultivation_needed(player["realm"])
-            return await interaction.followup.send(f"修为尚未圆满，还差 **{needed - player['cultivation']}** 点。")
-
+        返回要发送的 `{"embed": ..., "view": ...}`；普通小境界返回 None（走连续突破）。
+        按钮入口与 `/突破` 命令共用这一份 —— 以前命令里是复制粘贴的、只认炼气10层，
+        结果命令绕过了化神之壁，且筑基10层 / 结丹后期 没有丹药面板（ISSUES.md B15）。
+        """
         if player["realm"] == "炼气期10层":
             from utils.items import calc_zhuji_breakthrough_rate, can_skip_pill
             from utils.inventory import has_item
@@ -283,8 +251,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 ),
                 color=discord.Color.gold(),
             )
-            await interaction.followup.send(embed=embed, view=ZhujiBreakthroughView(interaction.user, self, player, has_pill, uid))
-            return
+            return {"embed": embed, "view": ZhujiBreakthroughView(author, self, player, has_pill, uid)}
 
         if player["realm"] == "筑基期10层":
             from utils.items.breakthrough import calc_ningdan_breakthrough_rate
@@ -303,8 +270,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 ),
                 color=discord.Color.gold(),
             )
-            await interaction.followup.send(embed=embed, view=NingdanBreakthroughView(interaction.user, self, player, has_pill, uid))
-            return
+            return {"embed": embed, "view": NingdanBreakthroughView(author, self, player, has_pill, uid)}
 
         if player["realm"] == "结丹期后期":
             from utils.items.breakthrough import calc_huaying_breakthrough_rate
@@ -323,8 +289,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 ),
                 color=discord.Color.gold(),
             )
-            await interaction.followup.send(embed=embed, view=HuayingBreakthroughView(interaction.user, self, player, has_pill, uid))
-            return
+            return {"embed": embed, "view": HuayingBreakthroughView(author, self, player, has_pill, uid)}
 
         if player["realm"] == "元婴期后期":
             embed = discord.Embed(
@@ -338,7 +303,28 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 color=discord.Color.dark_purple(),
             )
             embed.set_footer(text="化神之道，缘起天定，强求不得。")
-            return await interaction.followup.send(embed=embed)
+            return {"embed": embed}
+
+        return None
+
+    async def send_breakthrough(self, interaction: discord.Interaction):
+        uid = str(interaction.user.id)
+        player = await get_player(uid)
+        if not player:
+            return await interaction.followup.send("尚未踏入修仙之路。")
+        updates, _ = await settle_time(player)
+        await apply_updates(uid, updates)
+        player = await get_player(uid)
+        now = time.time()
+        if player["cultivating_until"] and now < player["cultivating_until"]:
+            return await interaction.followup.send("请先结束闭关再尝试突破。")
+        if not can_breakthrough(player):
+            needed = cultivation_needed(player["realm"])
+            return await interaction.followup.send(f"修为尚未圆满，还差 **{needed - player['cultivation']}** 点。")
+
+        prompt = await self._breakthrough_prompt(uid, player, interaction.user)
+        if prompt is not None:
+            return await interaction.followup.send(**prompt)
 
         result = await self._do_breakthrough_chain(uid, player, now)
         await interaction.followup.send(result)
@@ -630,28 +616,9 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         if not can_breakthrough(player):
             needed = cultivation_needed(player["realm"])
             return await ctx.send(f"{ctx.author.mention} 修为尚未圆满，还差 **{needed - player['cultivation']}** 点。")
-        if player["realm"] == "炼气期10层":
-            from utils.items import calc_zhuji_breakthrough_rate, can_skip_pill
-            from utils.inventory import has_item
-            from utils.views.cultivation import ZhujiBreakthroughView
-            has_pill = await has_item(uid, "筑基丹")
-            skip = can_skip_pill(player)
-            rate_no_pill = calc_zhuji_breakthrough_rate(player, use_pill=False)
-            rate_with_pill = calc_zhuji_breakthrough_rate(player, use_pill=True)
-            embed = discord.Embed(
-                title="✦ 炼气化液 · 筑基之关 ✦",
-                description=(
-                    "炼气期圆满，天地大关横亘于前。\n"
-                    "筑基之关乃修仙路上第一道天堑，非有大机缘者难以跨越。\n\n"
-                    f"当前突破成功率：**{rate_no_pill}%**\n"
-                    + (f"服用筑基丹后：**{rate_with_pill}%**\n" if has_pill else "（背包中无筑基丹）\n")
-                    + ("\n✨ 悟性与机缘皆已大成，可直接冲关！" if skip else "")
-                ),
-                color=discord.Color.gold(),
-            )
-            await ctx.send(ctx.author.mention, embed=embed,
-                           view=ZhujiBreakthroughView(ctx.author, self, player, has_pill, uid))
-            return
+        prompt = await self._breakthrough_prompt(uid, player, ctx.author)
+        if prompt is not None:
+            return await ctx.send(ctx.author.mention, **prompt)
         result = await self._do_breakthrough_chain(uid, player, now)
         await ctx.send(f"{ctx.author.mention} {result}")
 
@@ -702,15 +669,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         inv_virgin = bool(inviter["is_virgin"])
         tgt_virgin = bool(target_player["is_virgin"])
         both_virgin = inv_virgin and tgt_virgin
-        if both_virgin:
-            multiplier = random.uniform(10, 20)
-            mult_desc = f"双方皆为清白之身，阴阳交融，修为暴涨（**{multiplier:.1f}倍**）"
-        elif inv_virgin or tgt_virgin:
-            multiplier = 5.0
-            mult_desc = "一方清白之身，修为大增（**5倍**）"
-        else:
-            multiplier = 1.2
-            mult_desc = "双修加持，修为略有提升（**1.2倍**）"
+        # 倍率在这里掷一次并展示；对方接受时原样结算（见 start_dual_cultivation 的 multiplier）
+        multiplier, mult_desc = calculate_dual_multiplier(inv_virgin, tgt_virgin)
 
         embed = discord.Embed(
             title="✦ 双修邀请 ✦",
@@ -729,7 +689,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         inv_uid = str(inviter.id)
         tgt_uid = str(target.id)
         
-        result = await start_dual_cultivation(inv_uid, tgt_uid)
+        result = await start_dual_cultivation(inv_uid, tgt_uid, multiplier)
         
         if not result["success"]:
             return await interaction.followup.send(f"双修失败：{result['message']}")
@@ -762,9 +722,6 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             rows = result.fetchall()
         for row in rows:
             uid = row._mapping["discord_id"]
-            if uid in self._notified:
-                continue
-            self._notified.add(uid)
             years_done = row._mapping["cultivating_years"] or 0
             bonus = await get_cultivation_bonus(uid, row._mapping["current_city"], row._mapping["cave"])
             from utils.buffs import get_cultivation_speed_bonus
@@ -773,18 +730,28 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                 bonus += speed_bonus
             overflow = row._mapping["cultivation_overflow"] or 0
             gain = overflow if overflow > 0 else int(calc_cultivation_gain(years_done, row._mapping["comprehension"], row._mapping["spirit_root_type"]) * (1 + bonus))
-            new_cultivation = row._mapping["cultivation"] + gain
+            # 「谁来结算这一次」由数据库裁决：条件 UPDATE + rowcount。
+            # 以前靠进程内的 self._notified 集合去重，但它只在（从未上线的）「领取」按钮里被清除 ——
+            # 玩家第一次出关之后，之后每一次出关都被当成「已通知过」而跳过，修为不入账，直到 bot 重启（B14）。
+            # 修为用增量而不是写回绝对值，期间被别处改过的修为不会被覆盖；
+            # 玩家恰好在此刻手动撤销闭关（stop_cultivation）时条件不再成立，本次让给撤销那边。
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET cultivation = :cultivation, cultivation_overflow = 0, cultivating_until = NULL, cultivating_years = NULL, dual_partner_id = NULL WHERE discord_id = :uid"),
-                    {"cultivation": new_cultivation, "uid": uid}
+                claimed = await session.execute(
+                    text("UPDATE players SET cultivation = cultivation + :gain, cultivation_overflow = 0, "
+                         "cultivating_until = NULL, cultivating_years = NULL, dual_partner_id = NULL "
+                         "WHERE discord_id = :uid AND cultivating_until IS NOT NULL "
+                         "AND cultivating_until <= :now AND is_dead = 0"),
+                    {"gain": gain, "uid": uid, "now": now}
                 )
+                settled = claimed.rowcount == 1
                 await session.commit()
+            if not settled:
+                continue
             try:
                 player = await get_player(uid)
                 needed = cultivation_needed(player["realm"])
                 can_bt = can_breakthrough(player)
-                embed = discord.Embed(title="✦ 闭关结束 ✦", description=f"**{row['name']}** 出关！", color=discord.Color.gold())
+                embed = discord.Embed(title="✦ 闭关结束 ✦", description=f"**{row._mapping['name']}** 出关！", color=discord.Color.gold())
                 embed.add_field(name="修为获得", value=f"+{gain}", inline=True)
                 embed.add_field(name="当前修为", value=f"{player['cultivation']} / {needed}", inline=True)
                 embed.add_field(name="剩余寿元", value=f"{player['lifespan']} 年", inline=True)
@@ -792,9 +759,13 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                     embed.add_field(name="提示", value="修为已圆满，可尝试突破！", inline=False)
                 user = await self.bot.fetch_user(int(uid))
                 await user.send(embed=embed)
-            except Exception:
-                # 对方关了私信是常态，不当错误处理
+            except (discord.Forbidden, discord.NotFound):
+                # 对方关了私信 / 账号不在了是常态，不当错误处理
                 log.debug("私信发送失败", exc_info=True)
+            except Exception:
+                # 其余都是我们自己的 bug（曾经 row['name'] 在 SQLAlchemy 2 上抛 TypeError，
+                # 被这里吞成 debug，所有人的出关通知悄悄丢了很久）
+                log.exception("出关通知失败：%s", uid)
 
     @_cultivation_notifier.before_loop
     async def _before_notifier(self):
@@ -811,10 +782,6 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             rows = result.fetchall()
         for row in rows:
             uid = row._mapping["discord_id"]
-            notify_key = f"gather_{uid}"
-            if notify_key in self._notified:
-                continue
-            self._notified.add(notify_key)
             from utils.views.gathering import roll_gathering_rewards
             from utils.realms import get_realm_index as _gri
             from utils.inventory import add_item
@@ -830,13 +797,20 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             actual_duration = (p._mapping["gathering_until"] - p._mapping["last_active"]) if p and p._mapping["gathering_until"] else 7200
             years_spent = max(0.25, seconds_to_years(actual_duration))
             saved_bonus = p._mapping["gathering_bonus"] if p else 0
-            rewards = roll_gathering_rewards(years_spent, realm_idx, region_name, gather_type, gather_bonus=saved_bonus or 0)
+            # 先认领再发奖：条件 UPDATE + rowcount，同一次采集只会被结算一次（见闭关通知里的说明，B14）。
+            # 以前靠进程内的 self._notified 去重且从不清除，玩家第二次采集结束后奖励不再发放。
             async with AsyncSessionLocal() as session:
-                await session.execute(
-                    text("UPDATE players SET gathering_until = NULL, gathering_type = NULL WHERE discord_id = :uid"),
-                    {"uid": uid}
+                claimed = await session.execute(
+                    text("UPDATE players SET gathering_until = NULL, gathering_type = NULL "
+                         "WHERE discord_id = :uid AND gathering_until IS NOT NULL "
+                         "AND gathering_until <= :now AND is_dead = 0"),
+                    {"uid": uid, "now": now}
                 )
+                settled = claimed.rowcount == 1
                 await session.commit()
+            if not settled:
+                continue
+            rewards = roll_gathering_rewards(years_spent, realm_idx, region_name, gather_type, gather_bonus=saved_bonus or 0)
             for item_name, qty in rewards:
                 await add_item(uid, item_name, qty)
             try:
@@ -857,9 +831,11 @@ class CultivationCog(commands.Cog, name="Cultivation"):
                     embed.set_footer(text=f"材料总价值约 {total_value} 灵石（可使用 {COMMAND_PREFIX}出售 [材料名] 出售）")
                 user = await self.bot.fetch_user(int(uid))
                 await user.send(embed=embed)
-            except Exception:
-                # 对方关了私信是常态，不当错误处理
+            except (discord.Forbidden, discord.NotFound):
+                # 对方关了私信 / 账号不在了是常态，不当错误处理
                 log.debug("私信发送失败", exc_info=True)
+            except Exception:
+                log.exception("采集通知失败：%s", uid)
 
     @_gathering_notifier.before_loop
     async def _before_gathering_notifier(self):

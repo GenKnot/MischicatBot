@@ -466,6 +466,9 @@ class _ConfirmView(TimedView):
 
     @discord.ui.button(label="开炉炼丹", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 一次点击 = 一次开炉。连点会各付全价各开一炉，结果消息还会互相覆盖，玩家只看得到一炉。
+        if not self.try_claim():
+            return await interaction.response.send_message("这一炉已经开了。", ephemeral=True)
         await interaction.response.defer()
         from utils.alchemy import attempt_alchemy
         uid = str(interaction.user.id)

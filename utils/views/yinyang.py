@@ -33,10 +33,9 @@ class YinYangButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         choice = self.view.event["choices"][self.index]
         if choice.get("next"):
             embed = discord.Embed(title=f"✦ {self.view.event['title']} ✦", description=choice["next"]["desc"], color=discord.Color.dark_purple())
@@ -46,7 +45,7 @@ class YinYangButton(discord.ui.Button):
             from cogs.explore import _apply_rewards, _pick_choice_result
             same = [c for c in self.view.event["choices"] if c["label"] == choice["label"]]
             result = _pick_choice_result(same, dict(self.view.player))
-            _apply_rewards(self.view.uid, result.get("rewards", {}))
+            await _apply_rewards(self.view.uid, result.get("rewards", {}))
             await _send_yinyang_finale(interaction, self.view.finale_event, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 
@@ -82,10 +81,9 @@ class YinYangNextButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         from cogs.explore import _apply_rewards, _pick_choice_result
         choices = self.view.next_event["choices"]
         choice = choices[self.index]
@@ -96,7 +94,7 @@ class YinYangNextButton(discord.ui.Button):
             return
         same = [c for c in choices if c["label"] == choice["label"]]
         result = _pick_choice_result(same, dict(self.view.player))
-        _apply_rewards(self.view.uid, result.get("rewards", {}))
+        await _apply_rewards(self.view.uid, result.get("rewards", {}))
         await _send_yinyang_finale(interaction, self.view.finale_event, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 
@@ -139,10 +137,9 @@ class YinYangFinaleButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         from cogs.explore import _apply_rewards, _pick_choice_result
         choices = self.view.event["choices"]
         choice = choices[self.index]
@@ -153,7 +150,7 @@ class YinYangFinaleButton(discord.ui.Button):
             return
         same = [c for c in choices if c["label"] == choice["label"]]
         result = _pick_choice_result(same, dict(self.view.player))
-        _apply_rewards(self.view.uid, result.get("rewards", {}))
+        await _apply_rewards(self.view.uid, result.get("rewards", {}))
         await _do_yinyang_rebirth(interaction, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 
@@ -188,15 +185,14 @@ class YinYangFinaleSubButton(discord.ui.Button):
         self.index = index
 
     async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("此事已处理。", ephemeral=True)
         await interaction.response.defer()
-        for item in self.view.children:
-            item.disabled = True
-        self.view.stop()
         from cogs.explore import _apply_rewards, _pick_choice_result
         choices = self.view.next_event["choices"]
         same = [c for c in choices if c["label"] == choices[self.index]["label"]]
         result = _pick_choice_result(same, dict(self.view.player))
-        _apply_rewards(self.view.uid, result.get("rewards", {}))
+        await _apply_rewards(self.view.uid, result.get("rewards", {}))
         await _do_yinyang_rebirth(interaction, self.view.player, self.view.cog, self.view.uid, result.get("flavor", ""))
 
 

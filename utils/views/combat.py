@@ -226,52 +226,55 @@ class VictoryActionView(TimedView):
 
     @discord.ui.button(label="💰 打劫灵石", style=discord.ButtonStyle.danger)
     async def rob(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        def_uid = self.loser["discord_id"]
-        atk_uid = self.winner["discord_id"]
-        async with AsyncSessionLocal() as session:
-            r = await session.execute(text("SELECT spirit_stones FROM players WHERE discord_id = :uid"), {"uid": def_uid})
-            row = r.fetchone()
-            if not row:
-                return await interaction.followup.send("对方数据异常。", ephemeral=True)
-            loot = max(1, int(row._mapping["spirit_stones"] * random.uniform(0.3, 0.6)))
-            # 按刚读到的余额算出的 loot，可能在此期间已被对方花掉；
-            # 扣不动就说明对方已经没那么多灵石了，本次搜刮落空。
-            from utils.atomic import grant_stones, spend_stones
-            if not await spend_stones(session, def_uid, loot):
-                await session.rollback()
-                return await interaction.followup.send("对方身上已经没什么油水了。", ephemeral=True)
-            await grant_stones(session, atk_uid, loot)
-            await session.commit()
-        for item in self.children:
-            item.disabled = True
-        self.stop()
-        await interaction.followup.send(f"你从 **{self.loser['name']}** 身上搜刮了 **{loot} 灵石**。", ephemeral=True)
+        # 打劫可能落空（对方身上没钱了），落空不该用掉这次机会，所以用 hold/finish 而不是 try_claim。
+        # 占位必须在第一个 await 之前；占着的期间别的点击（包括击杀、废修为）都进不来。
+        if not self.try_hold():
+            return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            from sqlalchemy import text
+            from utils.db_async import AsyncSessionLocal
+            def_uid = self.loser["discord_id"]
+            atk_uid = self.winner["discord_id"]
+            async with AsyncSessionLocal() as session:
+                r = await session.execute(text("SELECT spirit_stones FROM players WHERE discord_id = :uid"), {"uid": def_uid})
+                row = r.fetchone()
+                if not row:
+                    return await interaction.followup.send("对方数据异常。", ephemeral=True)
+                loot = max(1, int(row._mapping["spirit_stones"] * random.uniform(0.3, 0.6)))
+                # 按刚读到的余额算出的 loot，可能在此期间已被对方花掉；
+                # 扣不动就说明对方已经没那么多灵石了，本次搜刮落空。
+                from utils.atomic import grant_stones, spend_stones
+                if not await spend_stones(session, def_uid, loot):
+                    await session.rollback()
+                    return await interaction.followup.send("对方身上已经没什么油水了。", ephemeral=True)
+                await grant_stones(session, atk_uid, loot)
+                await session.commit()
+            self.finish()
+            await interaction.followup.send(f"你从 **{self.loser['name']}** 身上搜刮了 **{loot} 灵石**。", ephemeral=True)
+        finally:
+            self.release_hold()          # 落空 / 出错时放回，让玩家改选别的；已 finish 则无影响
 
     @discord.ui.button(label="💀 废去修为", style=discord.ButtonStyle.danger)
     async def cripple(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.try_claim():
+            return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
         await interaction.response.defer(ephemeral=True)
         from sqlalchemy import text
         from utils.db_async import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
             await session.execute(text("UPDATE players SET cultivation = 0 WHERE discord_id = :uid"), {"uid": self.loser["discord_id"]})
             await session.commit()
-        for item in self.children:
-            item.disabled = True
-        self.stop()
         await interaction.followup.send(f"你强行打散了 **{self.loser['name']}** 的修为，其修为归零。", ephemeral=True)
 
     @discord.ui.button(label="☠️ 击杀", style=discord.ButtonStyle.danger)
     async def kill(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.try_claim():
+            return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
         await interaction.response.defer(ephemeral=True)
         from sqlalchemy import text
         from utils.db_async import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
             await session.execute(text("UPDATE players SET is_dead = 1, lifespan = 0 WHERE discord_id = :uid"), {"uid": self.loser["discord_id"]})
             await session.commit()
-        for item in self.children:
-            item.disabled = True
-        self.stop()
         await interaction.followup.send(f"你取了 **{self.loser['name']}** 的性命。其魂归天道，尘归尘，土归土。", ephemeral=True)

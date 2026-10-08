@@ -41,10 +41,10 @@ jobs:
       - name: 跑测试并检查覆盖率门槛
         # --cov-fail-under 是棘轮：只许升不许降。
         # 每次实质性提升覆盖率后，把这个数字一起调高。
-        # 刻意比实测值（约 22.2%）低 1 个百分点：部分用例带随机分支，
+        # 刻意比实测值（约 41.7%）低 1 个百分点：部分用例带随机分支，
         # 覆盖率会小幅抖动，贴边设置会变成随机失败的 CI。
         run: |
           pytest tests/ -q \
             --cov=utils --cov=cogs --cov=web \
             --cov-report=term-missing:skip-covered \
-            --cov-fail-under=21
+            --cov-fail-under=40

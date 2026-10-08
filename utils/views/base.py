@@ -57,6 +57,56 @@ class TimedView(discord.ui.View):
             return False
         return True
 
+    _held = False
+
+    def try_claim(self) -> bool:
+        """占住这个面板「只能用一次」的操作：第一个调用者拿到 True，之后都是 False。
+
+        用在一次性按钮的回调里，**必须在回调的第一个 `await` 之前调用**：
+
+            async def callback(self, interaction):
+                if not self.view.try_claim():
+                    return await interaction.response.send_message("已处理。", ephemeral=True)
+                await interaction.response.defer()      # 之后再做会让出事件循环的事
+
+        为什么：`interaction.response.defer()` 要走网络。如果先 defer 再 stop()，两次几乎同时的
+        点击会在 stop() 之前一起越过入口，奖励/扣费各结算两遍。「检查 + 作废」之间没有 await，
+        在 asyncio 里天然原子。
+
+        返回 False 时调用方应当直接回一句「已处理」，不要继续往下做。
+        一个面板上有几个互斥的按钮（打劫 / 废修为 / 击杀）时，它们共用同一个占位，
+        所以也能防「同时点两个不同的按钮」。
+
+        如果操作**可能被拒绝而不该用掉这次机会**（比如对方身上没钱了），改用
+        `try_hold()` / `finish()` / `release_hold()`。
+        """
+        if not self.try_hold():
+            return False
+        self.finish()
+        return True
+
+    def try_hold(self) -> bool:
+        """暂时占住面板（操作进行中）。成功返回 True，之后必须 `finish()` 或 `release_hold()`。
+
+        占着的期间别的点击（包括别的按钮）都拿到 False；操作被拒绝时 `release_hold()` 放回，
+        玩家可以改选别的，操作成功时 `finish()` 作废面板。同样要在第一个 `await` 之前调用。
+        """
+        if self.is_finished() or self._held:
+            return False
+        self._held = True
+        return True
+
+    def release_hold(self) -> None:
+        """放回占位（操作被拒绝，不算用掉这次机会）。已经 `finish()` 的面板不受影响。"""
+        self._held = False
+
+    def finish(self) -> None:
+        """作废面板：禁用全部按钮并 `stop()`。"""
+        self._held = False
+        for item in self.children:
+            item.disabled = True
+        self.stop()
+
     async def on_timeout(self) -> None:
         for item in self.children:
             item.disabled = True

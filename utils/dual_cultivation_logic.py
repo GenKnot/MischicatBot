@@ -78,23 +78,38 @@ async def check_dual_requirements(inviter_id: str, target_id: str) -> dict:
         }
 
 
+def _multiplier_range(inviter_virgin: bool, target_virgin: bool) -> tuple[float, float]:
+    """双修倍率的**唯一**规则：双方清白 10~20 倍（随机）；一方清白 5 倍；都不是 1.2 倍。"""
+    if inviter_virgin and target_virgin:
+        return 10, 20
+    if inviter_virgin or target_virgin:
+        return 5.0, 5.0
+    return 1.2, 1.2
+
+
 def calculate_dual_multiplier(inviter_virgin: bool, target_virgin: bool) -> tuple[float, str]:
-    both_virgin = inviter_virgin and target_virgin
-    
-    if both_virgin:
-        multiplier = random.uniform(10, 20)
+    """掷出一个倍率及其描述。发邀请时调用一次，展示给对方；对方接受时该倍率原样结算。"""
+    lo, hi = _multiplier_range(inviter_virgin, target_virgin)
+    multiplier = random.uniform(lo, hi) if lo != hi else lo
+
+    if inviter_virgin and target_virgin:
         desc = f"双方皆为清白之身，阴阳交融，修为暴涨（**{multiplier:.1f}倍**）"
     elif inviter_virgin or target_virgin:
-        multiplier = 5.0
         desc = "一方清白之身，修为大增（**5倍**）"
     else:
-        multiplier = 1.2
         desc = "双修加持，修为略有提升（**1.2倍**）"
-    
+
     return multiplier, desc
 
 
-async def start_dual_cultivation(inviter_id: str, target_id: str) -> dict:
+async def start_dual_cultivation(inviter_id: str, target_id: str, multiplier: float | None = None) -> dict:
+    """开始双修。
+
+    `multiplier` 是邀请面板上展示给对方的倍率：传了就**按它结算**，所见即所得。
+    但它只在结算时仍然适用才生效 —— 邀请发出到被接受之间，清白身可能已经被别的双修用掉；
+    若仍按旧的高倍率结算，同一份清白身就能兑现多次。所以倍率必须落在当前清白身状态对应的
+    区间内，否则拒绝，请对方重新发起邀请。不传则由这里现掷（没有展示过的场合）。
+    """
     now = time.time()
     
     async with AsyncSessionLocal() as session:
@@ -127,14 +142,13 @@ async def start_dual_cultivation(inviter_id: str, target_id: str) -> dict:
         inv_virgin = bool(inviter.is_virgin)
         tgt_virgin = bool(target.is_virgin)
         both_virgin = inv_virgin and tgt_virgin
-        
-        if both_virgin:
-            multiplier = random.uniform(10, 20)
-        elif inv_virgin or tgt_virgin:
-            multiplier = 5.0
-        else:
-            multiplier = 1.2
-        
+
+        lo, hi = _multiplier_range(inv_virgin, tgt_virgin)
+        if multiplier is None:
+            multiplier = random.uniform(lo, hi) if lo != hi else lo
+        elif not (lo - 1e-9 <= multiplier <= hi + 1e-9):
+            return {"success": False, "message": "双方状态已变化，邀请上的倍率已不适用，请重新发起邀请"}
+
         years = 1
         cultivating_until = now + years_to_seconds(years)
         

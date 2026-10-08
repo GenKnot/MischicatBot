@@ -32,20 +32,6 @@ class CultivateButton(discord.ui.Button):
         self.view.stop()
 
 
-class ClaimCultivationView(TimedView):
-    public = True          # 归属校验在按钮回调里（比对 self.uid）
-    def __init__(self, cog, uid: str):
-        super().__init__()
-        self.cog = cog
-        self.uid = uid
-
-    @discord.ui.button(label="领取修炼成果", style=discord.ButtonStyle.success)
-    async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer()
-        await self.cog.claim_cultivation(interaction, self.uid)
-        self.stop()
-
-
 class ZhujiBreakthroughView(TimedView):
     def __init__(self, author, cog, player: dict, has_pill: bool, uid: str):
         super().__init__()
@@ -63,6 +49,46 @@ class ZhujiBreakthroughView(TimedView):
         self.add_item(_ZhujiButton("直接冲关", use_pill=False))
 
 
+def _format_pill_result(res: dict, *, win_label: str, fail_label: str, pill: str, use_pill: bool) -> str:
+    """把 breakthrough_logic 的丹药突破结果排成一条消息。
+
+    只管措辞；成败、扣丹、狐符、防连点全在逻辑层，这里不再碰数据库。
+    """
+    if res.get("breakthrough"):
+        note = f"（服用{pill}）" if use_pill else ""
+        return (
+            f"🎉 **{res['name']}** {win_label}{note}！\n"
+            f"**{res['old_realm']}** ➜ **{res['new_realm']}**\n"
+            f"寿元上限→{res['lifespan_max']}年，当前寿元→{res['lifespan']}年"
+        )
+    note = f"（{pill}已消耗）" if use_pill else ""
+    text = (
+        f"💔 **{res['name']}** {fail_label}{note}！{res['fail_msg']}\n"
+        f"修为：{res['cultivation']}　寿元：{res['lifespan']}年"
+    )
+    if res["is_dead"]:
+        text += "\n寿元耗尽，魂归天道。"
+    elif res["saved_by_charm"]:
+        text += "\n危急关头，狐符替你挡下一劫，寿元仅余1年。"
+    return text
+
+
+async def _run_pill_breakthrough(interaction: discord.Interaction, view, handler, *,
+                                 win_label: str, fail_label: str, pill: str, use_pill: bool):
+    from utils.breakthrough_logic import STALE_MESSAGE
+    await interaction.response.defer()
+    res = await handler(view.uid, use_pill)
+    if not res["success"]:
+        await interaction.followup.send(res["message"])
+        if res["message"] != STALE_MESSAGE:          # 状态变了可以让玩家再点一次，其余情形面板作废
+            view.stop()
+        return
+    await interaction.followup.send(
+        _format_pill_result(res, win_label=win_label, fail_label=fail_label, pill=pill, use_pill=use_pill)
+    )
+    view.stop()
+
+
 class _ZhujiButton(discord.ui.Button):
     def __init__(self, label: str, use_pill: bool):
         style = discord.ButtonStyle.success if use_pill else discord.ButtonStyle.primary
@@ -70,78 +96,11 @@ class _ZhujiButton(discord.ui.Button):
         self.use_pill = use_pill
 
     async def callback(self, interaction: discord.Interaction):
-        import time
-        import random
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        from utils.items import calc_zhuji_breakthrough_rate
-        from utils.inventory import remove_item
-        from utils.realms import lifespan_max_for_realm, apply_failure, next_realm
-        from utils.player import get_player
-
-        await interaction.response.defer()
-        view: ZhujiBreakthroughView = self.view
-        cog = view.cog
-        uid = view.uid
-        player = await get_player(uid)
-        now = time.time()
-
-        if self.use_pill:
-            if not await remove_item(uid, "筑基丹"):
-                await interaction.followup.send("筑基丹已不在背包中。")
-                view.stop()
-                return
-
-        rate = calc_zhuji_breakthrough_rate(player, use_pill=self.use_pill) / 100
-        success = random.random() < rate
-
-        if success:
-            nxt = next_realm(player["realm"])
-            new_lifespan_max = lifespan_max_for_realm(nxt)
-            lifespan_gain = max(0, new_lifespan_max - player["lifespan_max"])
-            new_lifespan = player["lifespan"] + lifespan_gain
-            async with AsyncSessionLocal() as session:
-                # 带上读到的境界和修为当条件，连点的第二次就匹配不到行。
-                # 否则同一份状态会被判定两遍，可能连升两级。
-                result = await session.execute(
-                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, "
-                         "cultivation = 0, last_active = :la "
-                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
-                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid,
-                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
-                )
-                if result.rowcount != 1:
-                    await session.rollback()
-                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
-                await session.commit()
-            pill_note = "（服用筑基丹）" if self.use_pill else ""
-            await interaction.followup.send(
-                f"🎉 **{player['name']}** 炼气化液，成功筑基{pill_note}！\n"
-                f"**炼气期10层** ➜ **{nxt}**\n"
-                f"寿元上限→{new_lifespan_max}年，当前寿元→{new_lifespan}年"
-            )
-        else:
-            from utils.realms import roll_breakthrough, apply_failure
-            _, outcome = roll_breakthrough(player["realm"], player["physique"], player["bone"], player["cultivation"])
-            new_cultivation, new_lifespan, fail_msg = apply_failure(player["cultivation"], player["lifespan"], outcome)
-            async with AsyncSessionLocal() as session:
-                # 同上，失败惩罚也只能结算一次
-                result = await session.execute(
-                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la "
-                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
-                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid,
-                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
-                )
-                if result.rowcount != 1:
-                    await session.rollback()
-                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
-                await session.commit()
-            pill_note = "（筑基丹已消耗）" if self.use_pill else ""
-            await interaction.followup.send(
-                f"💔 **{player['name']}** 筑基失败{pill_note}！{fail_msg}\n"
-                f"修为：{new_cultivation}　寿元：{new_lifespan}年"
-            )
-        view.stop()
+        from utils.breakthrough_logic import handle_zhuji_breakthrough
+        await _run_pill_breakthrough(
+            interaction, self.view, handle_zhuji_breakthrough,
+            win_label="炼气化液，成功筑基", fail_label="筑基失败", pill="筑基丹", use_pill=self.use_pill,
+        )
 
 
 class _BackToMenuButton(discord.ui.Button):
@@ -211,6 +170,12 @@ class HuayingBreakthroughView(TimedView):
 
 
 class _MajorBreakthroughButton(discord.ui.Button):
+    # 丹药名 → (处理函数名, 成功时的描述)。函数在回调里再取，避免模块导入时的循环依赖。
+    _STAGES = {
+        "凝丹丹": ("handle_ningdan_breakthrough", "筑基化液，凝结金丹"),
+        "化婴丹": ("handle_huaying_breakthrough", "金丹破碎，元婴化形"),
+    }
+
     def __init__(self, label: str, pill_name: str, use_pill: bool):
         style = discord.ButtonStyle.success if use_pill else discord.ButtonStyle.primary
         super().__init__(label=label, style=style)
@@ -218,83 +183,9 @@ class _MajorBreakthroughButton(discord.ui.Button):
         self.use_pill = use_pill
 
     async def callback(self, interaction: discord.Interaction):
-        import time
-        import random
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        from utils.items.breakthrough import calc_ningdan_breakthrough_rate, calc_huaying_breakthrough_rate
-        from utils.inventory import remove_item
-        from utils.realms import lifespan_max_for_realm, apply_failure, next_realm
-        from utils.player import get_player
-
-        await interaction.response.defer()
-        view = self.view
-        cog = view.cog
-        uid = view.uid
-        player = await get_player(uid)
-        now = time.time()
-
-        if self.use_pill:
-            if not await remove_item(uid, self.pill_name):
-                await interaction.followup.send(f"「{self.pill_name}」已不在背包中。")
-                view.stop()
-                return
-
-        if self.pill_name == "凝丹丹":
-            rate = calc_ningdan_breakthrough_rate(player, use_pill=self.use_pill) / 100
-            pill_note_fail = "（凝丹丹已消耗）" if self.use_pill else ""
-            pill_note_win = "（服用凝丹丹）" if self.use_pill else ""
-            from_realm_label = "筑基化液，凝结金丹"
-        else:
-            rate = calc_huaying_breakthrough_rate(player, use_pill=self.use_pill) / 100
-            pill_note_fail = "（化婴丹已消耗）" if self.use_pill else ""
-            pill_note_win = "（服用化婴丹）" if self.use_pill else ""
-            from_realm_label = "金丹破碎，元婴化形"
-
-        success = random.random() < rate
-
-        if success:
-            nxt = next_realm(player["realm"])
-            new_lifespan_max = lifespan_max_for_realm(nxt)
-            lifespan_gain = max(0, new_lifespan_max - player["lifespan_max"])
-            new_lifespan = player["lifespan"] + lifespan_gain
-            async with AsyncSessionLocal() as session:
-                # 带上读到的境界和修为当条件，连点的第二次就匹配不到行。
-                # 否则同一份状态会被判定两遍，可能连升两级。
-                result = await session.execute(
-                    text("UPDATE players SET realm = :realm, lifespan = :ls, lifespan_max = :lsm, "
-                         "cultivation = 0, last_active = :la "
-                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
-                    {"realm": nxt, "ls": new_lifespan, "lsm": new_lifespan_max, "la": now, "uid": uid,
-                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
-                )
-                if result.rowcount != 1:
-                    await session.rollback()
-                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
-                await session.commit()
-            await interaction.followup.send(
-                f"🎉 **{player['name']}** {from_realm_label}{pill_note_win}！\n"
-                f"**{player['realm']}** ➜ **{nxt}**\n"
-                f"寿元上限→{new_lifespan_max}年，当前寿元→{new_lifespan}年"
-            )
-        else:
-            from utils.realms import roll_breakthrough
-            _, outcome = roll_breakthrough(player["realm"], player["physique"], player["bone"], player["cultivation"])
-            new_cultivation, new_lifespan, fail_msg = apply_failure(player["cultivation"], player["lifespan"], outcome)
-            async with AsyncSessionLocal() as session:
-                # 同上，失败惩罚也只能结算一次
-                result = await session.execute(
-                    text("UPDATE players SET cultivation = :cult, lifespan = :ls, last_active = :la "
-                         "WHERE discord_id = :uid AND realm = :old_realm AND cultivation = :old_cult"),
-                    {"cult": new_cultivation, "ls": new_lifespan, "la": now, "uid": uid,
-                     "old_realm": player["realm"], "old_cult": player["cultivation"]}
-                )
-                if result.rowcount != 1:
-                    await session.rollback()
-                    return await interaction.followup.send("状态已变化，请重新尝试突破。")
-                await session.commit()
-            await interaction.followup.send(
-                f"💔 **{player['name']}** 突破失败{pill_note_fail}！{fail_msg}\n"
-                f"修为：{new_cultivation}　寿元：{new_lifespan}年"
-            )
-        view.stop()
+        from utils import breakthrough_logic
+        handler_name, win_label = self._STAGES[self.pill_name]
+        await _run_pill_breakthrough(
+            interaction, self.view, getattr(breakthrough_logic, handler_name),
+            win_label=win_label, fail_label="突破失败", pill=self.pill_name, use_pill=self.use_pill,
+        )

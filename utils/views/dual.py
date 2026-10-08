@@ -22,9 +22,10 @@ class DualCultivateInviteView(TimedView):
 
     @discord.ui.button(label="接受双修", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.try_claim():
+            return await interaction.response.send_message("这份邀请已处理。", ephemeral=True)
         await interaction.response.defer()
         await self.cog.do_dual_cultivate(interaction, self.inviter, self.target, self.multiplier, self.both_virgin)
-        self.stop()
 
     @discord.ui.button(label="拒绝", style=discord.ButtonStyle.danger)
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
