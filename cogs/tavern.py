@@ -13,6 +13,7 @@ from utils.combat import calc_power
 from utils.character import years_to_seconds, seconds_to_years
 from utils import quest_logic
 from utils.logging_setup import audit
+from utils.tasks import loop_guard
 from utils.views.base import TimedView
 
 log = logging.getLogger(__name__)
@@ -66,7 +67,6 @@ GATHER_DURATION = {"普通": 2, "精英": 2, "传说": 2}
 class TavernCog(commands.Cog, name="Tavern"):
     def __init__(self, bot):
         self.bot = bot
-        self._notified: set[str] = set()
 
     async def _auto_resolve_quest(self, uid: str):
         result = await quest_logic.resolve_quest(uid)
@@ -82,6 +82,7 @@ class TavernCog(commands.Cog, name="Tavern"):
             log.debug("私信发送失败 uid=%s", uid, exc_info=True)
 
     @tasks.loop(minutes=1)
+    @loop_guard(log, "任务结算")
     async def _quest_notifier(self):
         now = time.time()
         async with AsyncSessionLocal() as session:
@@ -94,14 +95,17 @@ class TavernCog(commands.Cog, name="Tavern"):
                 )
             )
             players = result.scalars().all()
-        
+
         for player in players:
             uid = player.discord_id
-            if uid in self._notified:
-                continue
-            self._notified.add(uid)
-            await self._auto_resolve_quest(uid)
-            self._notified.discard(uid)
+            # 逐个玩家隔离：某个玩家的结算出错不能挡住排在后面的人，也不能让整个循环永久停止。
+            # 谁来结算由 resolve_quest 在数据库里原子认领（B22）；以前这里靠一个进程内的 _notified 集合去重，
+            # 它只能防循环自己和自己，防不住玩家手动「完成任务」，而且结算抛异常时 discard 被跳过，
+            # 这个玩家就永久卡在集合里（B23）。出错的玩家任务原样保留，下一分钟自然会再被扫到。
+            try:
+                await self._auto_resolve_quest(uid)
+            except Exception:
+                log.exception("任务结算失败：%s", uid)
 
     @_quest_notifier.before_loop
     async def _before_notifier(self):
@@ -383,14 +387,8 @@ class QuestButton(discord.ui.Button):
                 color=TIER_COLOR.get(self.tier, discord.Color.teal()),
             )
             if q["type"] == "combat":
-                player_dict = {
-                    "realm": player.realm,
-                    "physique": player.physique,
-                    "soul": player.soul,
-                    "comprehension": player.comprehension,
-                    "techniques": player.techniques,
-                    "equipment": player.equipment,
-                }
+                # 和 quest_logic 结算时同一口径：整行字段（含 discord_id → 装备加成、fortune、buff）
+                player_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}
                 player_power = await calc_power(player_dict)
                 enemy_power = q["enemy"]["power"]
                 diff = player_power - enemy_power
@@ -428,14 +426,21 @@ class QuestConfirmView(TimedView):
 
     @discord.ui.button(label="接取任务", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.try_claim():
+        # 先占位：start_quest 可能因闭关 / 采集 / 守城 / 队员有任务而拒绝，被拒绝不算用掉这次机会（#11）
+        if not self.try_hold():
             return await interaction.response.send_message("这个任务已经接取过了。", ephemeral=True)
         await interaction.response.defer()
         uid = str(interaction.user.id)
 
-        result = await quest_logic.start_quest(uid, self.quest, self.tier)
+        try:
+            result = await quest_logic.start_quest(uid, self.quest, self.tier)
+        except Exception:
+            self.release_hold()
+            raise
         if not result.get("success"):
+            self.release_hold()
             return await interaction.followup.send(result.get("message", "接取任务失败"), ephemeral=True)
+        self.finish()
         
         duration = result.get("duration", 1)
         party_size = result.get("party_size")

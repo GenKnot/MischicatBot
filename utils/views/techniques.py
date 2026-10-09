@@ -7,7 +7,7 @@ from utils.db_async import AsyncSessionLocal, Player
 from utils.player import get_player
 from utils.views.base import TimedView
 from utils.sects import (
-    TECHNIQUES, TECHNIQUE_STAGES, calc_technique_stat_bonus,
+    TECHNIQUES, calc_technique_stat_bonus,
     get_technique_cost, next_stage,
 )
 
@@ -191,7 +191,6 @@ class TechniquesView(TimedView):
 
         options = []
         for t in trainable:
-            info = TECHNIQUES.get(t["name"], {})
             stage = t.get("stage", "入门")
             nxt = next_stage(stage)
             stones, years = get_technique_cost(t["name"], stage)
@@ -327,13 +326,6 @@ class ToggleEquipView(TimedView):
                     "功法列表在此期间有变动，请重新操作。", ephemeral=True)
             msg = f"已装备功法「**{name}**」。"
 
-        player = await get_player(uid)
-        embed = _build_techniques_embed(player)
-        try:
-            parent_msg = interaction.message.reference and await interaction.channel.fetch_message(interaction.message.reference.message_id)
-        except Exception:
-            parent_msg = None
-
         await interaction.response.send_message(msg, ephemeral=True)
 
 
@@ -419,8 +411,15 @@ class TrainConfirmView(TimedView):
             return await interaction.response.send_message("角色不存在。", ephemeral=True)
 
         now = time.time()
+        if player["is_dead"]:
+            return await interaction.response.send_message("道友已坐化。", ephemeral=True)
         if player.get("cultivating_until") and now < player["cultivating_until"]:
             return await interaction.response.send_message("道友正在闭关。", ephemeral=True)
+        # 确认修炼 = 进入闭关，不能和采集、任务同时进行（B58）
+        if player.get("gathering_until") and now < player["gathering_until"]:
+            return await interaction.response.send_message("道友正在采集中，无法修炼功法。", ephemeral=True)
+        if player.get("active_quest"):
+            return await interaction.response.send_message("道友正在执行任务，无法修炼功法。", ephemeral=True)
 
         if player["spirit_stones"] < self.stones_cost:
             return await interaction.response.send_message("灵石不足。", ephemeral=True)
@@ -448,7 +447,9 @@ class TrainConfirmView(TimedView):
                     "UPDATE players SET techniques = :t, "
                     "spirit_stones = spirit_stones - :cost, lifespan = lifespan - :years, "
                     "cultivating_until = :cu, cultivating_years = :cy, last_active = :la "
-                    "WHERE discord_id = :uid "
+                    "WHERE discord_id = :uid AND is_dead = 0 AND active_quest IS NULL "
+                    "AND (cultivating_until IS NULL OR cultivating_until <= :la) "
+                    "AND (gathering_until IS NULL OR gathering_until <= :la) "
                     "AND spirit_stones >= :cost AND lifespan >= :years "
                     "AND techniques = :old_t"
                 ),
@@ -466,7 +467,7 @@ class TrainConfirmView(TimedView):
             if result.rowcount != 1:
                 await session.rollback()
                 return await interaction.response.send_message(
-                    "状态已变化（灵石/寿元不足，或功法在此期间被改动），请重新操作。",
+                    "状态已变化（灵石/寿元不足、正在闭关/采集/做任务，或功法在此期间被改动），请重新操作。",
                     ephemeral=True)
             await session.commit()
 
@@ -525,12 +526,15 @@ class LearnSelectView(TimedView):
             )
             return
 
+        from utils.realms import get_technique_slot_limit
         equipped_count = sum(1 for t in techniques if t.get("equipped"))
+        slot_limit = get_technique_slot_limit(player["realm"])      # 栏位随境界增加，不是固定 5（B57）
+        auto_equip = equipped_count < slot_limit
         techniques.append({
             "name": name,
             "grade": info.get("grade", "黄级下品"),
             "stage": "入门",
-            "equipped": equipped_count < 5,
+            "equipped": auto_equip,
         })
 
         async with AsyncSessionLocal() as session:
@@ -552,7 +556,7 @@ class LearnSelectView(TimedView):
 
         grade = info.get("grade", "?")
         ttype = info.get("type", "?")
-        equipped_str = "已自动装备" if equipped_count < 5 else "未装备（已满5本）"
+        equipped_str = "已自动装备" if auto_equip else f"未装备（已满{slot_limit}本）"
         await interaction.response.edit_message(
             content=f"成功学习「**{name}**」（{grade} · {ttype}）！{equipped_str}。",
             view=None

@@ -121,12 +121,19 @@ class TravelCog(commands.Cog, name="Travel"):
         if await is_defending(uid):
             return await _out(f"{ctx.author.mention} 你正在守城，无法离开！坚守阵地直到事件结束。")
 
+        # 条件写入：前面检查过的『没在闭关 / 采集』到这里已隔了几个 await，期间状态可能变了（B44）
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET current_city = :city WHERE discord_id = :uid"),
-                {"city": target["name"], "uid": uid},
+            moved = await session.execute(
+                text(
+                    "UPDATE players SET current_city = :city WHERE discord_id = :uid "
+                    "AND (cultivating_until IS NULL OR cultivating_until <= :now) "
+                    "AND (gathering_until IS NULL OR gathering_until <= :now)"
+                ),
+                {"city": target["name"], "uid": uid, "now": time.time()},
             )
             await session.commit()
+        if moved.rowcount != 1:
+            return await _out(f"{ctx.author.mention} 状态刚刚变化（闭关或采集），未能移动，请稍后再试。")
 
         embed = discord.Embed(
             title=f"✦ 抵达 {target['name']} ✦",

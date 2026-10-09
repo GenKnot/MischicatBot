@@ -28,7 +28,7 @@ EVENTS.append(_e(
         _c("购买情报", next_event={
             "desc": "情报商压低声音说：「最近有一支商队会经过某处山谷，携带大量灵石，但也有护卫随行。」",
             "choices": [
-                _c("前去拦截商队", condition=_cond("physique", 7), rewards={"spirit_stones": -50, "spirit_stones_gain": 200, "reputation": -30}, flavor="你成功拦截了商队，但此事传出后名声大损。灵石 -50+200，声望 -30"),
+                _c("前去拦截商队", condition=_cond("physique", 7), rewards={"spirit_stones": 150, "reputation": -30}, flavor="你成功拦截了商队，但此事传出后名声大损。灵石 -50+200，声望 -30"),
                 _c("前去拦截商队", rewards={"spirit_stones": -50, "lifespan": -10, "reputation": -20}, flavor="护卫比你想象的强，你受伤逃脱，还损失了购买情报的灵石。寿元 -10，灵石 -50，声望 -20"),
                 _c("将情报转卖给商队", condition=_cond("comprehension", 6), rewards={"spirit_stones": 80, "reputation": 15}, flavor="你将情报卖给了商队，让他们提前防备，赚了差价，声望略有提升。灵石 +80，声望 +15"),
                 _c("放弃，不想惹麻烦", rewards={"spirit_stones": -50}, flavor="你购买了情报，但没有行动，灵石白花了。灵石 -50"),
@@ -134,7 +134,7 @@ EVENTS.append(_e(
         _c("花钱打听详情", next_event={
             "desc": "消息贩子说矿脉在西域荒漠深处，但附近有妖兽盘踞，需要有实力的修士才能前往。",
             "choices": [
-                _c("前往矿脉", condition=_cond("physique", 7), rewards={"spirit_stones": -30, "spirit_stones_gain": 200}, flavor="你击败了妖兽，成功开采了矿脉，大赚一笔。灵石 -30+200"),
+                _c("前往矿脉", condition=_cond("physique", 7), rewards={"spirit_stones": 170}, flavor="你击败了妖兽，成功开采了矿脉，大赚一笔。灵石 -30+200"),
                 _c("前往矿脉", rewards={"spirit_stones": -30, "lifespan": -8}, flavor="妖兽比你想象的强，你受伤撤退，灵石白花了。灵石 -30，寿元 -8"),
                 _c("将消息转卖给他人", condition=_cond("comprehension", 6), rewards={"spirit_stones": 50}, flavor="你将消息转卖给了另一名修士，赚了差价。灵石 +50"),
             ]

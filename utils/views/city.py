@@ -66,6 +66,13 @@ class CityMenuView(TimedView):
         self.add_item(CityMenuButton("返回主菜单", "menu", discord.ButtonStyle.secondary))
 
 
+async def _load_player(uid: str) -> dict | None:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
+        row = result.fetchone()
+        return dict(row._mapping) if row else None
+
+
 class CityMenuButton(discord.ui.Button):
     def __init__(self, label: str, action: str, style: discord.ButtonStyle):
         super().__init__(label=label, style=style)
@@ -73,6 +80,30 @@ class CityMenuButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         cog = self.view.cog
+
+        if self.action == "menu":
+            from utils.views.world import _send_main_menu
+            if not cog:
+                await interaction.response.send_message("无法返回。", ephemeral=True)
+                return
+            await interaction.response.defer()
+            await _send_main_menu(interaction, cog)
+            return
+
+        # 菜单上的按钮是『打开面板时』按当时状态生成的，面板能在聊天里留很久：
+        # 点击时重新核对玩家还在、没坐化、人还在城里（没走进荒野）—— 以前这些只靠菜单入口挡一次，
+        # 玩家不存在时 `fetchone()._mapping` 直接 AttributeError，坐化的人也能赌博 / 打工 / 签到（B69）
+        uid = str(interaction.user.id)
+        player = await _load_player(uid)
+        if not player:
+            await interaction.response.send_message("尚未踏入修仙之路。", ephemeral=True)
+            return
+        if player["is_dead"]:
+            await interaction.response.send_message("道友已坐化。", ephemeral=True)
+            return
+        if get_region(player.get("current_city", "")) is not None:
+            await interaction.response.send_message("此处是秘地荒野，没有这些设施，请先返回城市。", ephemeral=True)
+            return
 
         if self.action == "tavern":
             await interaction.response.defer()
@@ -86,34 +117,14 @@ class CityMenuButton(discord.ui.Button):
 
         elif self.action == "jobs":
             from utils.views.jobs import JobsView, _jobs_overview_embed
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             await interaction.response.edit_message(
                 embed=await _jobs_overview_embed(player),
                 view=JobsView(interaction.user, player, cog),
             )
 
-        elif self.action == "menu":
-            from utils.views.world import _send_main_menu
-            if not cog:
-                await interaction.response.send_message("无法返回。", ephemeral=True)
-                return
-            await interaction.response.defer()
-            await _send_main_menu(interaction, cog)
-
         elif self.action == "checkin":
-            from utils.views.checkin import CheckinView, _checkin_result_embed
+            from utils.views.checkin import CheckinView
             import time
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             today = time.strftime("%Y-%m-%d", time.gmtime())
             last = player.get("checkin_last_date") or ""
             if last == today:
@@ -131,12 +142,6 @@ class CityMenuButton(discord.ui.Button):
 
         elif self.action == "gamble":
             from utils.views.gamble import GambleView, _gamble_overview_embed
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             await interaction.response.edit_message(
                 embed=_gamble_overview_embed(player),
                 view=GambleView(interaction.user, player, cog),
@@ -144,12 +149,6 @@ class CityMenuButton(discord.ui.Button):
 
         elif self.action == "roulette":
             from utils.views.roulette import RouletteView, _wheel_overview_embed
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             await interaction.response.edit_message(
                 embed=_wheel_overview_embed(player),
                 view=RouletteView(interaction.user, player, cog),
@@ -158,12 +157,6 @@ class CityMenuButton(discord.ui.Button):
         elif self.action == "bank":
             from utils.views.bank import BankMainView, _bank_main_embed
             from utils.bank import get_bank_account, get_term_deposits, BANK_CITIES
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             if player.get("current_city") not in BANK_CITIES:
                 cities_str = "、".join(BANK_CITIES)
                 await interaction.response.send_message(f"钱庄只在以下城市设有分号：{cities_str}", ephemeral=True)
@@ -178,12 +171,6 @@ class CityMenuButton(discord.ui.Button):
         elif self.action == "market":
             from utils.views.market import MarketMainView, _market_main_embed, _get_listings_with_names
             from utils.market import MARKET_CITIES
-            uid = str(interaction.user.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid}
-                )
-                player = dict(result.fetchone()._mapping)
             if player.get("current_city") not in MARKET_CITIES:
                 cities_str = "、".join(MARKET_CITIES)
                 await interaction.response.send_message(f"交易坊只在以下城市开放：{cities_str}", ephemeral=True)

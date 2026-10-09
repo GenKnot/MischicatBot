@@ -9,6 +9,7 @@ from utils.views.base import TimedView
 log = logging.getLogger(__name__)
 
 
+NO_PLAYER = "尚未踏入修仙之路。"
 _DEFAULT_EVENT_HINT = "每日 22:00（北美东部时间）触发，天下修士皆可参与"
 
 # 这个提示对所有人都一样，而且几分钟才变一次，但主菜单是最常打开的界面。
@@ -299,16 +300,16 @@ class MenuButton(discord.ui.Button):
             async with AsyncSessionLocal() as session:
                 res = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
                 row = res.fetchone()
-                player = dict(row._mapping)
-                party_id = player.get("party_id")
+                party_id = row._mapping["party_id"] if row else None
                 if not party_id:
                     return await interaction.response.send_message("你不在任何队伍中。", ephemeral=True)
                 res2 = await session.execute(text("SELECT * FROM players WHERE party_id = :pid"), {"pid": party_id})
                 members = [dict(r._mapping) for r in res2.fetchall()]
                 res3 = await session.execute(text("SELECT leader_id FROM parties WHERE party_id = :pid"), {"pid": party_id})
-                leader = dict(res3.fetchone()._mapping)
+                leader_row = res3.fetchone()      # 队伍被解散而 party_id 残留时为 None：照样列出成员，只是没有队长标记
+                leader_id = leader_row._mapping["leader_id"] if leader_row else None
             await interaction.response.send_message(
-                embed=party_info_embed(members, leader["leader_id"]),
+                embed=party_info_embed(members, leader_id),
                 ephemeral=True,
             )
             return
@@ -362,7 +363,10 @@ class MenuButton(discord.ui.Button):
                 uid = str(interaction.user.id)
                 async with AsyncSessionLocal() as session:
                     _res = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
-                    player = dict(_res.fetchone()._mapping)
+                    _row = _res.fetchone()
+                if not _row:
+                    return await interaction.followup.send(NO_PLAYER, ephemeral=True)
+                player = dict(_row._mapping)
                 await interaction.followup.edit_message(
                     message_id=interaction.message.id,
                     embed=await _city_menu_embed(player),
@@ -395,7 +399,10 @@ class MenuButton(discord.ui.Button):
                 uid = str(interaction.user.id)
                 async with AsyncSessionLocal() as session:
                     res = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
-                    player = dict(res.fetchone()._mapping)
+                    _row = res.fetchone()
+                if not _row:
+                    return await interaction.followup.send(NO_PLAYER, ephemeral=True)
+                player = dict(_row._mapping)
                 equips = await get_equipment_list(uid)
                 embed = _build_equipment_embed(player, equips)
                 view = EquipmentManageView(interaction.user, cog)
@@ -428,7 +435,9 @@ class MenuButton(discord.ui.Button):
                     )).fetchone()
                 now = _time.time()
                 from utils.events.public.wanbao import is_auction_locked
-                if await is_auction_locked(uid):
+                if player is None:
+                    await interaction.followup.send(NO_PLAYER, ephemeral=True)
+                elif await is_auction_locked(uid):
                     await interaction.followup.send("拍卖会进行中，在万宝楼内无法采集。", ephemeral=True)
                 elif defense_row:
                     await interaction.followup.send("守城期间无法采集，专心守城！", ephemeral=True)

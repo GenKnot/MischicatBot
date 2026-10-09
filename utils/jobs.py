@@ -23,8 +23,7 @@ JOBS = [
         "tier": 1,
         "speaker": "码头管事",
         "desc": "在港口城市搬运货物，纯体力活。",
-        "req": {},
-        "city_tags": ["港口", "北冥港", "碧波城"],
+        "req": {"city_in": ["北冥港", "碧波城"]},
         "reward": {"spirit_stones": (50, 120)},
         "dialogues": [
             "「这箱灵石矿少说三百斤，道友一个人扛？」",
@@ -257,6 +256,8 @@ def _check_req(player: dict, req: dict) -> bool:
         return False
     if "city" in req and player.get("current_city") != req["city"]:
         return False
+    if "city_in" in req and player.get("current_city") not in req["city_in"]:
+        return False
     return True
 
 
@@ -288,6 +289,8 @@ def _req_desc(req: dict) -> str:
         parts.append("已加入宗门")
     if "city" in req:
         parts.append(f"需在{req['city']}")
+    if "city_in" in req:
+        parts.append(f"需在{'/'.join(req['city_in'])}")
     return "、".join(parts) if parts else "无"
 
 

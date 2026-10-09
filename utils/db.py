@@ -1,16 +1,30 @@
+import contextlib
 import sqlite3
 import os
 
 from utils.config import DB_PATH
 
 
+@contextlib.contextmanager
 def get_conn():
+    """同步 SQLite 连接：`with get_conn() as conn:`，正常离开提交、出错回滚，**并且关闭连接**。
+
+    `sqlite3.Connection` 自带的上下文管理器只提交 / 回滚、不关闭 —— 以前每个网页请求都留下一个没关的连接，
+    靠垃圾回收才释放（pytest 里满屏 ResourceWarning: unclosed database）（B76）。
+    """
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _migrate(conn):

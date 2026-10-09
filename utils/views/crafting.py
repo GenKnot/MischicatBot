@@ -61,6 +61,27 @@ def _crafting_overview_embed() -> discord.Embed:
     return embed
 
 
+async def _load_alive_player(interaction: discord.Interaction) -> dict | None:
+    """读取点击者的玩家数据；不存在或已坐化时直接回复并返回 None（B77）。
+
+    以前这里 `fetchone()._mapping` 直接读：玩家不存在会 AttributeError；已坐化的玩家（旧面板）还能进炼丹台 / 铸造坊，
+    而炼丹和锻造的逻辑层并不检查 `is_dead`。
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": str(interaction.user.id)}
+        )
+        row = result.fetchone()
+    if not row:
+        await interaction.response.send_message("尚未踏入修仙之路。", ephemeral=True)
+        return None
+    player = dict(row._mapping)
+    if player["is_dead"]:
+        await interaction.response.send_message("道友已坐化。", ephemeral=True)
+        return None
+    return player
+
+
 class CraftingMenuView(TimedView):
     def __init__(self, author, cog):
         super().__init__()
@@ -72,13 +93,9 @@ class CraftingMenuView(TimedView):
         from utils.views.alchemy import AlchemyMainView
         from utils.alchemy import get_known_recipes_with_choices
         uid = str(interaction.user.id)
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                text("SELECT * FROM players WHERE discord_id = :uid"),
-                {"uid": uid},
-            )
-            row = result.fetchone()
-            player = dict(row._mapping)
+        player = await _load_alive_player(interaction)
+        if player is None:
+            return
         if player.get("alchemy_level", 0) == 0 and player.get("current_city") != "丹阁":
             await interaction.response.send_message(
                 "你尚未入门炼丹之道。\n前往**中州·丹阁**参加入门考核，获得炼丹师资质后方可开炉。",
@@ -98,11 +115,9 @@ class CraftingMenuView(TimedView):
     async def forge_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         from utils.views.forging import ForgingMainView, _forging_main_embed
         from utils.forging import FORGING_CITIES
-        uid = str(interaction.user.id)
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
-            row = result.fetchone()
-            player = dict(row._mapping)
+        player = await _load_alive_player(interaction)
+        if player is None:
+            return
         if player.get("forging_level", 0) == 0 and player.get("current_city") not in FORGING_CITIES:
             cities_str = "、".join(FORGING_CITIES)
             await interaction.response.send_message(

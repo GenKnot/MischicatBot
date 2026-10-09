@@ -328,3 +328,125 @@ async def test_并发发放奖励不丢更新(db, solo):
     assert p.spirit_stones == 100 * times, f"灵石应为 {100 * times}，实际 {p.spirit_stones}"
     assert p.reputation == 5 * times
     assert p.cultivation == 10 * times
+
+
+# --- 结算只发生一次（B22）-----------------------------------------------------------
+# 任务结算有三个入口会撞到一起：茶馆通知循环（每分钟）、玩家手动「完成任务」、队友的结算。
+# 原先靠通知循环里一个进程内的集合去重，它只能防「循环自己和自己」（本来就串行），
+# 防不住手动领取 —— 两次 resolve_quest 同时到达，奖励发两遍。现在在数据库里原子认领。
+
+import asyncio
+
+
+@pytest.fixture
+def gather_fixed(monkeypatch):
+    """采集任务的随机事件取第一个（奖励倍率 1.0），金额可预期。"""
+    monkeypatch.setattr(quest_logic.random, "choice", lambda seq: seq[0])
+
+
+async def _give_quest(db, uid, quest, party_id=None):
+    D = db["db_async"]
+    async with D.AsyncSessionLocal() as s:
+        p = await s.get(D.Player, uid)
+        p.active_quest = json.dumps(quest, ensure_ascii=False)
+        p.quest_due = time.time() - 1
+        await s.commit()
+
+
+async def test_同时结算同一个任务_奖励只发一次(db, solo, gather_fixed):
+    """B22：茶馆通知循环那一分钟恰好撞上玩家手动『完成任务』（或连点按钮）—— 500 灵石发成 1000。"""
+    await _give_quest(db, solo, GATHER_QUEST)
+
+    results = await asyncio.gather(resolve_quest(solo), resolve_quest(solo))
+
+    assert sum(1 for r in results if r.get("success")) == 1
+    assert (await _player(db, solo)).spirit_stones == 500
+
+
+async def test_同时结算很多次_也只发一次(db, solo, gather_fixed):
+    await _give_quest(db, solo, GATHER_QUEST)
+    results = await asyncio.gather(*(resolve_quest(solo) for _ in range(6)))
+    assert sum(1 for r in results if r.get("success")) == 1
+    assert (await _player(db, solo)).spirit_stones == 500
+
+
+async def test_先后两次结算_第二次提示没有任务(db, solo, gather_fixed):
+    await _give_quest(db, solo, GATHER_QUEST)
+    first = await resolve_quest(solo)
+    second = await resolve_quest(solo)
+    assert first["success"] and not second["success"] and "没有进行中的任务" in second["message"]
+    assert (await _player(db, solo)).spirit_stones == 500
+
+
+async def test_队伍里几个人同时触发结算_每人只拿一份(db, party, gather_fixed):
+    """任何一个队员的结算都会处理整队：必须是整队只有一个赢家，否则每个人都被发多份。"""
+    for uid in party:
+        await _give_quest(db, uid, GATHER_QUEST)
+
+    results = await asyncio.gather(*(resolve_quest(uid) for uid in party))
+
+    assert sum(1 for r in results if r.get("success")) == 1
+    for uid in party:
+        assert (await _player(db, uid)).spirit_stones == 500, f"{uid} 应当只拿到一份奖励"
+        assert (await _player(db, uid)).active_quest is None
+
+
+async def test_队员先后各自结算_后到的拿不到第二份(db, party, gather_fixed):
+    for uid in party:
+        await _give_quest(db, uid, GATHER_QUEST)
+    first = await resolve_quest(party[0])
+    others = [await resolve_quest(uid) for uid in party[1:]]
+    assert first["success"] and not any(r.get("success") for r in others)
+    assert [(await _player(db, uid)).spirit_stones for uid in party] == [500, 500, 500]
+
+
+async def test_战斗失败也只结算一次_惩罚不会扣两遍(db, solo, monkeypatch):
+    """失败分支同样会写寿元：两次同时结算，寿元会被扣两次。"""
+    import utils.combat as combat
+    weak_quest = {**COMBAT_QUEST, "enemy": {"name": "巨兽", "power": 10 ** 9}}
+    await _give_quest(db, solo, weak_quest)
+    monkeypatch.setattr(quest_logic.random, "uniform", lambda a, b: 1.0)
+
+    async def _escape(player):
+        return True, 50
+    monkeypatch.setattr(combat, "roll_escape", _escape)
+    before = (await _player(db, solo)).lifespan
+
+    results = await asyncio.gather(resolve_quest(solo), resolve_quest(solo))
+
+    assert sum(1 for r in results if r.get("success")) == 1
+    assert (await _player(db, solo)).lifespan == before - 2                    # 普通任务逃脱只损 2 年，不是 4
+
+
+async def test_结算中途出错_任务原样恢复_下次可以重试(db, solo, gather_fixed, monkeypatch):
+    """先认领后发奖，发奖出错时不能把任务白白吞掉：认领要撤销，留给下一轮重试。"""
+    await _give_quest(db, solo, GATHER_QUEST)
+    real = quest_logic._apply_quest_rewards
+
+    async def _boom(*a, **k):
+        raise RuntimeError("发奖时出错")
+    monkeypatch.setattr(quest_logic, "_apply_quest_rewards", _boom)
+
+    with pytest.raises(RuntimeError):
+        await resolve_quest(solo)
+
+    p = await _player(db, solo)
+    assert p.active_quest is not None and p.quest_due is not None and p.spirit_stones == 0
+
+    monkeypatch.setattr(quest_logic, "_apply_quest_rewards", real)
+    retry = await resolve_quest(solo)
+    assert retry["success"] and (await _player(db, solo)).spirit_stones == 500
+
+
+async def test_队伍结算中途出错_全队的任务都恢复(db, party, gather_fixed, monkeypatch):
+    for uid in party:
+        await _give_quest(db, uid, GATHER_QUEST)
+
+    async def _boom(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(quest_logic, "_apply_quest_rewards", _boom)
+    with pytest.raises(RuntimeError):
+        await resolve_quest(party[0])
+
+    for uid in party:
+        assert (await _player(db, uid)).active_quest is not None

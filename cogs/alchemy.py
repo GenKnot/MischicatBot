@@ -3,8 +3,9 @@ from discord.ext import commands
 
 from utils.config import COMMAND_PREFIX, is_master
 from utils.db_async import AsyncSessionLocal, Player, Inventory
-from utils.alchemy import PILLS, RECIPES, QUALITY_NAMES, list_available_recipes, get_mastery_count, get_mastery_label
+from utils.alchemy import list_available_recipes, get_mastery_label
 from utils.views.alchemy import AlchemyMainView
+from utils.atomic import daily_used_today
 from utils.logging_setup import audit
 
 async def _get_player(discord_id: str):
@@ -30,7 +31,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
         uid = str(ctx.author.id)
         player = await _get_player(uid)
         if not player:
-            await ctx.send(f"你还没有角色，请先使用 `{COMMAND_PREFIX}开始` 创建角色。")
+            await ctx.send(f"你还没有角色，请先使用 `{COMMAND_PREFIX}创建角色` 创建角色。")
             return
         if player.is_dead:
             await ctx.send("你已坐化，无法炼丹。")
@@ -49,13 +50,14 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await ctx.send("你当前品级没有可用丹方。")
             return
 
-        from utils.alchemy import get_known_recipes_with_choices
+        from utils.alchemy import get_known_recipes_with_choices, DAILY_LIMIT
+        used_today = daily_used_today(player.alchemy_daily_count, player.alchemy_daily_reset)
         known_map = await get_known_recipes_with_choices(uid)
         view = AlchemyMainView(ctx.author, player_dict, has_yanhuo, set(known_map.keys()), cog=self, known_choices=known_map)
         await ctx.send(
             f"**炼丹台**\n"
             f"炼丹师品级：{player.alchemy_level} 品  |  "
-            f"今日剩余次数：{max(0, 6 - player.alchemy_daily_count)}/6\n"
+            f"今日剩余次数：{max(0, DAILY_LIMIT - used_today)}/{DAILY_LIMIT}\n"
             f"选择要炼制的丹药：",
             view=view,
         )
@@ -84,10 +86,10 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await ctx.send("你还没有角色。")
             return
 
-        from utils.alchemy import ALCHEMY_EXP_THRESHOLDS
+        from utils.alchemy import ALCHEMY_EXP_THRESHOLDS, DAILY_LIMIT
         level = player.alchemy_level
         exp = player.alchemy_exp
-        daily = player.alchemy_daily_count
+        daily = daily_used_today(player.alchemy_daily_count, player.alchemy_daily_reset)
 
         if level == 0:
             await ctx.send(f"你尚未入门炼丹，使用 `{COMMAND_PREFIX}学炼丹` 拜师入门。")
@@ -102,7 +104,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
         embed = discord.Embed(title="炼丹信息", color=0xE8C97A)
         embed.add_field(name="炼丹师品级", value=f"{level} 品", inline=True)
         embed.add_field(name="炼丹经验", value=exp_str, inline=True)
-        embed.add_field(name="今日次数", value=f"{daily}/6", inline=True)
+        embed.add_field(name="今日次数", value=f"{daily}/{DAILY_LIMIT}", inline=True)
         embed.add_field(
             name=f"可炼丹药（{len(pill_names)} 种）",
             value="、".join(pill_names) if pill_names else "无",
@@ -154,7 +156,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             return
 
         has_yanhuo = bool(getattr(player, "yanhuo", None))
-        from utils.views.alchemy import _quality_cap_label, _pill_tier_label
+        from utils.views.alchemy import _quality_cap_label
         embed = discord.Embed(title="我的丹方", color=0xE8C97A)
         embed.description = f"已掌握 {len(known_ids)} 个丹方"
 
@@ -188,6 +190,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
                 p.alchemy_exp = 0
                 p.alchemy_daily_count = 0
                 await session.commit()
+        audit("debug_alchemy", ctx.author, target=uid, level=level)
         await ctx.send(f"已将炼丹师品级设为 {level} 品，今日次数重置。")
 
     @commands.command(name="重置炼丹次数")

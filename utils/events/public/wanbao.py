@@ -3,7 +3,7 @@ import random
 import time
 import uuid
 
-from utils.atomic import consume_item, spend_stones
+from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 
@@ -320,18 +320,29 @@ async def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool
         if not player:
             return False, "角色不存在。"
 
-        if player._mapping["spirit_stones"] < amount:
-            return False, f"可用灵石不足（当前 {player._mapping['spirit_stones']}，出价需 {amount}）。"
+        # 出价即托管（拍卖规则里写的是「出价时灵石自动冻结，被超越后立即解冻」）：
+        # 出价时就把灵石扣走，被超越时立即退回。继续给自己加价时，之前托管的那份已经付过了，只补差额。
+        # 以前什么都不冻结，只在结算时用 MAX(0, 灵石 - 成交价) 扣款 —— 出价后把灵石存进银行或转给小号，
+        # 扣款被夹成 0，得标者白拿物品，卖家却照样收全额，凭空造钱（ISSUES.md B19）。
+        own_escrow = (lot["current_bid"] or 0) if lot["bidder_id"] == discord_id else 0
+        need = amount - own_escrow
+        if player._mapping["spirit_stones"] < need:
+            return False, f"可用灵石不足（当前 {player._mapping['spirit_stones']}，出价需 {need}）。"
 
-        # 原子抢占最高价，此时尚未动过任何冻结额度，失败可以直接返回
+        # 原子抢占最高价；与下面的扣款在同一个事务里，扣款失败会连同抢占一起回滚
         if not await claim_highest_bid(
             session, lot["lot_id"], lot["current_bid"] or 0, amount, discord_id
         ):
             return False, "已有更高出价，请重新出价。"
 
+        if not await spend_stones(session, discord_id, need):
+            await session.rollback()
+            return False, f"可用灵石不足，出价需 {need}。"
+
         prev_bidder = lot["bidder_id"]
         if prev_bidder and prev_bidder != discord_id:
             prev_bid = lot["current_bid"]
+            await grant_stones(session, prev_bidder, prev_bid)               # 被超越，立即全额退回
             pfr = await session.execute(
                 text("SELECT amount FROM wanbao_frozen WHERE discord_id = :uid AND auction_id = :aid"),
                 {"uid": prev_bidder, "aid": auction_id}
@@ -361,12 +372,14 @@ async def settle_lot(lot: dict) -> dict:
                 {"lid": lot["lot_id"]}
             )
             if lot["seller_id"]:
-                # 流拍罚金：扣到 0 为止，不允许把灵石扣成负数
+                # 流拍罚金（取回费）：扣到 0 为止，不允许把灵石扣成负数
                 await session.execute(
                     text("UPDATE players SET spirit_stones = MAX(0, spirit_stones - :fee) "
                          "WHERE discord_id = :uid"),
                     {"fee": LISTING_FEE, "uid": lot["seller_id"]}
                 )
+                # 取回费收了，物品要还回去：上架时物品已被扣走，流拍后曾经只收费、不退货（ISSUES.md B20）
+                await grant_item(session, lot["seller_id"], lot["item_name"], lot["quantity"])
             await session.commit()
             return result
 
@@ -375,10 +388,7 @@ async def settle_lot(lot: dict) -> dict:
         commission = int(final_price * AUCTION_COMMISSION)
         seller_income = final_price - commission
 
-        await session.execute(
-            text("UPDATE players SET spirit_stones = MAX(0, spirit_stones - :fp) WHERE discord_id = :uid"),
-            {"fp": final_price, "uid": winner_id}
-        )
+        # 得标者的货款在出价时就已托管扣走（见 place_bid），这里不再扣
         fr = await session.execute(
             text("SELECT amount FROM wanbao_frozen WHERE discord_id = :uid AND auction_id = :aid"),
             {"uid": winner_id, "aid": lot["auction_id"]}

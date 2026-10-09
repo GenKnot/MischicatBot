@@ -33,13 +33,6 @@ WANBAO_DESC = (
 WANBAO_TRIGGER_HOUR = 20
 
 
-class WanbaoPublicView(TimedView):
-    def __init__(self, author, pe_cog=None):
-        super().__init__()
-        self.author = author
-        self.pe_cog = pe_cog
-
-
 class _WanbaoEventButton(discord.ui.Button):
     def __init__(self, pe_cog=None):
         super().__init__(label="万宝楼拍卖会", style=discord.ButtonStyle.primary)

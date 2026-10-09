@@ -5,7 +5,6 @@
 """
 
 import asyncio
-import json
 
 import pytest
 
@@ -263,6 +262,7 @@ async def test_不能对自己的拍品出价(db, auction):
 # --- 结算 --------------------------------------------------------------------
 
 async def test_成交后买家付款卖家收款(db, auction, bidders):
+    """付款发生在**出价时**（托管），结算只负责把物品交给得标者、把货款交给卖家。"""
     D = db["db_async"]
     async with D.AsyncSessionLocal() as s:
         s.add(make_player(D, "seller", stones=100_000))
@@ -273,20 +273,28 @@ async def test_成交后买家付款卖家收款(db, auction, bidders):
 
     from sqlalchemy import text
     async with D.AsyncSessionLocal() as s:
-        await s.execute(text("UPDATE wanbao_lots SET current_bid=1000, bidder_id='a', "
-                             "status='active' WHERE seller_id='seller'"))
+        await s.execute(text("UPDATE wanbao_lots SET status='pending' WHERE lot_index=0 AND auction_id=:a"),
+                        {"a": auction["auction_id"]})
+        idx = (await s.execute(text("SELECT lot_index FROM wanbao_lots WHERE seller_id='seller'"))).scalar()
+        await s.execute(text("UPDATE wanbao_lots SET status='active' WHERE seller_id='seller'"))
+        await s.execute(text("UPDATE wanbao_auctions SET current_lot=:i WHERE auction_id=:a"),
+                        {"i": idx, "a": auction["auction_id"]})
         await s.commit()
+    buyer_before = await _stones(db, "a")
+    ok, msg = await place_bid(auction["auction_id"], "a", 1000)
+    assert ok, msg
+    assert await _stones(db, "a") == buyer_before - 1000                     # 出价时就扣了
+    async with D.AsyncSessionLocal() as s:
         row = (await s.execute(text("SELECT * FROM wanbao_lots WHERE seller_id='seller'"))).fetchone()
     lot = dict(row._mapping)
 
-    buyer_before = await _stones(db, "a")
     result = await settle_lot(lot)
 
     commission = int(1000 * AUCTION_COMMISSION)
     assert result["winner_id"] == "a"
     assert result["final_price"] == 1000
     assert result["seller_income"] == 1000 - commission
-    assert await _stones(db, "a") == buyer_before - 1000
+    assert await _stones(db, "a") == buyer_before - 1000, "结算不能再扣一遍"
     assert await _stones(db, "seller") == seller_before + 1000 - commission
     assert (await db["inventory"].get_inventory("a")).get("灵芝草") == 1
 
@@ -328,3 +336,185 @@ async def test_扣手续费失败时物品会退回(db, auction, monkeypatch):
     assert not ok
     inventory = await db["inventory"].get_inventory("seller")
     assert inventory.get("灵芝草") == 5, "扣款失败时物品必须原样退回"
+
+
+# --- 托管：出价时冻结、被超越时解冻（拍卖规则里公布的，B19）------------------------
+
+async def _set_current_lot_house(db, auction):
+    """取当前这件（官方拍品）。"""
+    return await _lot(db, auction["auction_id"])
+
+
+async def test_出价时立即扣款(db, auction, bidders):
+    lot = await _lot(db, auction["auction_id"])
+    before = await _stones(db, "a")
+
+    ok, msg = await place_bid(auction["auction_id"], "a", lot["start_price"] + 100)
+
+    assert ok, msg
+    assert await _stones(db, "a") == before - (lot["start_price"] + 100)
+
+
+async def test_被超越时立即退款_新的领先者付款(db, auction, bidders):
+    lot = await _lot(db, auction["auction_id"])
+    p = lot["start_price"]
+    a0, b0 = await _stones(db, "a"), await _stones(db, "b")
+
+    assert (await place_bid(auction["auction_id"], "a", p + 100))[0]
+    assert (await place_bid(auction["auction_id"], "b", p + 200))[0]
+
+    assert await _stones(db, "a") == a0, "被超越的人应当立即全额退款"
+    assert await _stones(db, "b") == b0 - (p + 200)
+
+
+async def test_自己加价只补差额(db, auction, bidders):
+    lot = await _lot(db, auction["auction_id"])
+    p = lot["start_price"]
+    a0 = await _stones(db, "a")
+
+    assert (await place_bid(auction["auction_id"], "a", p + 100))[0]
+    assert (await place_bid(auction["auction_id"], "a", p + 500))[0]
+
+    assert await _stones(db, "a") == a0 - (p + 500)                         # 总共只付最新的那个价
+
+
+async def test_加价时只需补差额的灵石_不必再备一份全价(db, auction):
+    D = db["db_async"]
+    lot = await _lot(db, auction["auction_id"])
+    p = lot["start_price"]
+    async with D.AsyncSessionLocal() as s:
+        s.add(make_player(D, "tight", stones=p + 300))
+        await s.commit()
+
+    assert (await place_bid(auction["auction_id"], "tight", p + 100))[0]
+    ok, msg = await place_bid(auction["auction_id"], "tight", p + 300)       # 差额 200，手里剩 200
+    assert ok, msg
+    assert await _stones(db, "tight") == 0
+
+    ok, msg = await place_bid(auction["auction_id"], "tight", p + 301)       # 还差 1
+    assert not ok and "灵石不足" in msg
+    assert (await _lot(db, auction["auction_id"]))["current_bid"] == p + 300  # 出价没有生效
+
+
+async def test_灵石不足的出价不会留下半截状态(db, auction, db_poor_bidder, bidders):
+    """扣款失败必须连同『抢占最高价』一起回滚，否则没付钱的人坐上了领先位。"""
+    lot = await _lot(db, auction["auction_id"])
+    assert (await place_bid(auction["auction_id"], "a", lot["start_price"] + 10))[0]
+    a_after_bid = await _stones(db, "a")
+
+    ok, msg = await place_bid(auction["auction_id"], "poor", lot["start_price"] + 20)
+
+    assert not ok
+    after = await _lot(db, auction["auction_id"])
+    assert after["bidder_id"] == "a" and after["current_bid"] == lot["start_price"] + 10
+    assert await _stones(db, "a") == a_after_bid                             # 没有误退给 a
+
+
+async def test_被抢占失败的出价不扣款也不退款(db, auction, bidders, monkeypatch):
+    lot = await _lot(db, auction["auction_id"])
+    p = lot["start_price"] + 100
+    a0, b0 = await _stones(db, "a"), await _stones(db, "b")
+
+    results = await asyncio.gather(place_bid(auction["auction_id"], "a", p), place_bid(auction["auction_id"], "b", p))
+
+    winner = "a" if results[0][0] else "b"
+    loser = "b" if winner == "a" else "a"
+    start = {"a": a0, "b": b0}
+    assert await _stones(db, winner) == start[winner] - p
+    assert await _stones(db, loser) == start[loser], "没抢到的人一分钱都不该动"
+
+
+async def test_出价后转走灵石也赖不掉账(db, auction, bidders):
+    """B19：出价曾不冻结任何东西，结算时才用 MAX(0, 灵石 - 成交价) 扣款。
+    出价后把灵石存进银行 / 转给小号，扣款被夹成 0，得标者白拿物品，卖家却照样收全额 —— 凭空造钱。"""
+    D = db["db_async"]
+    async with D.AsyncSessionLocal() as s:
+        s.add(make_player(D, "seller", stones=1000))
+        s.add(D.Inventory(discord_id="seller", item_id="灵芝草", quantity=5))
+        await s.commit()
+    await list_item(auction["auction_id"], "seller", "灵芝草", 5, 5000)
+    from sqlalchemy import text
+    async with D.AsyncSessionLocal() as s:
+        await s.execute(text("UPDATE wanbao_lots SET status='pending' WHERE lot_index=0 AND auction_id=:a"),
+                        {"a": auction["auction_id"]})
+        idx = (await s.execute(text("SELECT lot_index FROM wanbao_lots WHERE seller_id='seller'"))).scalar()
+        await s.execute(text("UPDATE wanbao_lots SET status='active' WHERE seller_id='seller'"))
+        await s.execute(text("UPDATE wanbao_auctions SET current_lot=:i WHERE auction_id=:a"), {"i": idx, "a": auction["auction_id"]})
+        await s.commit()
+    total_before = sum([await _stones(db, u) for u in ("a", "b", "seller")])
+    assert (await place_bid(auction["auction_id"], "a", 9000))[0]
+
+    # 出价后把剩下的灵石全部转走
+    async with D.AsyncSessionLocal() as s:
+        await s.execute(text("UPDATE players SET spirit_stones = 0 WHERE discord_id = 'a'"))
+        await s.execute(text("UPDATE players SET spirit_stones = spirit_stones + 91000 WHERE discord_id = 'b'"))
+        await s.commit()
+        row = (await s.execute(text("SELECT * FROM wanbao_lots WHERE seller_id='seller'"))).fetchone()
+
+    result = await settle_lot(dict(row._mapping))
+
+    commission = int(9000 * AUCTION_COMMISSION)
+    total_after = sum([await _stones(db, u) for u in ("a", "b", "seller")])
+    # 灵石守恒：total_before 是上架之后取的（上架手续费当时已扣），所以全场的灵石只少了成交手续费
+    assert total_after == total_before - commission
+    assert result["seller_income"] == 9000 - commission
+    assert (await db["inventory"].get_inventory("a")).get("灵芝草") == 5
+
+
+async def test_一连串出价加结算_灵石总量守恒(db, auction, bidders):
+    lot = await _lot(db, auction["auction_id"])
+    p = lot["start_price"]
+    total_before = await _stones(db, "a") + await _stones(db, "b")
+
+    for who, amt in [("a", p + 10), ("b", p + 110), ("a", p + 300), ("b", p + 800), ("a", p + 1000)]:
+        assert (await place_bid(auction["auction_id"], who, amt))[0], (who, amt)
+    result = await settle_lot(await _lot(db, auction["auction_id"]))
+
+    assert result["winner_id"] == "a" and result["final_price"] == p + 1000
+    total_after = await _stones(db, "a") + await _stones(db, "b")
+    assert total_after == total_before - (p + 1000)                          # 只有得标者付了钱，没有任何人多付 / 少付
+
+
+async def test_流拍的玩家拍品_物品退还给卖家(db, auction):
+    """B20：上架时物品被扣走，流拍后只收了『取回费』，物品却没有还回去（全仓没有『取回』的实现）。"""
+    D = db["db_async"]
+    async with D.AsyncSessionLocal() as s:
+        s.add(make_player(D, "seller", stones=100_000))
+        s.add(D.Inventory(discord_id="seller", item_id="灵芝草", quantity=5))
+        await s.commit()
+    await list_item(auction["auction_id"], "seller", "灵芝草", 3, 500)
+    assert (await db["inventory"].get_inventory("seller")).get("灵芝草") == 2     # 上架扣了 3
+    from sqlalchemy import text
+    async with D.AsyncSessionLocal() as s:
+        row = (await s.execute(text("SELECT * FROM wanbao_lots WHERE seller_id='seller'"))).fetchone()
+    stones_before = await _stones(db, "seller")
+
+    await settle_lot(dict(row._mapping))                                        # 无人出价 → 流拍
+
+    assert (await db["inventory"].get_inventory("seller")).get("灵芝草") == 5, "流拍的物品应退还"
+    assert await _stones(db, "seller") == stones_before - LISTING_FEE            # 取回费照收
+
+
+async def test_流拍的官方拍品_没有卖家_不发物品(db, auction):
+    lot = await _lot(db, auction["auction_id"])
+    result = await settle_lot(lot)
+    assert result["winner_id"] is None
+    assert (await _lot(db, auction["auction_id"]))["status"] == "unsold"
+
+
+async def test_扣款在并发下失败_抢占的最高价一并作废(db, auction, bidders, monkeypatch):
+    """前置的『灵石够不够』检查通过之后、真正扣款之前，灵石被别处花掉了（银行、市场……）：
+    扣款失败，此前『抢占最高价』必须一起回滚，不能让没付钱的人坐上领先位。"""
+    lot = await _lot(db, auction["auction_id"])
+    assert (await place_bid(auction["auction_id"], "a", lot["start_price"] + 10))[0]
+    a_stones = await _stones(db, "a")
+
+    async def _cannot_pay(session, uid, amount):
+        return False
+    monkeypatch.setattr(wanbao, "spend_stones", _cannot_pay)
+    ok, msg = await place_bid(auction["auction_id"], "b", lot["start_price"] + 50)
+
+    assert not ok and "灵石不足" in msg
+    after = await _lot(db, auction["auction_id"])
+    assert after["bidder_id"] == "a" and after["current_bid"] == lot["start_price"] + 10
+    assert await _stones(db, "a") == a_stones                                # 上一个领先者也没被误退款

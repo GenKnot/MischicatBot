@@ -1,9 +1,9 @@
 import discord
 from utils.alchemy import (
-    PILLS, RECIPES, QUALITY_NAMES, NO_YANHUO_CAP,
-    list_available_recipes, get_recipes_for_pill, get_recipe_by_id,
+    PILLS, RECIPES, QUALITY_NAMES, NO_YANHUO_CAP, DAILY_LIMIT,
+    get_recipe_by_id,
     get_mastery_count, get_mastery_label, calc_success_rate,
-    get_known_recipes, get_known_recipes_with_choices,
+    get_known_recipes_with_choices,
 )
 from utils.atomic import consume_item
 from utils.db_async import AsyncSessionLocal, Inventory
@@ -32,26 +32,6 @@ def _pill_tier_label(tier: int) -> str:
 def _quality_cap_label(cap: int, has_yanhuo: bool) -> str:
     effective = cap if has_yanhuo else min(cap, NO_YANHUO_CAP)
     return QUALITY_NAMES[effective]
-
-
-def _match_recipe(main_items: list[str], aux_choices: dict[int, str]) -> dict | None:
-    selected_kinds = set(main_items)
-    for r in RECIPES:
-        r_kinds = set(ing["item"] for ing in r["main_ingredients"])
-        if r_kinds != selected_kinds:
-            continue
-        if len(aux_choices) != len(r["aux_groups"]):
-            continue
-        matched = True
-        for gi, group in enumerate(r["aux_groups"]):
-            chosen = aux_choices.get(gi)
-            valid = [o["item"] for o in group["options"]]
-            if chosen not in valid:
-                matched = False
-                break
-        if matched:
-            return r
-    return None
 
 
 def _auto_match_recipe(qty_map: dict[str, int], alchemy_level: int) -> tuple[dict | None, list[int]]:
@@ -342,18 +322,13 @@ class _ConfirmFreeMixButton(discord.ui.Button):
             if result["success"]:
                 await _give_pill(uid, result["pill"], result["quality_name"])
             elif result.get("lifespan_loss", 0) > 0:
-                async with AsyncSessionLocal() as session:
-                    from utils.db_async import Player as _Player
-                    p = await session.get(_Player, uid)
-                    if p:
-                        p.lifespan = max(0, p.lifespan - result["lifespan_loss"])
-                        if p.lifespan <= 0:
-                            p.is_dead = True
-                        await session.commit()
+                await _apply_lifespan_loss(uid, result["lifespan_loss"])
 
             embed = _result_embed(result, recipe, v.inventory)
             fail_view = None if result["success"] else _FailView(v.author, v.player, v.has_yanhuo, cog=getattr(v, "cog", None))
             await interaction.edit_original_response(embed=embed, view=fail_view)
+        except Exception as e:
+            # 以前这里缺了 except：成功的自由配药也会跑到下面的 log.exception，真出错时反而没人接（B59）
             log.exception("炼丹出错 uid=%s", uid)
             try:
                 await interaction.edit_original_response(content=f"炼丹出错：{e}", embed=None, view=None)
@@ -491,14 +466,7 @@ class _ConfirmView(TimedView):
         if result["success"]:
             await _give_pill(uid, result["pill"], result["quality_name"])
         elif result.get("lifespan_loss", 0) > 0:
-            async with AsyncSessionLocal() as session:
-                from utils.db_async import Player as _Player
-                p = await session.get(_Player, uid)
-                if p:
-                    p.lifespan = max(0, p.lifespan - result["lifespan_loss"])
-                    if p.lifespan <= 0:
-                        p.is_dead = True
-                    await session.commit()
+            await _apply_lifespan_loss(uid, result["lifespan_loss"])
 
         embed = _result_embed(result, self.recipe, self.inventory)
         fail_view = None if result["success"] else _FailView(self.author, self.player, self.has_yanhuo, cog=getattr(self, "cog", None))
@@ -591,7 +559,7 @@ def _result_embed(result: dict, recipe: dict, inventory: dict = None) -> discord
         if lifespan_loss:
             desc += f"\n寿元损失 {lifespan_loss} 年。"
         embed = discord.Embed(title=f"炼丹失败 — {consequence}", description=desc, color=0x8B0000)
-        embed.add_field(name="今日剩余次数", value=f"{6 - result['daily_count']}/6", inline=True)
+        embed.add_field(name="今日剩余次数", value=f"{max(0, DAILY_LIMIT - result['daily_count'])}/{DAILY_LIMIT}", inline=True)
         if consumed_str:
             embed.add_field(name="消耗材料", value=consumed_str, inline=False)
         return embed
@@ -605,7 +573,7 @@ def _result_embed(result: dict, recipe: dict, inventory: dict = None) -> discord
         color=color,
     )
     embed.add_field(name="品质", value=quality, inline=True)
-    embed.add_field(name="今日剩余次数", value=f"{6 - result['daily_count']}/6", inline=True)
+    embed.add_field(name="今日剩余次数", value=f"{max(0, DAILY_LIMIT - result['daily_count'])}/{DAILY_LIMIT}", inline=True)
     embed.add_field(name="熟练度", value=f"{result['mastery_label']}（{result['mastery_count']}次）", inline=True)
     if consumed_str:
         embed.add_field(name="消耗材料", value=consumed_str, inline=False)
@@ -634,6 +602,19 @@ async def _consume_free_mix(discord_id: str, all_items: list[str], inventory: di
     for item in all_items:
         to_consume[item] = to_consume.get(item, 0) + 1
     return await _consume_all(discord_id, to_consume)
+
+
+async def _apply_lifespan_loss(discord_id: str, loss: int) -> None:
+    """炼丹失败（炉毁 / 丹毒反噬）扣寿元，降到 0 即坐化。一条原子 UPDATE，并发失败不丢更新（B60）。"""
+    from sqlalchemy import text
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            text("UPDATE players SET lifespan = MAX(0, lifespan - :loss), "
+                 "is_dead = CASE WHEN lifespan - :loss <= 0 THEN 1 ELSE is_dead END "
+                 "WHERE discord_id = :uid"),
+            {"loss": loss, "uid": discord_id},
+        )
+        await session.commit()
 
 
 async def _give_pill(discord_id: str, pill_name: str, quality_name: str):

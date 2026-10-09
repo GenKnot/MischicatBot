@@ -1,7 +1,7 @@
-import discord
 from discord.ext import commands
 
 from utils.config import COMMAND_PREFIX
+from utils.logging_setup import audit
 
 
 class AdminCog(commands.Cog, name="Admin"):
@@ -19,12 +19,14 @@ class AdminCog(commands.Cog, name="Admin"):
         """
         if scope == "global":
             synced = await self.bot.tree.sync()
+            audit("sync", ctx.author, scope="global", count=len(synced))
             return await ctx.send(f"已全局同步 {len(synced)} 个斜杠命令，最多一小时后生效。")
 
         if ctx.guild is None:
             return await ctx.send(f"私聊里没有服务器可同步，用 `{COMMAND_PREFIX}sync global`。")
         self.bot.tree.copy_global_to(guild=ctx.guild)
         synced = await self.bot.tree.sync(guild=ctx.guild)
+        audit("sync", ctx.author, scope="guild", guild=ctx.guild.id, count=len(synced))
         await ctx.send(f"已同步 {len(synced)} 个斜杠命令到本服，立即生效。")
 
     @sync.error

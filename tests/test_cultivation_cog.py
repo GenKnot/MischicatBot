@@ -849,3 +849,136 @@ async def test_cog加载时启动两个定时任务_卸载时停止(db):
 def test_转发的辅助方法():
     cog = CultivationCog(bot=None)
     assert cog._calc_rebirth_bonus({"comprehension": 15, "rebirth_count": 0})["comprehension"] == 3
+
+
+# =============================================================================
+# I. 合并重复实现之后的保护（S9）
+# =============================================================================
+
+async def test_灵雨_停止闭关并前往_走闭关cog的停止逻辑(db, cog):
+    """utils/views/spirit_rain.py 会直接调用闭关 cog 的停止方法。
+    合并停止逻辑时曾差点把它删掉 —— 那个文件当时零覆盖，测试发现不了。"""
+    import types
+    from utils.views.spirit_rain import ConfirmStopAndTravelView
+    await _add_player(db, lifespan=50, current_city="灵虚城", **_mid(4))
+    view = ConfirmStopAndTravelView(UID, "铁甲城", "守城", True, False, await cult.get_player(UID))
+    i = it()
+    i.client = types.SimpleNamespace(cogs={"Cultivation": cog})
+
+    await view.confirm.callback(i)
+
+    p = await _row(db)
+    assert i.said("已停止**守城**，传送至 **铁甲城**")
+    assert p.current_city == "铁甲城"
+    assert p.cultivating_until is None and p.cultivation > 0 and p.lifespan == 50 - 4     # 闭关已按实际年数结算
+
+
+async def test_灵雨_别人不能替我确认(db, cog):
+    from utils.views.spirit_rain import ConfirmStopAndTravelView
+    view = ConfirmStopAndTravelView(UID, "铁甲城", "守城", True, False, {})
+    i = it("999")
+    await view.confirm.callback(i)
+    assert i.said("这不是你的操作")
+
+
+async def test_停止_双修搭档私信_关私信是常态_自己出错要报错(db, cog, caplog):
+    """B5 的同一类问题：以前一份入口把任何异常都吞成 debug、另一份直接 pass。现在统一分级。"""
+    import logging
+    import types
+    import discord
+
+    async def _closed(uid):
+        raise discord.Forbidden(types.SimpleNamespace(status=403, reason="Forbidden"), "Cannot send")
+    await _dual_pair(db)
+    cog.bot.fetch_user = _closed
+    with caplog.at_level(logging.DEBUG, logger="cogs.cultivation"):
+        ok, text = await cog._stop_cultivation_text(UID)
+    assert ok and "双修中止" in text
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+    caplog.clear()
+    await _dual_pair_again(db)
+
+    async def _boom(uid):
+        raise RuntimeError("代码里的 bug")
+    cog.bot.fetch_user = _boom
+    with caplog.at_level(logging.DEBUG, logger="cogs.cultivation"):
+        ok, text = await cog._stop_cultivation_text(UID)
+    assert ok and "双修中止" in text                          # 本人的结算不受影响
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+async def _dual_pair_again(db):
+    """上一轮已经把双方出关，重新拨回「双修闭关到一半」。"""
+    await _set(db, UID, dual_partner_id=PARTNER, **_mid(4))
+    await _set(db, PARTNER, dual_partner_id=UID, **_mid(4))
+
+
+async def test_停止_失败时返回原因而不是文案(db, cog):
+    await _add_player(db)
+    ok, text = await cog._stop_cultivation_text(UID)
+    assert ok is False and "并未在闭关" in text
+    ok, text = await cog._stop_cultivation_text("nobody")
+    assert ok is False and "角色不存在" in text
+
+
+async def test_修炼命令_与按钮入口写入同样的闭关状态(db, cog):
+    """命令曾自己写一条 UPDATE，与逻辑层并行存在。现在都走 start_cultivation，写入必须一致。"""
+    await _add_player(db, "10", active_buffs=json.dumps({"cultivation_speed_bonus": {"value": 50}}))
+    await _add_player(db, "11", active_buffs=json.dumps({"cultivation_speed_bonus": {"value": 50}}))
+    i, c = it("10"), ctx("11")
+
+    await cog.start_cultivate(i, 4)
+    await cog.cultivate.callback(cog, c, 4)
+
+    a, b = await _row(db, "10"), await _row(db, "11")
+    assert (a.cultivating_years, a.lifespan, a.cultivation_overflow) == (b.cultivating_years, b.lifespan, b.cultivation_overflow)
+    assert abs(a.cultivating_until - b.cultivating_until) < 5
+    # 两边给出的预估收益是同一个数
+    gain = int(calc_cultivation_gain(4, 5, "单灵根") * 1.5)
+    assert i.said(f"+{gain}") and c.said(f"+{gain}")
+
+
+async def test_修炼命令_落库被逻辑层拒绝时给出原因(db, cog, monkeypatch):
+    """前置检查通过之后、写入之前状态变了：命令要把逻辑层的拒绝原因告诉玩家，不能假装成功。"""
+    await _add_player(db)
+
+    async def _refuse(uid, years):
+        return {"success": False, "message": "正在闭关，还剩 1.0 年"}
+    monkeypatch.setattr(cult, "async_start_cultivation", _refuse)
+    c = ctx()
+
+    await cog.cultivate.callback(cog, c, 2)
+
+    assert c.said("正在闭关，还剩 1.0 年") and not c.said("开始闭关修炼")
+
+
+@pytest.mark.parametrize("entry", ["button", "view", "my_character"])
+async def test_面板_视图归属于发起人_别人点不动(db, cog, entry):
+    """合并两份面板实现之后，视图的归属人由共用方法传入；传错就会变成人人可点或谁都点不了。"""
+    await _add_player(db)
+    if entry == "button":
+        i = it()
+        await cog.send_profile(i)
+        msg, owner = i.last, i.user
+    else:
+        c = ctx()
+        await getattr(cog, entry).callback(cog, c)
+        msg, owner = c.last, c.author
+    view = msg.view
+
+    assert view.author == owner
+    assert await view.interaction_check(FakeInteraction(user_id=999)) is False
+    assert await view.interaction_check(FakeInteraction(user_id=int(UID))) is True
+
+
+async def test_停止_按钮入口失败时的文案不带提及(db, cog):
+    """失败原因原样返回（没有 @ 前缀），成功才带 @；命令入口的失败是固定提示。"""
+    await _add_player(db)
+    i = it()
+    await cog.send_stop(i)
+    assert i.last.content == "当前并未在闭关"
+
+    c = ctx()
+    await cog.stop_cultivate.callback(cog, c)
+    assert c.last.content == f"<@{UID}> 道友当前并未在闭关。"

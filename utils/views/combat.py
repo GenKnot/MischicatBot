@@ -2,6 +2,7 @@ import logging
 import random
 import discord
 from utils.views.party import PartyInviteButton
+from utils.tasks import spawn
 from utils.views.base import TimedView
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ class PlayerActionView(TimedView):
 
         uid = str(interaction.user.id)
         target_uid = self.target["discord_id"]
+        if uid == target_uid:
+            return await interaction.followup.send("不能和自己双修。", ephemeral=True)
 
         async with AsyncSessionLocal() as session:
             r1 = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
@@ -107,7 +110,7 @@ class PlayerActionView(TimedView):
 
         try:
             target_user = await interaction.client.fetch_user(int(target_uid))
-        except:
+        except Exception:
             return await interaction.followup.send("无法找到对方用户。", ephemeral=True)
 
         embed = discord.Embed(
@@ -132,27 +135,43 @@ class PlayerActionView(TimedView):
         )
 
     async def _attack_callback(self, interaction: discord.Interaction):
+        # 占位必须在第一个 await 之前：同时点两下会各打一场、各拿一份胜者面板（B62）。
+        # 被拒绝（对方已离开 / 安全区）不算用掉这次机会，所以用 hold 而不是 claim。
+        if not self.try_hold():
+            return await interaction.response.send_message("战斗已经开始或结束了。", ephemeral=True)
+        try:
+            await self._do_attack(interaction)
+        finally:
+            self.release_hold()          # 已 finish 则无影响
+
+    async def _do_attack(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         from sqlalchemy import text
         from utils.db_async import AsyncSessionLocal
         from utils.combat import roll_combat, roll_escape
+        from utils.world import SPECIAL_REGIONS
         uid = str(interaction.user.id)
         def_uid = self.target["discord_id"]
+        if uid == def_uid:
+            return await interaction.followup.send("不能攻击自己。", ephemeral=True)
         async with AsyncSessionLocal() as session:
             r1 = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": uid})
             row1 = r1.fetchone()
             r2 = await session.execute(text("SELECT * FROM players WHERE discord_id = :uid"), {"uid": def_uid})
             row2 = r2.fetchone()
+        if not row1 or not row2:
+            return await interaction.followup.send("数据异常。", ephemeral=True)
         atk = dict(row1._mapping)
         dfn = dict(row2._mapping)
         if atk["is_dead"] or dfn["is_dead"]:
             return await interaction.followup.send("对方已坐化。", ephemeral=True)
         if atk["current_city"] != dfn["current_city"]:
             return await interaction.followup.send("对方已离开此地。", ephemeral=True)
+        # 按钮在打开面板时就定了能不能点；两人一起走进安全区后，旧面板不能再用（B64）
+        if atk["current_city"] not in {r["name"] for r in SPECIAL_REGIONS}:
+            return await interaction.followup.send("此地为安全区域，无法发起攻击。", ephemeral=True)
         won, atk_power, def_power = await roll_combat(atk, dfn)
-        for item in self.children:
-            item.disabled = True
-        self.stop()
+        self.finish()
 
         from utils.combat import consume_combat_buffs, consume_escape_buff
         await consume_combat_buffs(uid, atk)
@@ -175,7 +194,50 @@ class PlayerActionView(TimedView):
             else:
                 result_embed.description += f"**{atk['name']}** 败北，但 **{dfn['name']}** 未能逃脱（逃跑成功率 {escape_pct}%）！"
                 result_embed.color = discord.Color.dark_red()
-                await interaction.followup.send(embed=result_embed, view=VictoryActionView(interaction.user, dfn, atk), ephemeral=True)
+                # 胜者是防守方，他不在场、没有任何交互可点；败北的攻击者不能拿到对自己的处置权（B63）。
+                # 只发战报；败者的『战斗回血』照旧。
+                _schedule_lifespan_restore(atk)
+                await interaction.followup.send(embed=result_embed, ephemeral=True)
+
+
+async def _check_lifespan_restore(player: dict):
+    from sqlalchemy import text
+    from utils.db_async import AsyncSessionLocal
+    from utils.buffs import get_buff_value, consume_once_buff
+    lifespan = player.get("lifespan", 0)
+    lifespan_max = player.get("lifespan_max", 1)
+    if lifespan_max <= 0:
+        return
+    if lifespan / lifespan_max > 0.2:
+        return
+    restore_pct = get_buff_value(player, "combat_lifespan_restore", 0)
+    if restore_pct <= 0:
+        return
+    restore_amount = int(lifespan_max * restore_pct / 100)
+    if restore_amount <= 0:
+        return
+    old_raw = player.get("active_buffs") or "{}"
+    _, raw = consume_once_buff(old_raw, "combat_lifespan_restore")
+    uid = player.get("discord_id", "")
+    async with AsyncSessionLocal() as session:
+        # buff 表 CAS。原先无条件覆盖，两场战斗同时结算会各回一次血。
+        await session.execute(
+            text("UPDATE players SET lifespan = MIN(lifespan_max, lifespan + :amt), "
+                 "active_buffs = :raw "
+                 "WHERE discord_id = :uid AND COALESCE(active_buffs, '{}') = :old_raw"),
+            {"amt": restore_amount, "raw": raw, "old_raw": old_raw, "uid": uid}
+        )
+        await session.commit()
+
+
+def _schedule_lifespan_restore(player: dict):
+    coro = _check_lifespan_restore(player)
+    try:
+        spawn(coro, log=log, name="战斗回血")
+    except RuntimeError:
+        # 没有运行中的事件循环，回血只能跳过
+        coro.close()
+        log.debug("拿不到事件循环，跳过战斗回血")
 
 
 class VictoryActionView(TimedView):
@@ -187,42 +249,10 @@ class VictoryActionView(TimedView):
         self._schedule_lifespan_restore(loser)
 
     def _schedule_lifespan_restore(self, player: dict):
-        import asyncio
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self._check_lifespan_restore(player))
-        except RuntimeError:
-            # 没有运行中的事件循环，回血只能跳过
-            log.debug("拿不到事件循环，跳过战斗回血")
+        _schedule_lifespan_restore(player)
 
     async def _check_lifespan_restore(self, player: dict):
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        from utils.buffs import get_buff_value, consume_once_buff
-        lifespan = player.get("lifespan", 0)
-        lifespan_max = player.get("lifespan_max", 1)
-        if lifespan_max <= 0:
-            return
-        if lifespan / lifespan_max > 0.2:
-            return
-        restore_pct = get_buff_value(player, "combat_lifespan_restore", 0)
-        if restore_pct <= 0:
-            return
-        restore_amount = int(lifespan_max * restore_pct / 100)
-        if restore_amount <= 0:
-            return
-        old_raw = player.get("active_buffs") or "{}"
-        _, raw = consume_once_buff(old_raw, "combat_lifespan_restore")
-        uid = player.get("discord_id", "")
-        async with AsyncSessionLocal() as session:
-            # buff 表 CAS。原先无条件覆盖，两场战斗同时结算会各回一次血。
-            await session.execute(
-                text("UPDATE players SET lifespan = MIN(lifespan_max, lifespan + :amt), "
-                     "active_buffs = :raw "
-                     "WHERE discord_id = :uid AND COALESCE(active_buffs, '{}') = :old_raw"),
-                {"amt": restore_amount, "raw": raw, "old_raw": old_raw, "uid": uid}
-            )
-            await session.commit()
+        await _check_lifespan_restore(player)
 
     @discord.ui.button(label="💰 打劫灵石", style=discord.ButtonStyle.danger)
     async def rob(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -237,10 +267,12 @@ class VictoryActionView(TimedView):
             def_uid = self.loser["discord_id"]
             atk_uid = self.winner["discord_id"]
             async with AsyncSessionLocal() as session:
-                r = await session.execute(text("SELECT spirit_stones FROM players WHERE discord_id = :uid"), {"uid": def_uid})
+                r = await session.execute(text("SELECT spirit_stones, is_dead FROM players WHERE discord_id = :uid"), {"uid": def_uid})
                 row = r.fetchone()
                 if not row:
                     return await interaction.followup.send("对方数据异常。", ephemeral=True)
+                if row._mapping["is_dead"]:
+                    return await interaction.followup.send("对方已坐化。", ephemeral=True)
                 loot = max(1, int(row._mapping["spirit_stones"] * random.uniform(0.3, 0.6)))
                 # 按刚读到的余额算出的 loot，可能在此期间已被对方花掉；
                 # 扣不动就说明对方已经没那么多灵石了，本次搜刮落空。
@@ -257,24 +289,41 @@ class VictoryActionView(TimedView):
 
     @discord.ui.button(label="💀 废去修为", style=discord.ButtonStyle.danger)
     async def cripple(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.try_claim():
+        # 对方可能已经坐化（B65）：落空不该用掉这次机会，所以和打劫一样用 hold / finish
+        if not self.try_hold():
             return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
-        await interaction.response.defer(ephemeral=True)
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("UPDATE players SET cultivation = 0 WHERE discord_id = :uid"), {"uid": self.loser["discord_id"]})
-            await session.commit()
-        await interaction.followup.send(f"你强行打散了 **{self.loser['name']}** 的修为，其修为归零。", ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            from sqlalchemy import text
+            from utils.db_async import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(
+                    text("UPDATE players SET cultivation = 0 WHERE discord_id = :uid AND is_dead = 0"),
+                    {"uid": self.loser["discord_id"]})
+                await session.commit()
+            if res.rowcount != 1:
+                return await interaction.followup.send("对方已坐化，无从下手。", ephemeral=True)
+            self.finish()
+            await interaction.followup.send(f"你强行打散了 **{self.loser['name']}** 的修为，其修为归零。", ephemeral=True)
+        finally:
+            self.release_hold()
 
     @discord.ui.button(label="☠️ 击杀", style=discord.ButtonStyle.danger)
     async def kill(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.try_claim():
+        if not self.try_hold():
             return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
-        await interaction.response.defer(ephemeral=True)
-        from sqlalchemy import text
-        from utils.db_async import AsyncSessionLocal
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("UPDATE players SET is_dead = 1, lifespan = 0 WHERE discord_id = :uid"), {"uid": self.loser["discord_id"]})
-            await session.commit()
-        await interaction.followup.send(f"你取了 **{self.loser['name']}** 的性命。其魂归天道，尘归尘，土归土。", ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            from sqlalchemy import text
+            from utils.db_async import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(
+                    text("UPDATE players SET is_dead = 1, lifespan = 0 WHERE discord_id = :uid AND is_dead = 0"),
+                    {"uid": self.loser["discord_id"]})
+                await session.commit()
+            if res.rowcount != 1:
+                return await interaction.followup.send("对方已坐化，无从下手。", ephemeral=True)
+            self.finish()
+            await interaction.followup.send(f"你取了 **{self.loser['name']}** 的性命。其魂归天道，尘归尘，土归土。", ephemeral=True)
+        finally:
+            self.release_hold()

@@ -2,7 +2,7 @@ import logging
 import time
 import random
 import json
-from sqlalchemy import select
+from sqlalchemy import select, update
 from utils.atomic import grant_item, increment_player
 from utils.db_async import AsyncSessionLocal, Player, Inventory, Equipment
 from utils.combat import calc_power
@@ -138,13 +138,61 @@ async def resolve_quest(discord_id: str) -> dict:
             return {"success": False, "message": "任务数据异常"}
         
         quest_type = quest_data.get("type", "combat")
-        
-        if quest_type == "combat":
-            result = await _resolve_combat_quest(discord_id, player, quest_data)
-        else:
-            result = await _resolve_gather_quest(discord_id, player, quest_data)
-        
+
+        # 先认领、后发奖：谁先把任务从数据库里「领走」谁来结算。
+        # 结算的入口不止一个 —— 茶馆通知循环（每分钟）、玩家手动「完成任务」、队友触发的整队结算 ——
+        # 以前靠通知循环里一个进程内的集合去重，它只能防循环自己和自己（本来就串行），
+        # 防不住手动领取：两次结算同时到达，奖励发两遍（ISSUES.md B22）。
+        raw = player.active_quest
+        claimed_ids = await _claim_quest(discord_id, player.party_id, raw, now)
+        if discord_id not in claimed_ids:
+            return {"success": False, "message": "没有进行中的任务"}
+
+        try:
+            if quest_type == "combat":
+                result = await _resolve_combat_quest(discord_id, player, quest_data)
+            else:
+                result = await _resolve_gather_quest(discord_id, player, quest_data)
+        except Exception:
+            # 发奖时出错：把认领撤销，任务原样留着等下一轮重试，不能白白吞掉玩家的任务
+            await _unclaim_quest(claimed_ids, raw, player.quest_due)
+            raise
+
         return result
+
+
+async def _claim_quest(discord_id: str, party_id: str | None, raw: str, now: float) -> set[str]:
+    """原子认领任务，返回被认领的玩家 ID 集合（调用者不在其中说明被别人抢先了）。
+
+    队伍任务整队一起认领：任何一个队员的结算都会处理整队，所以必须是**一条 UPDATE** 覆盖全队，
+    单条语句才能保证只有一个赢家；分开认领的话，两个队员各领各的，都会去给整队发奖。
+    """
+    cond = [Player.active_quest == raw, Player.quest_due <= now]
+    if party_id:
+        cond.append(Player.party_id == party_id)
+    else:
+        cond.append(Player.discord_id == discord_id)
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            update(Player).where(*cond)
+            .values(active_quest=None, quest_due=None)
+            .returning(Player.discord_id)
+        )
+        claimed = {row[0] for row in result.fetchall()}
+        await session.commit()
+    return claimed
+
+
+async def _unclaim_quest(claimed_ids: set[str], raw: str, quest_due: float | None):
+    """撤销认领（发奖出错时）：把任务和截止时间放回去。"""
+    if not claimed_ids:
+        return
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            update(Player).where(Player.discord_id.in_(claimed_ids), Player.active_quest.is_(None))
+            .values(active_quest=raw, quest_due=quest_due)
+        )
+        await session.commit()
 
 
 async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dict) -> dict:

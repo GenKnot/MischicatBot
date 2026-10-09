@@ -170,6 +170,17 @@ async def claim_cooldown(session, discord_id: str, cooldown_col, seconds: float,
     return result.rowcount == 1
 
 
+def daily_used_today(used: int | None, reset_ts: float | None, now: float | None = None) -> int:
+    """已读出来的『今日已用次数』按 UTC 日界折算：不是今天记录的就算 0。
+
+    和 `claim_daily_quota` 的跨日归零是同一个日界；展示用，不查库。
+    """
+    now = time.time() if now is None else now
+    if time.gmtime(reset_ts or 0)[:3] != time.gmtime(now)[:3]:
+        return 0
+    return used or 0
+
+
 async def peek_daily_used(session, discord_id: str, count_col, reset_col,
                           now: float | None = None) -> int:
     """只读查询今日已用次数（跨日按 0 计），用于展示，不做任何修改。"""

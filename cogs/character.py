@@ -1,17 +1,14 @@
 import asyncio
-import random
-import time
 from typing import Optional
 
 import discord
 from discord.ext import commands
 
-from utils.character import QUESTIONS, calc_stats, roll_spirit_root, REALM_LIFESPAN
-from sqlalchemy import text
-from utils.db_async import AsyncSessionLocal, Player
+from utils.character import QUESTIONS
+from utils.character_create_logic import commit_character
+from utils.death_rebirth_logic import calculate_rebirth_bonus
 from utils.player import get_player
-from utils.world import CITIES
-from utils.views.character_create import CharacterCreateView
+from utils.views.character_create import CharacterCreateView, _build_result_embed
 
 
 class CharacterCog(commands.Cog, name="Character"):
@@ -20,15 +17,7 @@ class CharacterCog(commands.Cog, name="Character"):
         self._creating: set[str] = set()
 
     def _calc_rebirth_bonus(self, player: dict) -> dict:
-        rebirth_count = player.get("rebirth_count", 0)
-        mult = 1 + rebirth_count * 0.5
-        return {
-            "comprehension": max(0, int((player.get("comprehension", 5) - 5) * 0.3 * mult)),
-            "physique":      max(0, int((player.get("physique", 5) - 5) * 0.3 * mult)),
-            "fortune":       max(0, int((player.get("fortune", 5) - 5) * 0.3 * mult)),
-            "bone":          max(0, int((player.get("bone", 5) - 5) * 0.3 * mult)),
-            "soul":          max(0, int((player.get("soul", 5) - 5) * 0.3 * mult)),
-        }
+        return calculate_rebirth_bonus(player)
 
     async def _create_character_text(self, ctx):
         uid = str(ctx.author.id)
@@ -60,103 +49,10 @@ class CharacterCog(commands.Cog, name="Character"):
             if not name or len(name) > 16:
                 return await ctx.send("道号无效，创建已取消。")
 
-            stats = calc_stats(answers)
-            spirit_root, root_type = roll_spirit_root()
-            lifespan = REALM_LIFESPAN["炼气期"]
-            now = time.time()
-            starting_city = random.choice(CITIES)["name"]
-
-            old = await get_player(uid)
-            rebirth_bonus = {}
-            async with AsyncSessionLocal() as session:
-                if old and old["is_dead"]:
-                    rebirth_bonus = self._calc_rebirth_bonus(old) if (
-                        old.get("sect") == "仙葬谷" or old.get("has_bahongchen")
-                    ) else {}
-                    p = await session.get(Player, uid)
-                    p.name = name
-                    p.gender = gender
-                    p.spirit_root = spirit_root
-                    p.spirit_root_type = root_type
-                    p.comprehension = stats["comprehension"] + rebirth_bonus.get("comprehension", 0)
-                    p.physique = stats["physique"] + rebirth_bonus.get("physique", 0)
-                    p.fortune = stats["fortune"] + rebirth_bonus.get("fortune", 0)
-                    p.bone = stats["bone"] + rebirth_bonus.get("bone", 0)
-                    p.soul = stats["soul"] + rebirth_bonus.get("soul", 0)
-                    p.lifespan = lifespan
-                    p.lifespan_max = lifespan
-                    p.spirit_stones = stats["spirit_stones"]
-                    p.cultivation = 0
-                    p.realm = "炼气期1层"
-                    p.cultivating_until = None
-                    p.cultivating_years = None
-                    p.is_dead = False
-                    p.is_virgin = True
-                    p.sect = None
-                    p.sect_rank = None
-                    p.techniques = "[]"
-                    p.dual_partner_id = None
-                    p.cultivation_overflow = 0
-                    p.current_city = starting_city
-                    p.explore_count = 0
-                    p.explore_reset_year = 0
-                    p.reputation = 0
-                    p.cave = None
-                    p.active_quest = None
-                    p.quest_due = None
-                    p.gathering_until = None
-                    p.gathering_type = None
-                    p.created_at = now
-                    p.last_active = now
-                else:
-                    from utils.db_async import Player as _Player
-                    session.add(_Player(
-                        discord_id=uid,
-                        name=name,
-                        gender=gender,
-                        spirit_root=spirit_root,
-                        spirit_root_type=root_type,
-                        comprehension=stats["comprehension"],
-                        physique=stats["physique"],
-                        fortune=stats["fortune"],
-                        bone=stats["bone"],
-                        soul=stats["soul"],
-                        lifespan=lifespan,
-                        lifespan_max=lifespan,
-                        spirit_stones=stats["spirit_stones"],
-                        created_at=now,
-                        last_active=now,
-                        current_city=starting_city,
-                    ))
-                await session.commit()
-
-            speed_label = {
-                "单灵根": "极快",
-                "双灵根": "较快",
-                "三灵根": "普通",
-                "四灵根": "较慢",
-                "五灵根": "迟缓",
-                "变异灵根": "特殊",
-            }.get(root_type, "未知")
-
-            embed = discord.Embed(
-                title=f"✦ {name} ✦",
-                description=f"{gender}修 · 炼气期1层 · {starting_city}",
-                color=discord.Color.teal(),
-            )
-            embed.add_field(name="灵根", value=f"{root_type}·{spirit_root}（修炼速度：{speed_label}）", inline=False)
-            embed.add_field(name="悟性", value=stats["comprehension"] + rebirth_bonus.get("comprehension", 0), inline=True)
-            embed.add_field(name="体魄", value=stats["physique"] + rebirth_bonus.get("physique", 0), inline=True)
-            embed.add_field(name="机缘", value=stats["fortune"] + rebirth_bonus.get("fortune", 0), inline=True)
-            embed.add_field(name="根骨", value=stats["bone"] + rebirth_bonus.get("bone", 0), inline=True)
-            embed.add_field(name="神识", value=stats["soul"] + rebirth_bonus.get("soul", 0), inline=True)
-            embed.add_field(name="寿元", value=f"{lifespan} 年", inline=True)
-            embed.add_field(name="灵石", value=stats["spirit_stones"], inline=True)
-            if rebirth_bonus and any(v > 0 for v in rebirth_bonus.values()):
-                bonus_str = "  ".join(f"{k} +{v}" for k, v in rebirth_bonus.items() if v > 0)
-                embed.add_field(name="✨ 轮回感悟", value=bonus_str, inline=False)
-            embed.set_footer(text="天道有常，长生路远，望道友珍重。")
-            await ctx.send(f"天地感应，灵根初现……\n{ctx.author.mention}", embed=embed)
+            created = await commit_character(uid, name, gender, answers)
+            if created is None:
+                return await ctx.send(f"{ctx.author.mention} 道友已踏入修仙之路，无需重新创建。")
+            await ctx.send(f"天地感应，灵根初现……\n{ctx.author.mention}", embed=_build_result_embed(**created))
 
         except asyncio.TimeoutError:
             await ctx.send(f"{ctx.author.mention} 响应超时，创建已取消。")
@@ -194,8 +90,8 @@ class CharacterCog(commands.Cog, name="Character"):
 
     @commands.hybrid_command(name="解散队伍", aliases=["jsdw"], description="解散当前所在队伍")
     async def disband_party(self, ctx):
-        from utils.views.party import disband_party
-        msg = await disband_party(str(ctx.author.id), self.bot)
+        from utils.views.party import disband_party_func
+        msg = await disband_party_func(str(ctx.author.id), self.bot)
         await ctx.send(f"{ctx.author.mention} {msg}")
 
     @commands.hybrid_command(name="help", description="查看修仙系统主菜单与可用指令")

@@ -6,6 +6,7 @@ from collections import deque
 import discord
 from discord.ext import commands
 
+from utils.tasks import spawn
 from utils.ytdlp_helper import (build_ffmpeg_options, check_media_dependencies,
                                 check_pot_provider, get_ytdl, is_allowed_host,
                                 is_youtube_playlist_link, parse_media_url)
@@ -44,7 +45,7 @@ class MusicCog(commands.Cog, name="Music"):
             is_first_from_playlist = source_info.get("is_first_from_playlist")
             if playlist_query and is_first_from_playlist:
                 source_info["is_first_from_playlist"] = False
-                self.bot.loop.create_task(self._enqueue_playlist_rest(ctx, playlist_query))
+                spawn(self._enqueue_playlist_rest(ctx, playlist_query), log=log, name="加载歌单剩余歌曲")
 
             artist = source_info.get("artist") or source_info.get("uploader")
             track = source_info.get("track") or source_info.get("title")
@@ -94,12 +95,22 @@ class MusicCog(commands.Cog, name="Music"):
             await channel.connect()
         await ctx.send(f"joined **{channel.name}**")
 
+    def _reset_playlist_state(self, query: str | None = None):
+        """清掉歌单的跳过计数/取消标记；不传 query 则全部清空。"""
+        if query is None:
+            self._playlist_skip_counts.clear()
+            self._cancelled_playlists.clear()
+        else:
+            self._playlist_skip_counts.pop(query, None)
+            self._cancelled_playlists.discard(query)
+
     @commands.hybrid_command(name="leave", aliases=["l"], description="让音乐机器人离开当前语音频道并清空队列")
     async def leave(self, ctx):
         if not self._is_connected(ctx):
             return await ctx.send("i'm not in a voice channel")
         self.queue.clear()
         self.current = None
+        self._reset_playlist_state()
         await ctx.voice_client.disconnect()
         await ctx.send("disconnected")
 
@@ -115,6 +126,9 @@ class MusicCog(commands.Cog, name="Music"):
                 "其它站点请直接给歌名。")
 
         is_yt_playlist_link = is_youtube_playlist_link(query)
+        if is_yt_playlist_link:
+            # 重新点播 = 新的一轮：上次被跳过/取消的记录不能永久生效
+            self._reset_playlist_state(query)
 
         async with ctx.typing():
             loop = asyncio.get_event_loop()
@@ -304,6 +318,7 @@ class MusicCog(commands.Cog, name="Music"):
     async def stop(self, ctx):
         self.queue.clear()
         self.current = None
+        self._reset_playlist_state()
         if ctx.voice_client:
             ctx.voice_client.stop()
         await ctx.send("stopped and cleared the queue")

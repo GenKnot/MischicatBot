@@ -9,6 +9,7 @@ from sqlalchemy import text
 from utils.player import get_player
 from utils.sects import SECTS, TECHNIQUES, check_requirements, get_technique_cost, next_stage, calc_technique_stat_bonus, TECHNIQUE_STAGES
 from utils.character import years_to_seconds, seconds_to_years
+from utils.views.techniques import _save_techniques
 
 
 def _parse_techniques(raw) -> list:
@@ -22,13 +23,9 @@ def _parse_techniques(raw) -> list:
     return result
 
 
-async def _save_techniques(uid: str, techniques: list):
-    async with AsyncSessionLocal() as session:
-        await session.execute(
-            text("UPDATE players SET techniques = :techniques WHERE discord_id = :uid"),
-            {"techniques": json.dumps(techniques, ensure_ascii=False), "uid": uid}
-        )
-        await session.commit()
+# 功法列表的写回用功法面板里那份（基于 atomic.cas_player_field 的 CAS）：命令与面板必须用同一种写法，
+# 否则 CAS 只保护写它的那一方 —— 命令这边无条件整份覆盖，面板那边的 CAS 就白加了。
+STALE_MESSAGE = "状态已变化（功法、灵石或寿元刚被别处改动过），请重新操作。"
 
 
 class SectCog(commands.Cog, name="Sect"):
@@ -125,12 +122,18 @@ class SectCog(commands.Cog, name="Sect"):
                     "equipped": len([x for x in techniques if x.get("equipped")]) < 5,
                 })
 
+        # 条件：仍然没有宗门，且功法列表还是读到的那份。同时发两条加入命令（或加入的同时在别处领了功法），
+        # 后到的一条落空，而不是把前一条的宗门和功法整份覆盖掉。
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET sect = :sect, sect_rank = :rank, techniques = :techniques WHERE discord_id = :uid"),
-                {"sect": name, "rank": "外门弟子", "techniques": json.dumps(techniques, ensure_ascii=False), "uid": uid}
+            result = await session.execute(
+                text("UPDATE players SET sect = :sect, sect_rank = :rank, techniques = :techniques "
+                     "WHERE discord_id = :uid AND sect IS NULL AND techniques IS :old"),
+                {"sect": name, "rank": "外门弟子", "techniques": json.dumps(techniques, ensure_ascii=False),
+                 "uid": uid, "old": player["techniques"]}
             )
             await session.commit()
+        if result.rowcount != 1:
+            return await ctx.send(f"{ctx.author.mention} {STALE_MESSAGE}")
 
         tech_str = "、".join(f"**{t}**" for t in new_techs) if new_techs else "（已全部习得）"
         await ctx.send(
@@ -186,7 +189,8 @@ class SectCog(commands.Cog, name="Sect"):
                 })
 
         if new_techs:
-            await _save_techniques(uid, techniques)
+            if not await _save_techniques(uid, techniques, player["techniques"]):
+                return await ctx.send(f"{ctx.author.mention} {STALE_MESSAGE}")
             tech_str = "、".join(f"**{t}**" for t in new_techs)
             await ctx.send(f"{ctx.author.mention} 从 **{player['sect']}** 领悟了新功法：{tech_str}")
         else:
@@ -250,7 +254,8 @@ class SectCog(commands.Cog, name="Sect"):
                         f"寿元需先消耗至 **{max_after_unequip}年** 以下方可卸下。"
                     )
             target["equipped"] = False
-            await _save_techniques(uid, techniques)
+            if not await _save_techniques(uid, techniques, player["techniques"]):
+                return await ctx.send(f"{ctx.author.mention} {STALE_MESSAGE}")
             return await ctx.send(f"{ctx.author.mention} 已卸下功法「**{name}**」。")
 
         equipped_count = sum(1 for t in techniques if t.get("equipped"))
@@ -258,7 +263,8 @@ class SectCog(commands.Cog, name="Sect"):
             return await ctx.send(f"{ctx.author.mention} 已装备5本功法，请先卸下一本再装备新的。")
 
         target["equipped"] = True
-        await _save_techniques(uid, techniques)
+        if not await _save_techniques(uid, techniques, player["techniques"]):
+            return await ctx.send(f"{ctx.author.mention} {STALE_MESSAGE}")
         await ctx.send(f"{ctx.author.mention} 已装备功法「**{name}**」。")
 
     @commands.hybrid_command(name="修炼功法", aliases=["xlgf"], description="消耗时间提升指定功法的境界")
@@ -304,23 +310,34 @@ class SectCog(commands.Cog, name="Sect"):
         new_stones = player["spirit_stones"] - stones_cost
         new_lifespan = player["lifespan"] - years_cost
 
+        # 一条条件 UPDATE 完成「校验 + 扣费 + 升阶段 + 进入闭关」（CONVENTIONS #1）：
+        # 灵石、寿元用**增量**扣减，并要求仍然够；功法列表要求还是读到的那份；还不能正处于闭关。
+        # 以前是把「读到的余额 - 花费」写成绝对值，读写之间别处到账的收入被抹掉，
+        # 别处花掉的灵石又被「写回去」—— 凭空造钱；同时发两条命令也会各自成功。
         async with AsyncSessionLocal() as session:
-            await session.execute(
+            result = await session.execute(
                 text(
-                    "UPDATE players SET techniques = :techniques, spirit_stones = :stones, lifespan = :lifespan, "
+                    "UPDATE players SET techniques = :techniques, "
+                    "spirit_stones = spirit_stones - :cost, lifespan = lifespan - :years, "
                     "cultivating_until = :cult_until, cultivating_years = :cult_years, last_active = :last_active "
-                    "WHERE discord_id = :uid"
+                    "WHERE discord_id = :uid AND techniques IS :old "
+                    "AND spirit_stones >= :cost AND lifespan >= :years "
+                    "AND (cultivating_until IS NULL OR cultivating_until <= :last_active)"
                 ),
                 {
                     "techniques": json.dumps(techniques, ensure_ascii=False),
-                    "stones": new_stones,
-                    "lifespan": new_lifespan,
+                    "cost": stones_cost,
+                    "years": years_cost,
                     "cult_until": cultivating_until,
                     "cult_years": years_cost,
                     "last_active": now,
                     "uid": uid,
+                    "old": player["techniques"],
                 }
             )
+            if result.rowcount != 1:
+                await session.rollback()
+                return await ctx.send(f"{ctx.author.mention} {STALE_MESSAGE}")
             await session.commit()
 
         info = TECHNIQUES.get(name, {})

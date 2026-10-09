@@ -20,6 +20,7 @@ from utils.views.public_event_overview import PublicEventOverviewView
 
 import logging
 from utils.config import is_master
+from utils.tasks import loop_guard
 
 log = logging.getLogger(__name__)
 
@@ -89,8 +90,17 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             self._lot_task.cancel()
 
     @tasks.loop(minutes=1)
+    @loop_guard(log, "公共事件调度")
     async def _scheduler(self):
         await self.bot.wait_until_ready()
+        # discord.ext.tasks 的循环体里抛出非网络类异常，循环会**永久停止**（is_running=False, failed=True）。
+        # 以前这里没有保护：一次数据库抖动、一次发消息被拒、一次公告频道为空时的 AttributeError，
+        # 灵雨和万宝楼的调度就一起停摆到 bot 重启 —— 21:00 触发灵雨时若出错，事件已是 active，
+        # 调度器却已死，永远没人去结算它，奖励永远不发（ISSUES.md B17）。
+        # loop_guard：这一轮出错就记一条 ERROR，下一分钟照常再来。
+        await self._scheduler_tick()
+
+    async def _scheduler_tick(self):
         now_mt = _montreal_now()
         today_str = now_mt.strftime("%Y-%m-%d")
         h, m = now_mt.hour, now_mt.minute
@@ -109,7 +119,13 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             if h >= 21 and last_date != today_str and now_ts >= trigger_ts:
                 if 4 not in self._preview_sent:
                     self._preview_sent.add(4)
-                    await self._trigger_spirit_rain(today_str)
+                    try:
+                        await self._trigger_spirit_rain(today_str)
+                    except Exception:
+                        # 触发失败（比如数据库抖了一下）要允许下一分钟重试：
+                        # 否则标记已经打上，要等到 22 点清掉标记才会补触发。
+                        self._preview_sent.discard(4)
+                        raise
             elif last_date != today_str:
                 for i, (ph, pm) in enumerate(zip(PREVIEW_HOURS, PREVIEW_MINUTES)):
                     if h == ph and m == pm and i not in self._preview_sent:
@@ -335,6 +351,9 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
                         view = PublicBidView(auction_id, next_lot["lot_index"], len(lots))
                         await channel.send(embed=embed, view=view)
                 else:
+                    # 清理本场的冻结资金记录与有没有公告频道无关；它曾放在『发结束公告』里，
+                    # 没有频道时就永远不清。
+                    await self._clear_frozen(auction_id)
                     if channel:
                         await self._announce_auction_end(channel, auction_id)
                     break
@@ -372,18 +391,20 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             )
         await channel.send(embed=embed)
 
-    async def _announce_auction_end(self, channel, auction_id: str):
-        from utils.events.public.wanbao import get_lots as _get_lots
-        from utils.views.wanbao import _item_display
-        lots = await _get_lots(auction_id)
-        sold = [l for l in lots if l["status"] == "sold"]
-        unsold = [l for l in lots if l["status"] == "unsold"]
+    async def _clear_frozen(self, auction_id: str):
         async with AsyncSessionLocal() as session:
             await session.execute(
                 text("DELETE FROM wanbao_frozen WHERE auction_id = :auction_id"),
                 {"auction_id": auction_id}
             )
             await session.commit()
+
+    async def _announce_auction_end(self, channel, auction_id: str):
+        from utils.events.public.wanbao import get_lots as _get_lots
+        from utils.views.wanbao import _item_display
+        lots = await _get_lots(auction_id)
+        sold = [l for l in lots if l["status"] == "sold"]
+        unsold = [l for l in lots if l["status"] == "unsold"]
 
         embed = discord.Embed(
             title="✦ 万宝楼拍卖会圆满结束 ✦",

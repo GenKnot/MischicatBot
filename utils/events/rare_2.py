@@ -38,7 +38,7 @@ EVENTS.append(_e(
     "荒野中，你发现了一块散发着仙气的碎片，那是传说中仙界飞升时留下的空间碎片，蕴含着极为纯粹的仙灵之气。",
     [
         _c("直接吸纳仙灵之气", condition=_cond("physique", 8), rewards={"cultivation": 500, "physique": 2, "lifespan": 60}, flavor="你以强横体魄吸纳了仙灵之气，修为暴涨，体魄大幅提升，寿元也得到了极大滋养。修为 +500，体魄 +2，寿元 +60"),
-        _c("直接吸纳仙灵之气", rewards={"cultivation": 300, "lifespan": 30, "lifespan_cost": 15}, flavor="仙灵之气过于纯粹，你强行吸纳，受了些内伤，但收获依然惊人。修为 +300，寿元 +15"),
+        _c("直接吸纳仙灵之气", rewards={"cultivation": 300, "lifespan": 15}, flavor="仙灵之气过于纯粹，你强行吸纳，受了些内伤，但收获依然惊人。修为 +300，寿元 +15"),
         _c("以神识感应碎片", condition=_cond("soul", 8), rewards={"soul": 2, "comprehension": 2, "lifespan": 50}, flavor="你以神识感应仙界碎片，从中感悟到了一丝仙道法则，神识和悟性都大幅提升，寿元也得到了滋养。神识 +2，悟性 +2，寿元 +50"),
         _c("以神识感应碎片", rewards={"soul": 1, "comprehension": 1, "lifespan": 30}, flavor="你感应到了仙灵之气，神识和悟性都有所提升，寿元也有所增长。神识 +1，悟性 +1，寿元 +30"),
         _c("将碎片带走出售", condition=_cond("fortune", 7), rewards={"spirit_stones": 800, "fortune": 1}, flavor="仙界碎片价值连城，你带到城中，被一位元婴期大修士高价收购。灵石 +800，机缘 +1"),

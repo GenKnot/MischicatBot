@@ -1,10 +1,9 @@
 import time
-import json
 import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.market import (
-    MARKET_CITIES, MAX_LISTINGS, FEE_RATE,
+    MAX_LISTINGS, FEE_RATE,
     get_active_listings, get_my_listings, get_expired_unclaimed,
     list_item, list_equipment, buy_listing, delist,
 )
@@ -14,7 +13,7 @@ from utils.views.base import TimedView
 ITEM_TYPE_LABELS = {
     "all": "全部",
     "herb": "草药",
-    "material": "矿石",
+    "ore": "矿石",
     "wood": "木材",
     "fish": "鱼类",
     "pill": "丹药",
@@ -327,7 +326,7 @@ class ListEquipView(TimedView):
 class ListItemModal(discord.ui.Modal, title="上架背包物品"):
     item_id_input = discord.ui.TextInput(label="物品ID", placeholder="如 herb_lingzhi", min_length=1, max_length=40)
     qty_input = discord.ui.TextInput(label="数量", placeholder="输入数字", min_length=1, max_length=6)
-    price_input = discord.ui.TextInput(label="单价（灵石）", placeholder="输入数字", min_length=1, max_length=12)
+    price_input = discord.ui.TextInput(label="总价（灵石，整笔挂单）", placeholder="买家为这整批付的价，输入数字", min_length=1, max_length=12)
 
     def __init__(self, author, cog):
         super().__init__()

@@ -25,6 +25,17 @@ TRANSFER_FEE_RATE = 0.02
 TRANSFER_MAX = 50000
 
 
+def _not_in_bank_city(player) -> dict | None:
+    """人不在有钱庄的城市时给出拒绝结果，否则返回 None。
+
+    城市菜单已经挡了「进不去钱庄」，但钱庄面板留在聊天里，人走了之后按钮照样能点 ——
+    所以逻辑层每次操作都要自己再查一遍（B34）。
+    """
+    if player.current_city in BANK_CITIES:
+        return None
+    return {"ok": False, "reason": f"钱庄只在以下城市设有分号：{'、'.join(BANK_CITIES)}"}
+
+
 def calc_demand_interest(principal: int, deposited_at: float) -> int:
     now = time.time()
     years = seconds_to_years(now - deposited_at)
@@ -71,6 +82,8 @@ async def deposit_demand(discord_id: str, amount: int) -> dict:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
+        if (refused := _not_in_bank_city(player)):
+            return refused
         if amount <= 0:
             return {"ok": False, "reason": "存入金额必须大于 0。"}
         if not await spend_stones(session, discord_id, amount):
@@ -103,6 +116,8 @@ async def withdraw_demand(discord_id: str, amount: int) -> dict:
         acc = await session.get(BankAccount, discord_id)
         if not player or not acc:
             return {"ok": False, "reason": "账户不存在。"}
+        if (refused := _not_in_bank_city(player)):
+            return refused
 
         now = time.time()
         seen_balance, seen_at = acc.demand_balance, acc.demand_deposited_at
@@ -126,6 +141,8 @@ async def deposit_term(discord_id: str, amount: int, term_years: int) -> dict:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
+        if (refused := _not_in_bank_city(player)):
+            return refused
         if amount < MIN_DEPOSIT:
             return {"ok": False, "reason": f"定期存款每笔最低 {MIN_DEPOSIT:,} 灵石。"}
 
@@ -162,6 +179,8 @@ async def withdraw_term(discord_id: str, deposit_id: str) -> dict:
         dep = await session.get(BankDeposit, deposit_id)
         if not player or not dep or dep.discord_id != discord_id:
             return {"ok": False, "reason": "存款记录不存在。"}
+        if (refused := _not_in_bank_city(player)):
+            return refused
         if dep.status != "active":
             return {"ok": False, "reason": "该存款已结算。"}
 
@@ -203,6 +222,8 @@ async def transfer(sender_id: str, receiver_id: str, amount: int) -> dict:
             return {"ok": False, "reason": "角色不存在。"}
         if not receiver:
             return {"ok": False, "reason": "对方角色不存在。"}
+        if (refused := _not_in_bank_city(sender)):
+            return refused
         if amount <= 0 or amount > TRANSFER_MAX:
             return {"ok": False, "reason": f"单次转账上限 {TRANSFER_MAX:,} 灵石。"}
         fee = max(1, int(amount * TRANSFER_FEE_RATE))

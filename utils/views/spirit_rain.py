@@ -40,10 +40,6 @@ def _today_trigger_ts() -> float:
     return now.replace(hour=21, minute=0, second=0, microsecond=0).timestamp()
 
 
-def _send_main_menu_ephemeral(interaction: discord.Interaction, cog):
-    pass
-
-
 SPIRIT_RAIN_DESC = (
     "天地异象，灵气暴涨，灵雨降临指定城市。\n\n"
     "**活动机制**\n"
@@ -194,7 +190,7 @@ class ConfirmStopAndTravelView(TimedView):
         if self.is_cultivating:
             cult_cog = interaction.client.cogs.get("Cultivation")
             if cult_cog:
-                await cult_cog._stop_cultivation_with_pair(self.uid, now, actor_name=interaction.user.display_name)
+                await cult_cog._stop_cultivation_text(self.uid)
             else:
                 player = self.player
                 from utils.character import seconds_to_years, calc_cultivation_gain, get_cultivation_bonus
@@ -254,13 +250,6 @@ class ConfirmStopAndTravelView(TimedView):
             return await interaction.response.send_message("这不是你的操作。", ephemeral=True)
         self.stop()
         await interaction.response.edit_message(content="已取消。", view=None)
-
-
-class SpiritRainView(TimedView):
-    def __init__(self, author, pe_cog=None):
-        super().__init__()
-        self.author = author
-        self.pe_cog = pe_cog
 
 
 class _EventDetailButton(discord.ui.Button):

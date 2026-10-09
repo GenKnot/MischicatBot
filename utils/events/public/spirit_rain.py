@@ -85,6 +85,11 @@ async def on_trigger(bot, channel, event_id: str, city: str):
     embed.add_field(name="💪 灵雨淬体", value="以体魄承受灵雨（需体魄≥7）", inline=True)
     embed.set_footer(text=f"事件ID: {event_id} · 灵雨城市：{city} · 持续60分钟")
 
+    # 没有公告频道时事件照常进行（玩家仍可通过「公共事件」面板参与），只是没有广播消息。
+    # 以前这里直接 channel.send，频道为空时抛 AttributeError —— 事件已是 active，调度器却被它弄死（B17）。
+    if not channel:
+        return
+
     view = SpiritRainView(event_id, city)
     msg = await channel.send(embed=embed, view=view)
 
@@ -121,8 +126,9 @@ async def on_settle(bot, channel, event: dict):
 
 
 async def _settle_spirit_rain_only(channel, city: str, participants: list[dict]):
-    if not channel:
-        return
+    # 发奖励不依赖频道：频道取不到（没配环境变量、bot 刚重启频道还没缓存）时只是不发公告。
+    # 以前这里 `if not channel: return` 放在最前面，on_settle 又已把事件标成 ended ——
+    # 守城者的奖励就永久丢了（ISSUES.md B16）。
     seen = set()
     unique = []
     for p in participants:
@@ -163,13 +169,12 @@ async def _settle_spirit_rain_only(channel, city: str, participants: list[dict])
             value="、".join(f"**{p['name']}**" for p in fled[:5]) + "　领取奖励后已离城",
             inline=False
         )
-    await channel.send(embed=embed)
+    if channel:
+        await channel.send(embed=embed)
 
 
 async def _settle_beast_tide(bot, channel, event_id: str, city: str, participants: list[dict], all_participants: list[dict], participant_ids: set):
-    if not channel:
-        return
-
+    # 同上：奖励照发，频道缺失只影响公告（B16）。
     from utils.equipment_db import give_equipment
 
     defenders = [p for p in participants if p.get("activity") == "defense" and p["current_city"] == city]
@@ -240,9 +245,11 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
         value="\n".join(result_lines) if result_lines else "无人参与守城。",
         inline=False,
     )
-    await channel.send(embed=embed_battle)
+    if channel:
+        await channel.send(embed=embed_battle)
 
-    if not idle_players:
+    # 对袖手旁观者的寿元惩罚需要有公告才执行：玩家看不到公告的情况下，不该悄悄扣他们的寿元。
+    if not channel or not idle_players:
         return
 
     loss_list = []

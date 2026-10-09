@@ -4,8 +4,6 @@ from utils.items.materials import MATERIALS
 from utils.items.wood import WOOD
 from utils.items.fish import FISH
 from utils.items.herbs import HERBS
-from utils.world import SPECIAL_REGIONS, get_region
-from utils.realms import get_realm_index
 from utils.views.base import TimedView
 
 
@@ -139,6 +137,24 @@ class GatherButton(discord.ui.Button):
             return
 
         now = _time.time()
+        if player["is_dead"]:
+            await interaction.followup.send("道友已坐化，无法采集。", ephemeral=True)
+            view.stop()
+            return
+        if player["active_quest"]:
+            await interaction.followup.send("道友正在执行任务，无法同时采集。", ephemeral=True)
+            view.stop()
+            return
+        from utils.player import is_defending
+        from utils.events.public.wanbao import is_auction_locked
+        if await is_defending(uid):
+            await interaction.followup.send("守城期间无法采集，专心守城！", ephemeral=True)
+            view.stop()
+            return
+        if await is_auction_locked(uid):
+            await interaction.followup.send("拍卖会进行中，在万宝楼内无法采集。", ephemeral=True)
+            view.stop()
+            return
         if player["cultivating_until"] and now < player["cultivating_until"]:
             await interaction.followup.send("道友正在闭关，无法采集。", ephemeral=True)
             view.stop()
@@ -153,7 +169,7 @@ class GatherButton(discord.ui.Button):
             view.stop()
             return
 
-        from utils.buffs import get_gather_bonus, get_buff_value, consume_once_buff, buffs_to_json
+        from utils.buffs import get_gather_bonus, get_buff_value, consume_once_buff
         gather_bonus = get_gather_bonus(player)
         cooldown_reduction = get_buff_value(player, "gather_cooldown_reduction", 0) / 100.0
 
@@ -162,7 +178,6 @@ class GatherButton(discord.ui.Button):
 
         gathering_until = now + years_to_seconds(actual_years)
         lifespan_cost = math.ceil(actual_years) if actual_years > 0 else 0
-        new_lifespan = player["lifespan"] - lifespan_cost
 
         active_buffs_raw = player.get("active_buffs") or "{}"
         old_buffs_raw = active_buffs_raw      # CAS 用：写回前 buff 表的原值
@@ -176,8 +191,10 @@ class GatherButton(discord.ui.Button):
 
         # 上面的检查是先读再判断，连点会两次都通过、把一次性 buff 用两遍。
         # 条件写进 UPDATE 里。
-        conditions = ("WHERE discord_id = :uid "
+        # 菜单入口和上面的检查都是先读后判，这里把同样的条件再写进 WHERE（B55）
+        conditions = ("WHERE discord_id = :uid AND is_dead = 0 AND active_quest IS NULL "
                       "AND (gathering_until IS NULL OR gathering_until <= :now) "
+                      "AND (cultivating_until IS NULL OR cultivating_until <= :now) "
                       "AND lifespan >= :cost")
         params = {"gu": gathering_until, "gt": view.gather_type, "cost": lifespan_cost,
                   "la": now, "now": now, "gb": gather_bonus, "uid": uid}

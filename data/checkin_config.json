@@ -8,7 +8,7 @@
   "spirit_stones": {
     "tiers": [
       {"label": "一档", "min": 1,    "max": 500,  "weight": 40},
-      {"label": "二档", "min": 501,  "max": 2500, "weight": 42},
+      {"label": "二档", "min": 501,  "max": 1500, "weight": 42},
       {"label": "三档", "min": 1501, "max": 3000, "weight": 10},
       {"label": "四档", "min": 3001, "max": 6000, "weight": 2}
     ]

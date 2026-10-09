@@ -1,15 +1,12 @@
 import asyncio
-import random
-import time
 
 import discord
 
 from typing import Optional, Dict
 
-from utils.character import QUESTIONS, calc_stats, roll_spirit_root, REALM_LIFESPAN
-from utils.db_async import AsyncSessionLocal, Player
+from utils.character import QUESTIONS
+from utils.character_create_logic import commit_character
 from utils.player import get_player
-from utils.world import CITIES
 from utils.views.base import TimedView
 
 
@@ -217,7 +214,7 @@ class CharacterCreateView(TimedView):
             q = QUESTIONS[self.step]
             for key in ("A", "B", "C"):
                 label = q["options"][key][0]
-                self.add_item(_AnswerButton(label=label, choice=key, style=discord.ButtonStyle.success))
+                self.add_item(_AnswerButton(label=label, choice=key, step=self.step, style=discord.ButtonStyle.success))
         else:
             self.add_item(_OpenNameModalButton())
 
@@ -238,9 +235,13 @@ class CharacterCreateView(TimedView):
         self.step = 0
         await self._advance(interaction)
 
-    async def choose_answer(self, interaction: discord.Interaction, choice: str):
+    async def choose_answer(self, interaction: discord.Interaction, choice: str, step: int):
         if self.step < 0 or self.step >= len(QUESTIONS):
             await interaction.response.send_message("当前不在答题阶段。", ephemeral=True)
+            return
+        if step != self.step:
+            # 点的是上一题的旧按钮（连点 / 与文字输入同时到达）：不能算成这一题的答案，否则会悄悄跳过一题
+            await interaction.response.send_message("题目已更新，请按当前题目作答。", ephemeral=True)
             return
         self.answers[self.step] = choice
         self.step += 1
@@ -261,87 +262,11 @@ class CharacterCreateView(TimedView):
         self.stop()
 
     async def _commit_character(self, name: str):
-        answers = dict(self.answers)
-        stats = calc_stats(answers)
-        spirit_root, root_type = roll_spirit_root()
-        lifespan = REALM_LIFESPAN["炼气期"]
-        now = time.time()
-        starting_city = random.choice(CITIES)["name"]
-
-        rebirth_bonus = {}
-        old = await get_player(self.uid)
-        async with AsyncSessionLocal() as session:
-            if old and old.get("is_dead"):
-                rebirth_bonus = self.char_cog._calc_rebirth_bonus(old) if (
-                    old.get("sect") == "仙葬谷" or old.get("has_bahongchen")
-                ) else {}
-                p = await session.get(Player, self.uid)
-                p.name = name
-                p.gender = self.gender
-                p.spirit_root = spirit_root
-                p.spirit_root_type = root_type
-                p.comprehension = stats["comprehension"] + rebirth_bonus.get("comprehension", 0)
-                p.physique = stats["physique"] + rebirth_bonus.get("physique", 0)
-                p.fortune = stats["fortune"] + rebirth_bonus.get("fortune", 0)
-                p.bone = stats["bone"] + rebirth_bonus.get("bone", 0)
-                p.soul = stats["soul"] + rebirth_bonus.get("soul", 0)
-                p.lifespan = lifespan
-                p.lifespan_max = lifespan
-                p.spirit_stones = stats["spirit_stones"]
-                p.cultivation = 0
-                p.realm = "炼气期1层"
-                p.cultivating_until = None
-                p.cultivating_years = None
-                p.is_dead = False
-                p.is_virgin = True
-                p.sect = None
-                p.sect_rank = None
-                p.techniques = "[]"
-                p.dual_partner_id = None
-                p.cultivation_overflow = 0
-                p.current_city = starting_city
-                p.explore_count = 0
-                p.explore_reset_year = 0
-                p.reputation = 0
-                p.cave = None
-                p.active_quest = None
-                p.quest_due = None
-                p.gathering_until = None
-                p.gathering_type = None
-                p.created_at = now
-                p.last_active = now
-            else:
-                session.add(Player(
-                    discord_id=self.uid,
-                    name=name,
-                    gender=self.gender,
-                    spirit_root=spirit_root,
-                    spirit_root_type=root_type,
-                    comprehension=stats["comprehension"],
-                    physique=stats["physique"],
-                    fortune=stats["fortune"],
-                    bone=stats["bone"],
-                    soul=stats["soul"],
-                    lifespan=lifespan,
-                    lifespan_max=lifespan,
-                    spirit_stones=stats["spirit_stones"],
-                    created_at=now,
-                    last_active=now,
-                    current_city=starting_city,
-                ))
-            await session.commit()
-
-        embed = _build_result_embed(
-            name=name,
-            gender=self.gender,
-            starting_city=starting_city,
-            spirit_root=spirit_root,
-            root_type=root_type,
-            lifespan=lifespan,
-            stats=stats,
-            rebirth_bonus=rebirth_bonus,
-        )
-        return embed
+        """落库并返回结果卡片；玩家已存活（并发提交 / 重复点击）时返回 None。"""
+        created = await commit_character(self.uid, name, self.gender, self.answers)
+        if created is None:
+            return None
+        return _build_result_embed(**created)
 
     async def finalize(self, interaction: discord.Interaction, name: str):
         if not name or len(name) > 16:
@@ -371,6 +296,12 @@ class CharacterCreateView(TimedView):
         if self._text_task:
             self._text_task.cancel()
         self.char_cog._creating.discard(self.uid)
+        if embed is None:                                   # 被并发的另一次提交抢先了
+            if self.message:
+                await self.message.edit(content="你已创建角色，无需重复创建。", embed=None, view=None)
+            await interaction.followup.send("你已创建角色。", ephemeral=True)
+            self.stop()
+            return
         if self.message:
             await self.message.edit(
                 content=f"天地感应，灵根初现……\n{self.author.mention}",
@@ -405,6 +336,11 @@ class CharacterCreateView(TimedView):
         if self._text_task:
             self._text_task.cancel()
         self.char_cog._creating.discard(self.uid)
+        if embed is None:
+            if self.message:
+                await self.message.edit(content="你已创建角色，无需重复创建。", embed=None, view=None)
+            self.stop()
+            return
         if self.message:
             await self.message.edit(
                 content=f"天地感应，灵根初现……\n{self.author.mention}",
@@ -424,12 +360,13 @@ class _GenderButton(discord.ui.Button):
 
 
 class _AnswerButton(discord.ui.Button):
-    def __init__(self, label: str, choice: str, style: discord.ButtonStyle):
+    def __init__(self, label: str, choice: str, step: int, style: discord.ButtonStyle):
         super().__init__(label=label, style=style, row=0)
         self.choice = choice
+        self.step = step                    # 这个按钮属于哪一题
 
     async def callback(self, interaction: discord.Interaction):
-        await self.view.choose_answer(interaction, self.choice)
+        await self.view.choose_answer(interaction, self.choice, self.step)
 
 
 class _OpenNameModalButton(discord.ui.Button):

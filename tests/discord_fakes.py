@@ -73,6 +73,7 @@ class FakeContext(_Recorder):
         super().__init__()
         self.author = FakeUser(id=int(user_id), name=name)
         self.guild = None
+        self.channel = object()                       # 只用来做 `m.channel == ctx.channel` 的比较
 
     async def send(self, content=None, **kwargs):
         return self._record(content, **kwargs)
@@ -89,6 +90,7 @@ class _Response(_Recorder):
         super().__init__()
         self._parent = parent
         self.deferred = False
+        self.modal = None
 
     async def send_message(self, content=None, **kwargs):
         msg = self._record(content, **kwargs)
@@ -98,16 +100,33 @@ class _Response(_Recorder):
     async def defer(self, **kwargs):
         self.deferred = True
 
+    def is_done(self) -> bool:
+        """与真实的 InteractionResponse 一致：defer 过或已经响应过都算 done。"""
+        return self.deferred or self.modal is not None or bool(self.messages)
+
     async def edit_message(self, content=None, **kwargs):
         msg = self._record(content, **kwargs)
         self._parent.messages.append(msg)
         return msg
+
+    async def send_modal(self, modal):
+        """弹出表单。真实的 Discord 里这算作一次响应；这里记下表单本身供断言。"""
+        self.modal = modal
+        self._parent.modal = modal
 
 
 class _Followup(_Recorder):
     def __init__(self, parent):
         super().__init__()
         self._parent = parent
+
+    async def edit_message(self, message_id=None, content=None, **kwargs):
+        """followup.edit_message(message_id=…, embed=…, view=…)：改的是原消息，记成一次编辑。"""
+        msg = SentMessage(content=content, embed=kwargs.get("embed"), view=kwargs.get("view"))
+        self._parent.edited.append(msg)
+        self._parent.messages.append(msg)
+        self.messages.append(msg)
+        return msg
 
     async def send(self, content=None, **kwargs):
         msg = self._record(content, **kwargs)
@@ -126,6 +145,7 @@ class FakeInteraction(_Recorder):
         self.edited: list[SentMessage] = []
         # 真实的 Interaction 上有这个；面板超时要靠它拿到消息去编辑
         self.message = None
+        self.modal = None
 
     async def edit_original_response(self, content=None, **kwargs):
         msg = SentMessage(content=content, embed=kwargs.get("embed"),

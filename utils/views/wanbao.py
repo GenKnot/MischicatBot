@@ -343,9 +343,6 @@ class BidView(TimedView):
         await self._do_bid(interaction, 1000)
 
 
-WanbaoView = WanbaoMainView
-
-
 class ListItemModal(discord.ui.Modal, title="上架拍品"):
     item_name = discord.ui.TextInput(label="物品名称", placeholder="例：雷云芝", max_length=30)
     quantity = discord.ui.TextInput(label="数量", placeholder="例：20", max_length=5)

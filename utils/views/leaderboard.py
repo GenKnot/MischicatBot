@@ -15,10 +15,11 @@ def _medal(i: int) -> str:
 async def _build_realm_embed() -> discord.Embed:
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text("SELECT name, realm, rebirth_count FROM players WHERE is_dead = 0")
+            text("SELECT name, realm, rebirth_count, cultivation FROM players WHERE is_dead = 0")
         )
         rows = result.fetchall()
-    rows = sorted(rows, key=lambda r: get_realm_index(r.realm), reverse=True)[:10]
+    # 同境界按修为排：只按境界下标排的话，同境界的人顺序取决于库里的行序（B70）
+    rows = sorted(rows, key=lambda r: (get_realm_index(r.realm), r.cultivation or 0), reverse=True)[:10]
     embed = discord.Embed(title="✦ 境界榜 ✦", color=discord.Color.gold())
     lines = []
     for i, r in enumerate(rows):

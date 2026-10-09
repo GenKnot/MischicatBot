@@ -1,7 +1,6 @@
 import random
 
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy import select
+from sqlalchemy import func
 
 from sqlalchemy import update
 
@@ -141,29 +140,57 @@ async def get_forging_mastery_count(discord_id: str) -> int:
 
 
 async def add_forging_exp(discord_id: str, exp: int) -> tuple[int, int, bool]:
+    """原子加炼器经验，够门槛则升一级。返回 (等级, 经验, 是否升级)。
+
+    经验用 `exp = exp + n` 加（并发开炉不丢更新），升级用 `WHERE forging_level = 旧等级` 做 CAS，
+    同时到达的几次只会升一级（B42）。
+    """
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if not player:
+        res = await session.execute(
+            update(Player).where(Player.discord_id == discord_id)
+            .values(forging_exp=Player.forging_exp + exp)
+            .returning(Player.forging_level, Player.forging_exp)
+        )
+        got = res.first()
+        if got is None:
             return 0, 0, False
-        player.forging_exp += exp
+        level, total = got
         leveled_up = False
-        if player.forging_level < 9:
-            next_threshold = FORGING_EXP_THRESHOLDS[player.forging_level + 1] if player.forging_level + 1 < len(FORGING_EXP_THRESHOLDS) else 999999
-            if player.forging_exp >= next_threshold:
-                player.forging_level += 1
-                leveled_up = True
+        if level < 9:
+            nxt = level + 1
+            threshold = FORGING_EXP_THRESHOLDS[nxt] if nxt < len(FORGING_EXP_THRESHOLDS) else 999999
+            if total >= threshold:
+                up = await session.execute(
+                    update(Player).where(Player.discord_id == discord_id, Player.forging_level == level)
+                    .values(forging_level=nxt)
+                )
+                if up.rowcount == 1:
+                    level, leveled_up = nxt, True
         await session.commit()
-        return player.forging_level, player.forging_exp, leveled_up
+        return level, total, leveled_up
 
 
 async def increment_forging_mastery(discord_id: str) -> int:
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if not player:
-            return 0
-        player.forging_mastery_count = (player.forging_mastery_count or 0) + 1
+        res = await session.execute(
+            update(Player).where(Player.discord_id == discord_id)
+            .values(forging_mastery_count=func.coalesce(Player.forging_mastery_count, 0) + 1)
+            .returning(Player.forging_mastery_count)
+        )
+        got = res.first()
         await session.commit()
-        return player.forging_mastery_count
+        return got[0] if got else 0
+
+
+async def _claim_entry_exam(discord_id: str) -> bool:
+    """原子完成入门考核：只有 0 级的玩家能被升到 1 级、经验归零。已是炼器师返回 False。"""
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(
+            update(Player).where(Player.discord_id == discord_id, Player.forging_level == 0)
+            .values(forging_level=1, forging_exp=0)
+        )
+        await session.commit()
+        return res.rowcount == 1
 
 
 async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
@@ -191,10 +218,7 @@ async def attempt_forge(
     player_bone: int,
     forging_level: int,
 ) -> dict:
-    allowed, daily_count = await check_and_consume_daily(discord_id)
-    if not allowed:
-        return {"ok": False, "reason": f"今日锻造次数已达上限（{DAILY_LIMIT}次），明日再来。"}
-
+    # 先做不带副作用的校验：被拒的尝试不能烧掉今日次数（B41）
     ore_qty_needed = SLOT_MAIN_ORE_QTY[slot]
     if inventory.get(ore_name, 0) < ore_qty_needed:
         return {"ok": False, "reason": f"主材不足：「{ore_name}」需要 {ore_qty_needed} 个，当前只有 {inventory.get(ore_name, 0)} 个。"}
@@ -209,32 +233,39 @@ async def attempt_forge(
     if forging_level > 0 and QUALITY_ORDER.index(target_quality) > QUALITY_ORDER.index(max_quality):
         return {"ok": False, "reason": f"炼器品级不足，当前最高可锻造「{max_quality}」品质。"}
 
-    mastery_count = await get_forging_mastery_count(discord_id)
-    success_rate = calc_forge_success_rate(forging_level, target_quality, player_bone, mastery_count)
-    success = random.randint(1, 100) <= success_rate
-
     consumed = {ore_name: ore_qty_needed}
     if aux_wood:
         consumed[aux_wood] = 1
     if aux_herb:
         consumed[aux_herb] = 1
 
-    # 材料一次性在同一事务里扣净：逐个扣时中途失败会留下"扣了一半"的背包
+    # 今日次数和材料在同一个事务里一起占：任一不满足整组回滚（次数也退回）。
+    # `inventory` 只是调用方的快照，真正的扣减以数据库为准。
     async with AsyncSessionLocal() as session:
+        daily_count = await claim_daily_quota(
+            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, DAILY_LIMIT
+        )
+        if daily_count is None:
+            return {"ok": False, "reason": f"今日锻造次数已达上限（{DAILY_LIMIT}次），明日再来。"}
         for item_name, qty in consumed.items():
             if not await consume_item(session, discord_id, item_name, qty):
                 await session.rollback()
                 return {"ok": False, "reason": f"「{item_name}」不足，需要 {qty} 个。"}
         await session.commit()
 
+    mastery_count = await get_forging_mastery_count(discord_id)
+    success_rate = calc_forge_success_rate(forging_level, target_quality, player_bone, mastery_count)
+    success = random.randint(1, 100) <= success_rate
+
     if not success:
         consequence, lifespan_loss = roll_forge_failure()
         if lifespan_loss > 0:
             async with AsyncSessionLocal() as session:
-                player = await session.get(Player, discord_id)
-                if player:
-                    player.lifespan = max(1, player.lifespan - lifespan_loss)
-                    await session.commit()
+                await session.execute(
+                    update(Player).where(Player.discord_id == discord_id)
+                    .values(lifespan=func.max(1, Player.lifespan - lifespan_loss))
+                )
+                await session.commit()
         return {
             "ok": False,
             "success": False,
@@ -259,18 +290,14 @@ async def attempt_forge(
     await give_equipment(discord_id, equipment)
 
     new_count = await increment_forging_mastery(discord_id)
-    new_level, new_exp, leveled_up = await add_forging_exp(discord_id, FORGING_EXP_PER_CRAFT)
 
-    exam_passed = False
-    async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if player and player.forging_level == 0:
-            player.forging_level = 1
-            player.forging_exp = 0
-            await session.commit()
-            new_level = 1
-            leveled_up = True
-            exam_passed = True
+    # 0 级玩家的第一炉成功就是入门考核：先于普通加经验处理，否则 add_forging_exp 会把 0 级直接升到 1 级，
+    # 『通过入门考核』永远不会出现（B43）
+    exam_passed = await _claim_entry_exam(discord_id)
+    if exam_passed:
+        new_level, new_exp, leveled_up = 1, 0, True
+    else:
+        new_level, new_exp, leveled_up = await add_forging_exp(discord_id, FORGING_EXP_PER_CRAFT)
 
     return {
         "ok": True,
@@ -297,7 +324,6 @@ async def attempt_reforge(
 ) -> dict:
     from utils.equipment_db import get_equipment_by_id
     from utils.equipment import generate_equipment, QUALITY_ORDER
-    import json
 
     eq = await get_equipment_by_id(equip_id, discord_id)
     if not eq:

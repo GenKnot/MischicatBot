@@ -5,12 +5,25 @@ import json
 from sqlalchemy import delete, select, update
 
 from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
-from utils.db_async import AsyncSessionLocal, Equipment, MarketListing
+from utils.equipment_db import new_equipment_row
+from utils.db_async import AsyncSessionLocal, Equipment, MarketListing, Player
 
 MARKET_CITIES = ["灵虚城", "丹阁", "落云城", "碧波城", "天工城"]
 MAX_LISTINGS = 5
 FEE_RATE = 0.08
 LISTING_TTL = 3 * 24 * 3600
+
+
+async def _not_in_market_city(session, discord_id: str) -> dict | None:
+    """人不在有交易坊的城市时给出拒绝结果，否则返回 None（B36）。
+
+    城市菜单已经挡了「进不去交易坊」，但交易坊面板留在聊天里，人走了之后照样能点，
+    所以上架 / 购买在逻辑层自己再查一遍。下架 / 领回不查：走远了也不能把货困在摊位里。
+    """
+    player = await session.get(Player, discord_id)
+    if player is not None and player.current_city in MARKET_CITIES:
+        return None
+    return {"ok": False, "reason": f"交易坊只在以下城市营业：{'、'.join(MARKET_CITIES)}"}
 
 
 async def get_active_listings(item_type: str = None) -> list[dict]:
@@ -46,6 +59,8 @@ async def get_expired_unclaimed(discord_id: str) -> list[dict]:
 async def list_item(discord_id: str, item_id: str, quantity: int, price: int) -> dict:
     from utils.items import ITEMS
     async with AsyncSessionLocal() as session:
+        if (refused := await _not_in_market_city(session, discord_id)):
+            return refused
         active_result = await session.execute(
             select(MarketListing).where(
                 MarketListing.seller_id == discord_id,
@@ -86,6 +101,8 @@ async def list_item(discord_id: str, item_id: str, quantity: int, price: int) ->
 
 async def list_equipment(discord_id: str, equip_id: str, price: int) -> dict:
     async with AsyncSessionLocal() as session:
+        if (refused := await _not_in_market_city(session, discord_id)):
+            return refused
         active_result = await session.execute(
             select(MarketListing).where(
                 MarketListing.seller_id == discord_id,
@@ -150,10 +167,17 @@ async def buy_listing(discord_id: str, listing_id: str) -> dict:
             return {"ok": False, "reason": "该商品已下架或不存在。"}
         if listing.seller_id == discord_id:
             return {"ok": False, "reason": "不能购买自己的商品。"}
+        if (refused := await _not_in_market_city(session, discord_id)):
+            return refused
 
         now = time.time()
         if now >= listing.expires_at:
-            listing.status = "expired"
+            # 条件更新：别处刚把它卖掉 / 下架的话，不能被我们改回 expired
+            await session.execute(
+                update(MarketListing)
+                .where(MarketListing.listing_id == listing_id, MarketListing.status == "active")
+                .values(status="expired")
+            )
             await session.commit()
             return {"ok": False, "reason": "该商品已过期。"}
 
@@ -184,19 +208,7 @@ async def buy_listing(discord_id: str, listing_id: str) -> dict:
         if item_type == "item":
             await grant_item(session, discord_id, item_id, quantity)
         else:
-            eq_info = json.loads(eq_data)
-            session.add(Equipment(
-                equip_id=eq_info["equip_id"],
-                discord_id=discord_id,
-                name=eq_info["name"],
-                slot=eq_info["slot"],
-                quality=eq_info["quality"],
-                tier=eq_info["tier"],
-                tier_req=eq_info["tier_req"],
-                stats=json.dumps(eq_info["stats"], ensure_ascii=False),
-                flavor=eq_info["flavor"],
-                equipped=False,
-            ))
+            session.add(new_equipment_row(discord_id, json.loads(eq_data)))
 
         await session.commit()
         return {"ok": True, "item_name": item_name, "price": price, "fee": fee}
@@ -208,28 +220,32 @@ async def delist(discord_id: str, listing_id: str) -> dict:
         if not listing or listing.seller_id != discord_id:
             return {"ok": False, "reason": "上架记录不存在。"}
         if listing.status not in ("active", "expired"):
-            return {"ok": False, "reason": "该商品已售出。"}
+            return {"ok": False, "reason": "该商品已售出。" if listing.status == "sold" else "该商品已下架。"}
 
-        if listing.item_type == "item":
-            await grant_item(session, discord_id, listing.item_id, listing.quantity)
+        # 取值放在认领之前：rollback / 提交后 ORM 对象会过期，再读属性会触发同步 IO
+        item_type, item_id, quantity = listing.item_type, listing.item_id, listing.quantity
+        item_name, eq_data = listing.item_name, listing.eq_data
+
+        # 原子认领：只有把 active / expired 改成 delisted 的那一次才退货。
+        # 以前先退货再改状态，连点会退多份；与别人购买同时发生时，买家拿货、卖家也拿回货（B35）。
+        claimed = await session.execute(
+            update(MarketListing)
+            .where(MarketListing.listing_id == listing_id,
+                   MarketListing.seller_id == discord_id,
+                   MarketListing.status.in_(("active", "expired")))
+            .values(status="delisted")
+        )
+        if claimed.rowcount != 1:
+            await session.rollback()
+            return {"ok": False, "reason": "该商品刚刚被处理过（已售出或已下架）。"}
+
+        if item_type == "item":
+            await grant_item(session, discord_id, item_id, quantity)
         else:
-            eq_info = json.loads(listing.eq_data)
-            session.add(Equipment(
-                equip_id=eq_info["equip_id"],
-                discord_id=discord_id,
-                name=eq_info["name"],
-                slot=eq_info["slot"],
-                quality=eq_info["quality"],
-                tier=eq_info["tier"],
-                tier_req=eq_info["tier_req"],
-                stats=json.dumps(eq_info["stats"], ensure_ascii=False),
-                flavor=eq_info["flavor"],
-                equipped=False,
-            ))
+            session.add(new_equipment_row(discord_id, json.loads(eq_data)))
 
-        listing.status = "delisted"
         await session.commit()
-        return {"ok": True, "item_name": listing.item_name}
+        return {"ok": True, "item_name": item_name}
 
 
 async def expire_old_listings():

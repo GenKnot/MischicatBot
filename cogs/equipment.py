@@ -3,12 +3,15 @@ from discord.ext import commands
 
 from utils.config import COMMAND_PREFIX
 from utils.equipment_db import get_equipment_list, get_equipped, equip_item, unequip_item, discard_equipment
-from utils.equipment import format_equipment, equip_stat_bonus, get_player_tier, QUALITY_COLOR, STAT_NAMES, SLOTS
-from utils.inventory import get_inventory, remove_item
+from utils.equipment import format_equipment, equip_stat_bonus, get_player_tier, QUALITY_COLOR, STAT_NAMES
+from utils.inventory import get_inventory
 from utils.player import get_player
-from utils.atomic import consume_item
+from utils.atomic import consume_item, grant_stones
 from utils.db_async import AsyncSessionLocal
-from sqlalchemy import text
+
+
+# 这几种丹药是在突破时由突破逻辑自己从背包里取的（面板上的『服用…冲关』），`使用` 命令不处理（B51）
+BREAKTHROUGH_PILLS = ("筑基丹", "凝丹丹", "化婴丹")
 
 
 class EquipmentCog(commands.Cog, name="Equipment"):
@@ -88,13 +91,13 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             return await ctx.send(f"{ctx.author.mention} 用法：`{COMMAND_PREFIX}使用 [道具名]`")
 
         from utils.items import ITEMS
+        from utils.alchemy import QUALITY_NAMES
         from utils.db_async import Player, Inventory
         import time
 
         item_name_clean = item_name.strip()
         item_info = ITEMS.get(item_name_clean)
         if not item_info:
-            from utils.alchemy import QUALITY_NAMES
             for q in QUALITY_NAMES[1:]:
                 if item_name_clean.startswith(q):
                     base_name = item_name_clean[len(q):]
@@ -105,6 +108,15 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         if not item_info:
             return await ctx.send(f"{ctx.author.mention} 未知道具「{item_name_clean}」。")
 
+        if set(item_info.get("effect", {})) == {"breakthrough_bonus"}:
+            # 只有突破加成的丹药：不扣、不记 buff，指路到突破面板。以前这里会扣一颗并回复『已生效』，实际没有任何记录（B51）
+            if item_info.get("name") in BREAKTHROUGH_PILLS:
+                return await ctx.send(
+                    f"{ctx.author.mention} 「{item_name_clean}」在突破时自动取用：请在 `{COMMAND_PREFIX}突破` 面板里点"
+                    f"「服用{item_name_clean}冲关」，不要单独使用。"
+                )
+            return await ctx.send(f"{ctx.author.mention} 「{item_name_clean}」的突破加成暂未接入突破流程，暂时无法使用，丹药不会被扣除。")
+
         async with AsyncSessionLocal() as session:
             player = await session.get(Player, uid)
             if not player or player.is_dead:
@@ -114,13 +126,12 @@ class EquipmentCog(commands.Cog, name="Equipment"):
                 return await ctx.send(f"{ctx.author.mention} 背包中没有「{item_name_clean}」。")
 
             effect = item_info.get("effect", {})
-            stackable = item_info.get("stackable", True)
             now = time.time()
             msg_parts = []
 
             if "cultivation_gain" in effect:
                 gain = effect["cultivation_gain"]
-                from utils.alchemy import QUALITY_NAMES, QUALITY_MULTIPLIERS
+                from utils.alchemy import QUALITY_MULTIPLIERS
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
@@ -133,7 +144,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
 
             if "lifespan" in effect:
                 gain = effect["lifespan"]
-                from utils.alchemy import QUALITY_NAMES, QUALITY_MULTIPLIERS
+                from utils.alchemy import QUALITY_MULTIPLIERS
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
@@ -151,7 +162,7 @@ class EquipmentCog(commands.Cog, name="Equipment"):
 
             if "lifespan_extend" in effect:
                 gain = effect["lifespan_extend"]
-                from utils.alchemy import QUALITY_NAMES, QUALITY_MULTIPLIERS
+                from utils.alchemy import QUALITY_MULTIPLIERS
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
@@ -203,7 +214,6 @@ class EquipmentCog(commands.Cog, name="Equipment"):
                 stat_map = effect["stat_temp"]
                 hours = effect.get("buff_duration_hours", 24)
                 from utils.buffs import apply_buff
-                import time as _t
                 player.active_buffs = apply_buff(
                     player.active_buffs or "{}",
                     "stat_temp",
@@ -355,15 +365,12 @@ class EquipmentCog(commands.Cog, name="Equipment"):
             return await ctx.send(f"{ctx.author.mention} 背包中只有 **{owned}** 个「{item_name}」。")
 
         total = sell_price * quantity
-        ok = await remove_item(uid, item_name, quantity)
-        if not ok:
-            return await ctx.send(f"{ctx.author.mention} 出售失败。")
-
+        # 扣物品与加灵石在同一个事务里：两步之间出错物品不会白没（B53）
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET spirit_stones = spirit_stones + :amt WHERE discord_id = :uid"),
-                {"amt": total, "uid": uid}
-            )
+            if not await consume_item(session, uid, item_name, quantity):
+                await session.rollback()
+                return await ctx.send(f"{ctx.author.mention} 出售失败。")
+            await grant_stones(session, uid, total)
             await session.commit()
 
         await ctx.send(

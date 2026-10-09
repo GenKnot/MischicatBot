@@ -35,7 +35,10 @@ ALCHEMY_EXP_PER_CRAFT = 10
 
 def _load_pills() -> dict:
     with open(os.path.join(_DATA_DIR, "pills.json"), encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    # `_schema_notes` 之类下划线开头的键是给人看的说明，不是丹药；
+    # 以前被当成一件物品并进了 ITEMS（网页物品页搜索会因此 KeyError）（B75）
+    return {k: v for k, v in data.items() if not k.startswith("_")}
 
 
 def _load_recipes() -> list:
@@ -188,19 +191,31 @@ async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
 
 
 async def add_alchemy_exp(discord_id: str, exp: int) -> tuple[int, int, bool]:
+    """原子加炼丹经验，够门槛则升一级。经验用 `exp = exp + n`（并发炼丹不丢更新），
+    升级用 `WHERE alchemy_level = 旧等级` 做 CAS（B48）。"""
     async with AsyncSessionLocal() as session:
-        player = await session.get(Player, discord_id)
-        if not player:
+        res = await session.execute(
+            update(Player).where(Player.discord_id == discord_id)
+            .values(alchemy_exp=Player.alchemy_exp + exp)
+            .returning(Player.alchemy_level, Player.alchemy_exp)
+        )
+        got = res.first()
+        if got is None:
             return 0, 0, False
-        player.alchemy_exp += exp
+        level, total = got
         leveled_up = False
-        if player.alchemy_level < 9:
-            next_threshold = ALCHEMY_EXP_THRESHOLDS[player.alchemy_level + 1] if player.alchemy_level + 1 < len(ALCHEMY_EXP_THRESHOLDS) else 999999
-            if player.alchemy_exp >= next_threshold:
-                player.alchemy_level += 1
-                leveled_up = True
+        if level < 9:
+            nxt = level + 1
+            threshold = ALCHEMY_EXP_THRESHOLDS[nxt] if nxt < len(ALCHEMY_EXP_THRESHOLDS) else 999999
+            if total >= threshold:
+                up = await session.execute(
+                    update(Player).where(Player.discord_id == discord_id, Player.alchemy_level == level)
+                    .values(alchemy_level=nxt)
+                )
+                if up.rowcount == 1:
+                    level, leveled_up = nxt, True
         await session.commit()
-        return player.alchemy_level, player.alchemy_exp, leveled_up
+        return level, total, leveled_up
 
 
 async def attempt_alchemy(

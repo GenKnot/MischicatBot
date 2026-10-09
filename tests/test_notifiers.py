@@ -334,3 +334,97 @@ async def test_通知逻辑自己出错_要报错而不是吞成debug(db, cog, f
 
     errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
     assert errors and UID in errors[0].getMessage()
+
+
+# =============================================================================
+# 循环存活与逐个玩家隔离（B24）
+# =============================================================================
+# discord.ext.tasks 的循环体里抛出非网络类异常，循环会永久停止。B14 之后，闭关 / 采集的结算
+# 全靠这两个循环 —— 一次意外（数据库抖动、某个玩家的脏数据）就让所有人的结算停摆到重启。
+# 还有一层：如果异常只在某个玩家身上稳定出现，循环每分钟都卡在同一行，排在后面的人永远轮不到。
+
+@pytest.mark.parametrize("which", ["cultivation", "gathering"])
+async def test_查询出错_不会让循环永久停止(db, cog, which, caplog, monkeypatch):
+    import logging
+
+    class _BoomSession:
+        def __call__(self):
+            raise RuntimeError("数据库抖了一下")
+    monkeypatch.setattr(cult_cog_mod, "AsyncSessionLocal", _BoomSession())
+    loop = cog._cultivation_notifier if which == "cultivation" else cog._gathering_notifier
+
+    with caplog.at_level(logging.DEBUG, logger="cogs.cultivation"):
+        await loop.coro(cog)                                              # 不能把异常抛出来
+
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+async def test_闭关结算_一个玩家出错_不影响排在他后面的人(db, cog, monkeypatch, caplog):
+    import logging
+    await _add_player(db, "111111", **_finish())                          # 这个人的数据有问题
+    await _add_player(db, "222222", **_finish())
+    real = cult_cog_mod.get_cultivation_bonus
+
+    async def _bad_for_first(uid, *a, **k):
+        if uid == "111111":
+            raise ValueError("脏数据")
+        return await real(uid, *a, **k)
+    monkeypatch.setattr(cult_cog_mod, "get_cultivation_bonus", _bad_for_first)
+
+    with caplog.at_level(logging.DEBUG, logger="cogs.cultivation"):
+        await run_cult(cog)
+
+    assert (await _row(db, "222222")).cultivation == _gain(), "排在后面的人也要被结算"
+    assert (await _row(db, "111111")).cultivation == 0
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR and "111111" in r.getMessage()]
+
+
+async def test_采集结算_一个玩家出错_不影响排在他后面的人(db, cog, fixed_rewards, monkeypatch, caplog):
+    import logging
+    await _add_player(db, "111111", **_gathering())
+    await _add_player(db, "222222", **_gathering())
+    import utils.inventory as inv
+    real_add = inv.add_item
+
+    async def _bad_for_first(uid, item, qty=1):
+        if uid == "111111":
+            raise ValueError("脏数据")
+        return await real_add(uid, item, qty)
+    monkeypatch.setattr(inv, "add_item", _bad_for_first)
+
+    with caplog.at_level(logging.DEBUG, logger="cogs.cultivation"):
+        await run_gather(cog)
+
+    assert await _herbs(db, "222222") == (3, 1)
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR and "111111" in r.getMessage()]
+
+
+@pytest.mark.parametrize("which", ["cultivation", "gathering"])
+async def test_真实循环_出错一次之后仍在运行(db, which, monkeypatch):
+    """用真实的 tasks.Loop 验证，而不是只测我们的包装。"""
+    import asyncio
+
+    class ReadyBot(_FakeBot):
+        async def wait_until_ready(self):
+            return None
+
+    calls = []
+    c = CultivationCog(bot=ReadyBot())
+    loop = c._cultivation_notifier if which == "cultivation" else c._gathering_notifier
+    real_time = cult_cog_mod.time.time
+
+    class _T:
+        @staticmethod
+        def time():
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("出错一次")
+            return real_time()
+    monkeypatch.setattr(cult_cog_mod, "time", _T)
+    loop.change_interval(seconds=0.05)
+    loop.start()
+    try:
+        await asyncio.sleep(0.4)
+        assert len(calls) >= 2 and loop.is_running() and not loop.failed()
+    finally:
+        loop.cancel()

@@ -1,5 +1,4 @@
 import base64
-import binascii
 import json
 import logging
 import os
@@ -15,11 +14,10 @@ except ImportError:
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
-                               PlainTextResponse, RedirectResponse, Response)
+                               PlainTextResponse, Response)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from utils.config import DB_PATH
 from utils.db import get_conn
 from utils.items import ITEMS
 from utils.sects import (
@@ -77,14 +75,16 @@ def _basic_auth_ok(header: str | None) -> bool:
         return False
     try:
         decoded = base64.b64decode(header.split(" ", 1)[1], validate=True).decode("utf-8")
-    except (binascii.Error, UnicodeDecodeError, IndexError):
+    except (ValueError, UnicodeDecodeError, IndexError):
+        # binascii.Error 是 ValueError 的子类；头里带非 ASCII 字符时 b64decode 抛的是 ValueError（B73）
         return False
     user, sep, password = decoded.partition(":")
     if not sep:
         return False
     # 两个比较都要跑完，不能短路，否则用户名是否正确会从耗时上泄露
-    user_ok = secrets.compare_digest(user, WEB_USER)
-    pass_ok = secrets.compare_digest(password, WEB_PASS)
+    # compare_digest 对非 ASCII 的 str 直接抛 TypeError：按 UTF-8 字节比（B73）
+    user_ok = secrets.compare_digest(user.encode("utf-8"), WEB_USER.encode("utf-8"))
+    pass_ok = secrets.compare_digest(password.encode("utf-8"), WEB_PASS.encode("utf-8"))
     return user_ok and pass_ok
 
 
@@ -463,7 +463,6 @@ def items_page(
     for item in all_items:
         t = TYPE_LABEL.get(item.get("type", ""), item.get("type", "其他"))
         by_type.setdefault(t, []).append(item)
-    types = list(TYPE_LABEL.values())
     rarities = ["普通", "稀有", "珍贵", "绝世"]
     return templates.TemplateResponse(
         request=request,
@@ -623,6 +622,12 @@ def equipment_preview(
     }
 
     count = max(1, min(count, 10))
+    # 不认识的部位 / 品质当作「随机」，tier 夹到合法范围：以前原样交给 generate_equipment，非法值直接 500（B74）
+    if slot not in SLOTS:
+        slot = ""
+    if quality not in QUALITY_ORDER:
+        quality = ""
+    tier = max(0, min(tier, len(TIER_NAMES) - 1))
     results = []
     rolled = (
         "count" in request.query_params

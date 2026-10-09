@@ -27,20 +27,26 @@ async def _get_explore_limit(player) -> int:
     return EXPLORE_LIMIT + bonus
 
 
+# 事件奖励里 `_apply_rewards` 认识的键。事件数据里出现别的键会被静默忽略（B71），
+# tests/test_events_pool.py 会拿这两个常量去校验全部事件。
+REWARD_STAT_COLUMNS = {
+    "spirit_stones": "spirit_stones",
+    "lifespan": "lifespan",
+    "cultivation": "cultivation",
+    "comprehension": "comprehension",
+    "physique": "physique",
+    "fortune": "fortune",
+    "bone": "bone",
+    "soul": "soul",
+    "reputation": "reputation",
+}
+SPECIAL_REWARD_KEYS = {"discover_sect", "equipment"}
+
+
 async def _apply_rewards(discord_id: str, rewards: dict):
     if not rewards:
         return
-    stat_map = {
-        "spirit_stones": "spirit_stones",
-        "lifespan": "lifespan",
-        "cultivation": "cultivation",
-        "comprehension": "comprehension",
-        "physique": "physique",
-        "fortune": "fortune",
-        "bone": "bone",
-        "soul": "soul",
-        "reputation": "reputation",
-    }
+    stat_map = REWARD_STAT_COLUMNS
     # 遍历快照：装备分支会往 rewards 里加 "_generated_equipment"，
     # 直接遍历原字典会在下一轮抛 "dictionary changed size during iteration"。
     for key, val in list(rewards.items()):

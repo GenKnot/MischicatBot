@@ -1,7 +1,7 @@
 import logging
 import discord
 from utils.party import (
-    get_party, get_party_members, create_party, add_to_party,
+    get_party, get_party_members, accept_invite,
     remove_from_party, disband_party,
 )
 from utils.player import get_player
@@ -55,8 +55,14 @@ class PartyInviteButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         uid = str(interaction.user.id)
         target_uid = self.target["discord_id"]
+        if uid == target_uid:
+            return await interaction.response.send_message("不能邀请自己。", ephemeral=True)
         inv = await get_player(uid)
         tgt = await get_player(target_uid)
+        if not inv or not tgt:
+            return await interaction.response.send_message("对方数据不存在。", ephemeral=True)
+        if tgt["is_dead"]:
+            return await interaction.response.send_message("对方已坐化。", ephemeral=True)
         if inv["current_city"] != tgt["current_city"]:
             return await interaction.response.send_message("对方已离开此地。", ephemeral=True)
         if inv.get("party_id"):
@@ -86,23 +92,22 @@ class PartyInviteResponseView(TimedView):
         self.target = target
         self.inviter_user = inviter_user
 
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # public = True 时基类不校验归属：邀请是私信发给被邀请者的，这里再核对一次点击者（B68）
+        if interaction.message is not None:
+            self.message = interaction.message
+        if str(interaction.user.id) != str(self.target["discord_id"]):
+            await interaction.response.send_message("这不是你的邀请。", ephemeral=True)
+            return False
+        return True
+
     @discord.ui.button(label="接受", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = str(interaction.user.id)
-        inv_uid = self.inviter["discord_id"]
-        inv = await get_player(inv_uid)
-        tgt = await get_player(uid)
-        if inv["current_city"] != tgt["current_city"]:
-            return await interaction.response.send_message("邀请者已离开原城市，组队失败。")
-        if inv.get("party_id"):
-            party_id = inv["party_id"]
-            members = await get_party_members(party_id)
-            if len(members) >= 4:
-                return await interaction.response.send_message("队伍已满，无法加入。")
-            await add_to_party(party_id, uid)
-        else:
-            party_id = await create_party(inv_uid, inv["current_city"])
-            await add_to_party(party_id, uid)
+        result = await accept_invite(self.inviter["discord_id"], uid)
+        if not result["ok"]:
+            return await interaction.response.send_message(result["reason"])
+        party_id = result["party_id"]
         party = await get_party(party_id)
         members = await get_party_members(party_id)
         self.stop()
