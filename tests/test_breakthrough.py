@@ -56,27 +56,27 @@ def _force_random(monkeypatch, value: float):
 
 
 async def _player_dict(db):
-    can, d = await bt.can_breakthrough(UID)
+    can, d = await bt.load_breakthrough_state(UID)
     return d
 
 
-# --- can_breakthrough ---------------------------------------------------------
+# --- load_breakthrough_state ---------------------------------------------------------
 
 async def test_修为圆满才能突破(db):
     await _add_player(db, realm="炼气期1层", cultivation=cultivation_needed("炼气期1层"))
-    can, d = await bt.can_breakthrough(UID)
+    can, d = await bt.load_breakthrough_state(UID)
     assert can is True
     assert d["realm"] == "炼气期1层"
 
 
 async def test_修为差一点不能突破(db):
     await _add_player(db, realm="炼气期1层", cultivation=cultivation_needed("炼气期1层") - 1)
-    can, _ = await bt.can_breakthrough(UID)
+    can, _ = await bt.load_breakthrough_state(UID)
     assert can is False
 
 
 async def test_角色不存在_不能突破(db):
-    assert await bt.can_breakthrough("nobody") == (False, None)
+    assert await bt.load_breakthrough_state("nobody") == (False, None)
 
 
 # --- do_single_breakthrough：成功 ---------------------------------------------
@@ -644,3 +644,13 @@ def test_apply_failure_不再把未知类型当成走火入魔():
         apply_failure(100, 100, None)
     with pytest.raises(ValueError):
         apply_failure(100, 100, "nope")
+
+
+def test_两个突破判断函数不再同名():
+    """`utils.player.can_breakthrough(dict) -> bool`（纯判断）与按 id 读库的 `load_breakthrough_state` 各叫各的名字。"""
+    import inspect
+    from utils import player as player_mod
+    assert not hasattr(bt, "can_breakthrough")
+    assert list(inspect.signature(player_mod.can_breakthrough).parameters) == ["player"]
+    assert list(inspect.signature(bt.load_breakthrough_state).parameters) == ["discord_id"]
+    assert player_mod.can_breakthrough({"cultivation": 10**9, "realm": "炼气期1层"}) is True

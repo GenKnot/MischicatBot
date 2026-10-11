@@ -108,14 +108,12 @@ class EquipmentCog(commands.Cog, name="Equipment"):
         if not item_info:
             return await ctx.send(f"{ctx.author.mention} 未知道具「{item_name_clean}」。")
 
-        if set(item_info.get("effect", {})) == {"breakthrough_bonus"}:
-            # 只有突破加成的丹药：不扣、不记 buff，指路到突破面板。以前这里会扣一颗并回复『已生效』，实际没有任何记录（B51）
-            if item_info.get("name") in BREAKTHROUGH_PILLS:
-                return await ctx.send(
-                    f"{ctx.author.mention} 「{item_name_clean}」在突破时自动取用：请在 `{COMMAND_PREFIX}突破` 面板里点"
-                    f"「服用{item_name_clean}冲关」，不要单独使用。"
-                )
-            return await ctx.send(f"{ctx.author.mention} 「{item_name_clean}」的突破加成暂未接入突破流程，暂时无法使用，丹药不会被扣除。")
+        if item_info.get("name") in BREAKTHROUGH_PILLS and set(item_info.get("effect", {})) == {"breakthrough_bonus"}:
+            # 只有突破加成的**大关丹**：不扣、不记 buff，指路到突破面板。以前这里会扣一颗并回复『已生效』，实际没有任何记录（B51）
+            return await ctx.send(
+                f"{ctx.author.mention} 「{item_name_clean}」在突破时自动取用：请在 `{COMMAND_PREFIX}突破` 面板里点"
+                f"「服用{item_name_clean}冲关」，不要单独使用。"
+            )
 
         async with AsyncSessionLocal() as session:
             player = await session.get(Player, uid)
@@ -192,9 +190,16 @@ class EquipmentCog(commands.Cog, name="Equipment"):
                 msg_parts.append(f"修炼速度 **+{bonus_pct}%**，持续 2 游戏年（现实 4 小时）")
 
             if "breakthrough_bonus" in effect:
+                # 破障丹：一次性 buff，下一次任意境界的突破生效，成败都消耗（B52）；大关丹在上面已被拒绝，走不到这里
                 bonus = effect["breakthrough_bonus"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "breakthrough_bonus_once",
+                    bonus,
+                )
                 msg_parts.append(
-                    f"下次突破成功率 **+{bonus}%**\n（提示：请立即使用 `{COMMAND_PREFIX}突破` 以享受加成）"
+                    f"下次突破成功率 **+{bonus}%**（任意境界，成败都会消耗）\n（提示：请立即使用 `{COMMAND_PREFIX}突破` 以享受加成）"
                 )
 
             if "stat_permanent" in effect:
@@ -276,6 +281,17 @@ class EquipmentCog(commands.Cog, name="Equipment"):
                     expires_at=now + hours * 3600,
                 )
                 msg_parts.append(f"采集冷却缩短 **{bonus}%**，持续 {hours} 小时")
+
+            if "gather_cooldown_reduction_once" in effect:
+                # 一次性：下次采集缩短，用一次就消耗；和速灵丹的限时 `gather_cooldown_reduction` 是两个键（B56）
+                bonus = effect["gather_cooldown_reduction_once"]
+                from utils.buffs import apply_buff
+                player.active_buffs = apply_buff(
+                    player.active_buffs or "{}",
+                    "gather_cooldown_reduction_once",
+                    bonus,
+                )
+                msg_parts.append(f"下次采集时间缩短 **{bonus}%**")
 
             if "combat_lifespan_restore" in effect:
                 restore = effect["combat_lifespan_restore"]

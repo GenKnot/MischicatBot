@@ -1,6 +1,8 @@
 import uuid
 import time
 from sqlalchemy import exists, func, select, update
+from utils.bot_social import bot_gate
+from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, Party, Player
 
 
@@ -42,6 +44,9 @@ async def add_to_party(party_id: str, uid: str) -> bool:
 
     以前是『先数人数、再无条件写 party_id』：并发时能超过 4 人；玩家已在别的队伍时会被悄悄带走（B67）。
     """
+    leader = await get_party(party_id)
+    if leader is None or await bot_gate("party", leader["leader_id"], uid):
+        return False
     async with AsyncSessionLocal() as session:
         members = select(func.count()).select_from(Player).where(Player.party_id == party_id).scalar_subquery()
         res = await session.execute(
@@ -63,6 +68,10 @@ async def accept_invite(inviter_id: str, target_id: str) -> dict:
     """
     if inviter_id == target_id:
         return {"ok": False, "reason": "不能邀请自己。"}
+    if is_bot_id(inviter_id):
+        return {"ok": False, "reason": "机器人修士不会主动邀请组队。"}
+    if (refused := await bot_gate("party", inviter_id, target_id)):
+        return {"ok": False, "reason": refused, "bot_refused": True}
     async with AsyncSessionLocal() as session:
         await session.execute(
             update(Player).where(Player.discord_id.in_([inviter_id, target_id])).values(party_id=Player.party_id)

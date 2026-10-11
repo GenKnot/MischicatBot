@@ -2,9 +2,11 @@
 
 B62 —— `_attack_callback` 没有任何占位：同时点两下『发起攻击』会各打一场，各自生成一个胜者面板，
   于是可以打劫两次 / 又打劫又击杀。入口改用 `try_hold`，被拒绝时放回，打完 `finish()`。
-B63 —— 攻击者败北、而防守方没能逃脱时，发出去的是 `VictoryActionView(author=攻击者, winner=防守方, loser=攻击者)`：
+B63 —— （已按你的决定把「谁掷逃跑」改为攻击者，见 B63b）攻击者败北、而防守方没能逃脱时，发出去的是 `VictoryActionView(author=攻击者, winner=防守方, loser=攻击者)`：
   面板的主人是输家自己，『打劫灵石 / 击杀』对的是他自己 —— 他能把自己的灵石转给对方、或者杀死自己，
   而真正的胜者（防守方）根本不在场点不了。败北的一方不该拿到处置权，这里只发战报；败者的『战斗回血』照旧。
+B63b —— 败北的是攻击者，该掷逃跑的也是攻击者（要逃离防守方），而不是赢了的防守方：
+  以前掷的是防守方的逃跑率，文案还写「防守方趁乱逃脱」，说不通。现在攻击者掷自己的逃跑率，消耗的也是攻击者的逃跑 buff。
 B64 —— 攻击回调不再核对『此刻是否在可交战区域』『不是自己』：按钮在打开面板时就定了可不可点，
   两人一起走到安全区再点旧面板照样开打；目标是自己也能打。
 B65 —— 胜者面板的『废去修为 / 击杀』不校验对方还活着：对已坐化的人也提示『你取了他的性命』。
@@ -67,11 +69,17 @@ def buttons(view):
     return {getattr(c, "label", None): c for c in view.children}
 
 
+ESCAPE_CALLS = []
+
+
 def fix_fight(monkeypatch, won, escaped=False):
+    ESCAPE_CALLS.clear()
+
     async def rc(atk, dfn):
         return won, 100.0, 50.0
 
-    async def re(dfn):
+    async def re(who):
+        ESCAPE_CALLS.append(who["discord_id"])                # 记下是谁在掷逃跑
         return escaped, 30.0
     monkeypatch.setattr(combat_mod, "roll_combat", rc)
     monkeypatch.setattr(combat_mod, "roll_escape", re)
@@ -125,30 +133,42 @@ async def test_攻击_胜利给出胜者面板_战力写在战报里(db, monkeyp
     assert v.is_finished() and all(c.disabled for c in v.children)
 
 
-async def test_攻击_败北且防守方逃脱_只有战报(db, monkeypatch):
+async def test_B63b_攻击者败北_由攻击者掷逃跑_逃脱(db, monkeypatch):
     await _add(db, ATK)
     await _add(db, DEF)
     fix_fight(monkeypatch, False, escaped=True)
     i = await attack(await make_view(db))
-    assert "败北" in i.last.embed.description and "趁乱逃脱" in i.last.embed.description and i.last.view is None
+    desc = i.last.embed.description
+    assert ESCAPE_CALLS == [ATK] and "道友1001** 败北" in desc and "趁乱逃脱" in desc and i.last.view is None
+    assert "道友1002** 趁乱逃脱" not in desc                             # 逃脱的是攻击者，不是防守方
 
 
-async def test_B63_攻击者败北且对方没逃脱_攻击者拿不到处置权(db, monkeypatch):
+async def test_B63_攻击者败北且没逃脱_攻击者拿不到处置权(db, monkeypatch):
     await _add(db, ATK, stones=1000)
     await _add(db, DEF, stones=1000)
     fix_fight(monkeypatch, False, escaped=False)
     i = await attack(await make_view(db))
-    assert "未能逃脱" in i.last.embed.description and i.last.embed.color == discord.Color.dark_red()
-    assert i.last.view is None                                          # 输家不能对自己『打劫 / 击杀』
+    desc = i.last.embed.description
+    assert ESCAPE_CALLS == [ATK] and "未能逃脱" in desc and "被 **道友1002** 擒获" in desc
+    assert i.last.embed.color == discord.Color.dark_red() and i.last.view is None          # 输家不能对自己『打劫 / 击杀』
     assert (await row(db, ATK)).spirit_stones == 1000 and not (await row(db, ATK)).is_dead
 
 
-async def test_B63_败北的一方照旧触发战斗回血(db, monkeypatch):
+async def test_B63b_胜利时不掷逃跑(db, monkeypatch):
+    await _add(db, ATK)
+    await _add(db, DEF)
+    fix_fight(monkeypatch, True)
+    await attack(await make_view(db))
+    assert ESCAPE_CALLS == []
+
+
+@pytest.mark.parametrize("escaped", [False, True])
+async def test_B63_败北的一方照旧触发战斗回血_无论逃没逃掉(db, monkeypatch, escaped):
     from utils.buffs import apply_buff
     buffs = apply_buff("{}", "combat_lifespan_restore", 10)
     await _add(db, ATK, lifespan=10, active_buffs=buffs)                # 10/100 = 10% ≤ 20%
     await _add(db, DEF)
-    fix_fight(monkeypatch, False, escaped=False)
+    fix_fight(monkeypatch, False, escaped=escaped)
     await attack(await make_view(db))
     await asyncio.sleep(0.1)
     p = await row(db, ATK)
@@ -174,13 +194,23 @@ async def test_攻击_战斗加成消耗一次(db, monkeypatch):
     assert json.loads((await row(db, ATK)).active_buffs)["combat_power_bonus"]["charges"] == 1
 
 
-async def test_攻击_逃脱成功消耗逃跑buff(db, monkeypatch):
+async def test_攻击者逃脱成功_消耗的是攻击者的逃跑buff(db, monkeypatch):
     from utils.buffs import apply_buff
-    await _add(db, ATK)
+    await _add(db, ATK, active_buffs=apply_buff("{}", "escape_bonus_once", 50))
     await _add(db, DEF, active_buffs=apply_buff("{}", "escape_bonus_once", 50))
     fix_fight(monkeypatch, False, escaped=True)
     await attack(await make_view(db))
-    assert "escape_bonus_once" not in json.loads((await row(db, DEF)).active_buffs or "{}")
+    assert "escape_bonus_once" not in json.loads((await row(db, ATK)).active_buffs or "{}")
+    assert "escape_bonus_once" in json.loads((await row(db, DEF)).active_buffs or "{}")           # 防守方的不动
+
+
+async def test_攻击者没逃脱_不消耗逃跑buff(db, monkeypatch):
+    from utils.buffs import apply_buff
+    await _add(db, ATK, active_buffs=apply_buff("{}", "escape_bonus_once", 50))
+    await _add(db, DEF)
+    fix_fight(monkeypatch, False, escaped=False)
+    await attack(await make_view(db))
+    assert "escape_bonus_once" in json.loads((await row(db, ATK)).active_buffs or "{}")
 
 
 async def test_攻击_对方已坐化_或已离开(db, monkeypatch):
@@ -489,3 +519,13 @@ async def test_攻击_防守方的战斗加成也消耗一次(db, monkeypatch):
     fix_fight(monkeypatch, True)
     await attack(await make_view(db))
     assert json.loads((await row(db, DEF)).active_buffs)["combat_power_bonus"]["charges"] == 1
+
+
+async def test_双修_邀请好感不够的机器人被拒(db):
+    """U1：好感不够的机器人不肯双修。"""
+    await _add(db, ATK, techniques=json.dumps(["双修功法"]))
+    await _add(db, "bot_00001")
+    v = await make_view(db, target="bot_00001")
+    i = dual_inter()
+    await invite(v, i)
+    assert "双修" in i.last and i.last.view is None

@@ -3,6 +3,7 @@ import time
 
 import discord
 
+from utils import rumors
 from utils.combat import calc_power
 from utils.character import years_to_seconds
 from utils.equipment import generate_equipment
@@ -20,6 +21,14 @@ BEAST_TIDE_CHANCE = 0.30
 BEAST_TIDE_DURATION_MINS = 30
 
 
+BOT_MARK = "🤖"
+
+
+def _nm(p: dict) -> str:
+    """名单里的名字：机器人前面带 🤖（和排行榜一致）。"""
+    return f"{BOT_MARK} **{p['name']}**" if p.get("is_bot") else f"**{p['name']}**"
+
+
 def _pick_city() -> str:
     from utils.world import CITIES
     return random.choice(CITIES)["name"]
@@ -29,7 +38,7 @@ async def _get_participants(event_id: str) -> list[dict]:
     async with AsyncSessionLocal() as session:
         result = await session.execute(text("""
             SELECT ep.discord_id, ep.contribution, ep.joined_at, ep.activity,
-                   p.name, p.realm, p.current_city, p.party_id,
+                   p.name, p.realm, p.current_city, p.party_id, p.is_bot,
                    p.cultivating_until, p.gathering_until, p.active_quest
             FROM public_event_participants ep
             JOIN players p ON ep.discord_id = p.discord_id
@@ -44,7 +53,7 @@ async def _get_defense_participants(event_id: str) -> list[dict]:
     async with AsyncSessionLocal() as session:
         result = await session.execute(text("""
             SELECT ep.discord_id, ep.contribution, ep.joined_at, ep.activity,
-                   p.name, p.realm, p.current_city, p.party_id,
+                   p.name, p.realm, p.current_city, p.party_id, p.is_bot,
                    p.cultivating_until, p.gathering_until, p.active_quest
             FROM public_event_participants ep
             JOIN players p ON ep.discord_id = p.discord_id
@@ -61,7 +70,7 @@ async def _get_idle_in_city(city: str, participant_ids: set) -> list[dict]:
         result = await session.execute(text("""
             SELECT discord_id, name, realm
             FROM players
-            WHERE current_city = :city AND is_dead = 0
+            WHERE current_city = :city AND is_dead = 0 AND is_bot = 0
               AND (cultivating_until IS NULL OR cultivating_until <= :now)
               AND (gathering_until IS NULL OR gathering_until <= :now)
               AND active_quest IS NULL
@@ -150,7 +159,7 @@ async def _settle_spirit_rain_only(channel, city: str, participants: list[dict])
                 {"s": stones, "r": rep, "uid": p["discord_id"]}
             )
             await session.commit()
-        defense_lines.append(f"· **{p['name']}** — 灵石 +{stones}，声望 +{rep}")
+        defense_lines.append(f"· {_nm(p)} — 灵石 +{stones}，声望 +{rep}")
 
     embed = discord.Embed(
         title="✦ 天降灵雨 · 结束 ✦",
@@ -158,7 +167,7 @@ async def _settle_spirit_rain_only(channel, city: str, participants: list[dict])
         color=discord.Color.greyple(),
     )
     if in_city:
-        lines = [f"· **{p['name']}**" for p in in_city[:15] if p["discord_id"] not in defender_ids]
+        lines = [f"· {_nm(p)}" for p in in_city[:15] if p["discord_id"] not in defender_ids]
         if lines:
             embed.add_field(name="参与修士", value="\n".join(lines), inline=False)
     if defense_lines:
@@ -166,7 +175,7 @@ async def _settle_spirit_rain_only(channel, city: str, participants: list[dict])
     if fled:
         embed.add_field(
             name="⚠️ 临阵脱逃",
-            value="、".join(f"**{p['name']}**" for p in fled[:5]) + "　领取奖励后已离城",
+            value="、".join(_nm(p) for p in fled[:5]) + "　领取奖励后已离城",
             inline=False
         )
     if channel:
@@ -178,6 +187,9 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
     from utils.equipment_db import give_equipment
 
     defenders = [p for p in participants if p.get("activity") == "defense" and p["current_city"] == city]
+    from utils import bot_economy
+    if not bot_economy.load_config()["public_events"]["bots_compete_for_defense_rewards"]:
+        defenders = [p for p in defenders if not p.get("is_bot")]       # 应急开关：机器人守城但不参与排名领奖
     idle_players = await _get_idle_in_city(city, participant_ids)
 
     medal = ["🥇", "🥈", "🥉"]
@@ -198,7 +210,8 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
                     {"s": stones, "r": rep, "uid": uid}
                 )
                 await session.commit()
-            result_lines.append(f"{medal[0]} **{p['name']}**（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 2件稀有装备")
+            await rumors.record_player_rumor("beast_tide_hero", uid, city=city)
+            result_lines.append(f"{medal[0]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 2件稀有装备")
         elif i in (1, 2):
             stones = random.randint(1500, 2500)
             rep = 30
@@ -210,7 +223,7 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
                     {"s": stones, "r": rep, "uid": uid}
                 )
                 await session.commit()
-            result_lines.append(f"{medal[i]} **{p['name']}**（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 1件稀有装备")
+            result_lines.append(f"{medal[i]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 1件稀有装备")
         else:
             stones = random.randint(300, 800)
             rep = 10
@@ -221,7 +234,7 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
                 )
                 await session.commit()
             if i < 8:
-                result_lines.append(f"· **{p['name']}**（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}")
+                result_lines.append(f"· {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}")
 
     if len(defenders) > 8:
         result_lines.append(f"…共 {len(defenders)} 名修士坚守城池")
@@ -233,7 +246,7 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
             seen_fled.add(p["discord_id"])
             fled.append(p)
     if fled:
-        result_lines.append(f"\n⚠️ 以下修士领取灵雨奖励后临阵脱逃：" + "、".join(f"**{p['name']}**" for p in fled[:5]))
+        result_lines.append(f"\n⚠️ 以下修士领取灵雨奖励后临阵脱逃：" + "、".join(_nm(p) for p in fled[:5]))
 
     embed_battle = discord.Embed(
         title="⚔️ 万兽齐鸣 · 守城结算",
@@ -349,6 +362,96 @@ class SpiritRainView(discord.ui.View):
         await _send_main_menu(interaction, cog)
 
 
+async def grant_activity(uid: str, activity: str, player: dict, event_id: str) -> tuple[str, int]:
+    """发放一次灵雨活动的奖励（真人点按钮和机器人参与共用这一份），返回 (给玩家看的文字, 这次得到的灵石)。
+    参与记录（public_event_participants）由调用方先写好；这里只管奖励本身。"""
+    stones_gained = 0
+    msg = ""
+
+    if activity == "crystal":
+        stones = random.randint(150, 400)
+        items_gained = []
+        from utils.items import ITEMS
+        from utils.inventory import add_item
+        if random.random() < 0.65:
+            rarity_weights = {"普通": 70, "稀有": 25, "珍贵": 4, "绝世": 1}
+            herb_pool = [(k, v) for k, v in ITEMS.items() if v.get("type") == "herb"]
+            weights = [rarity_weights.get(v.get("rarity", "普通"), 70) for k, v in herb_pool]
+            count = random.randint(1, 2)
+            picked = random.choices([k for k, v in herb_pool], weights=weights, k=count)
+            picked = list(dict.fromkeys(picked))
+            for item in picked:
+                qty = 1 if ITEMS[item].get("rarity") in ("珍贵", "绝世") else random.randint(1, 2)
+                await add_item(uid, item, qty)
+                items_gained.append(f"{item}×{qty}")
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                text("UPDATE players SET spirit_stones = spirit_stones + :s WHERE discord_id = :uid"),
+                {"s": stones, "uid": uid}
+            )
+            await session.commit()
+        items_str = "、".join(items_gained) if items_gained else "无"
+        stones_gained = stones
+        msg = f"你收集了落地灵晶，获得 **{stones} 灵石**，材料：{items_str}"
+
+    elif activity == "enlighten":
+        stat = random.choice(["comprehension", "soul", "fortune"])
+        stat_names = {"comprehension": "悟性", "soul": "神识", "fortune": "机缘"}
+        gain = 1 if random.random() < 0.15 else 0
+        cult_gain = random.randint(80, 200)
+        async with AsyncSessionLocal() as session:
+            if gain:
+                await session.execute(
+                    text(f"UPDATE players SET {stat} = {stat} + 1, cultivation = cultivation + :cg WHERE discord_id = :uid"),
+                    {"cg": cult_gain, "uid": uid}
+                )
+            else:
+                await session.execute(
+                    text("UPDATE players SET cultivation = cultivation + :cg WHERE discord_id = :uid"),
+                    {"cg": cult_gain, "uid": uid}
+                )
+            await session.commit()
+        if gain:
+            msg = f"灵雨中你心有所悟，**{stat_names[stat]} +1**，修为 +{cult_gain}"
+        else:
+            msg = f"你在灵雨中打坐，修为 +{cult_gain}"
+
+    elif activity == "temper":
+        physique_gain = 1 if random.random() < 0.12 else 0
+        bone_gain = 1 if random.random() < 0.08 else 0
+        cult_gain = random.randint(100, 250)
+        updates = [f"cultivation = cultivation + {cult_gain}"]
+        if physique_gain:
+            updates.append("physique = physique + 1")
+        if bone_gain:
+            updates.append("bone = bone + 1")
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                text(f"UPDATE players SET {', '.join(updates)} WHERE discord_id = :uid"),
+                {"uid": uid}
+            )
+            await session.commit()
+        parts = [f"修为 +{cult_gain}"]
+        if physique_gain:
+            parts.append("体魄 +1")
+        if bone_gain:
+            parts.append("根骨 +1")
+        msg = "灵雨淬体，" + "，".join(parts)
+
+    elif activity == "defense":
+        from utils.bot_combat import power_multiplier        # 机器人有按档位的战力加成，真人是 1
+        power = int(await calc_power(player) * (await power_multiplier(player)) * random.uniform(0.9, 1.1))
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                text("UPDATE public_event_participants SET contribution = :p WHERE event_id = :eid AND discord_id = :uid AND activity = 'defense'"),
+                {"p": power, "eid": event_id, "uid": uid}
+            )
+            await session.commit()
+        msg = f"你加入守城队伍！战力贡献：**{power}**"
+
+    return msg, stones_gained
+
+
 async def _handle_activity(interaction: discord.Interaction, event_id: str, city: str, activity: str):
     await interaction.response.defer(ephemeral=True)
     uid = str(interaction.user.id)
@@ -420,87 +523,7 @@ async def _handle_activity(interaction: discord.Interaction, event_id: str, city
     except Exception:
         return await interaction.followup.send("操作失败，请稍后再试。", ephemeral=True)
 
-    msg = ""
-
-    if activity == "crystal":
-        stones = random.randint(150, 400)
-        items_gained = []
-        from utils.items import ITEMS
-        from utils.inventory import add_item
-        if random.random() < 0.65:
-            rarity_weights = {"普通": 70, "稀有": 25, "珍贵": 4, "绝世": 1}
-            herb_pool = [(k, v) for k, v in ITEMS.items() if v.get("type") == "herb"]
-            weights = [rarity_weights.get(v.get("rarity", "普通"), 70) for k, v in herb_pool]
-            count = random.randint(1, 2)
-            picked = random.choices([k for k, v in herb_pool], weights=weights, k=count)
-            picked = list(dict.fromkeys(picked))
-            for item in picked:
-                qty = 1 if ITEMS[item].get("rarity") in ("珍贵", "绝世") else random.randint(1, 2)
-                await add_item(uid, item, qty)
-                items_gained.append(f"{item}×{qty}")
-        async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE players SET spirit_stones = spirit_stones + :s WHERE discord_id = :uid"),
-                {"s": stones, "uid": uid}
-            )
-            await session.commit()
-        items_str = "、".join(items_gained) if items_gained else "无"
-        msg = f"你收集了落地灵晶，获得 **{stones} 灵石**，材料：{items_str}"
-
-    elif activity == "enlighten":
-        stat = random.choice(["comprehension", "soul", "fortune"])
-        stat_names = {"comprehension": "悟性", "soul": "神识", "fortune": "机缘"}
-        gain = 1 if random.random() < 0.15 else 0
-        cult_gain = random.randint(80, 200)
-        async with AsyncSessionLocal() as session:
-            if gain:
-                await session.execute(
-                    text(f"UPDATE players SET {stat} = {stat} + 1, cultivation = cultivation + :cg WHERE discord_id = :uid"),
-                    {"cg": cult_gain, "uid": uid}
-                )
-            else:
-                await session.execute(
-                    text("UPDATE players SET cultivation = cultivation + :cg WHERE discord_id = :uid"),
-                    {"cg": cult_gain, "uid": uid}
-                )
-            await session.commit()
-        if gain:
-            msg = f"灵雨中你心有所悟，**{stat_names[stat]} +1**，修为 +{cult_gain}"
-        else:
-            msg = f"你在灵雨中打坐，修为 +{cult_gain}"
-
-    elif activity == "temper":
-        physique_gain = 1 if random.random() < 0.12 else 0
-        bone_gain = 1 if random.random() < 0.08 else 0
-        cult_gain = random.randint(100, 250)
-        updates = [f"cultivation = cultivation + {cult_gain}"]
-        if physique_gain:
-            updates.append("physique = physique + 1")
-        if bone_gain:
-            updates.append("bone = bone + 1")
-        async with AsyncSessionLocal() as session:
-            await session.execute(
-                text(f"UPDATE players SET {', '.join(updates)} WHERE discord_id = :uid"),
-                {"uid": uid}
-            )
-            await session.commit()
-        parts = [f"修为 +{cult_gain}"]
-        if physique_gain:
-            parts.append("体魄 +1")
-        if bone_gain:
-            parts.append("根骨 +1")
-        msg = "灵雨淬体，" + "，".join(parts)
-
-    elif activity == "defense":
-        power = int(await calc_power(player) * random.uniform(0.9, 1.1))
-        async with AsyncSessionLocal() as session:
-            await session.execute(
-                text("UPDATE public_event_participants SET contribution = :p WHERE event_id = :eid AND discord_id = :uid AND activity = 'defense'"),
-                {"p": power, "eid": event_id, "uid": uid}
-            )
-            await session.commit()
-        msg = f"你加入守城队伍！战力贡献：**{power}**"
-
+    msg, _ = await grant_activity(uid, activity, player, event_id)
     await interaction.followup.send(msg, ephemeral=True)
 
 

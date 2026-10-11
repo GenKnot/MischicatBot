@@ -1,12 +1,26 @@
 import discord
 from sqlalchemy import text
+from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal
 from utils.realms import get_realm_index
 from utils.world import SPECIAL_REGIONS
 from utils.views.base import TimedView
 
 
-def _city_players_embed(city_players: list, viewer: dict) -> discord.Embed:
+PAGE_SIZE = 10
+BOT_MARK = "🤖"
+
+
+def _ordered(city_players: list) -> list:
+    """真人排在前面（机器人多了也不会把真人挤到后面去），各自保持原有顺序。"""
+    return sorted(city_players, key=lambda p: is_bot_id(p["discord_id"]))
+
+
+def _page_count(city_players: list) -> int:
+    return max(1, -(-len(city_players) // PAGE_SIZE))
+
+
+def _city_players_embed(city_players: list, viewer: dict, page: int = 0) -> discord.Embed:
     viewer_realm_idx = get_realm_index(viewer["realm"]) if viewer else 0
     viewer_cultivation = viewer["cultivation"] if viewer else 0
     embed = discord.Embed(title="✦ 同城修士 ✦", color=discord.Color.teal())
@@ -14,28 +28,51 @@ def _city_players_embed(city_players: list, viewer: dict) -> discord.Embed:
         embed.description = "此地暂无其他修士。"
         return embed
     lines = []
-    for p in city_players:
+    for p in _ordered(city_players)[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]:
         p_realm_idx = get_realm_index(p["realm"])
         stronger = p_realm_idx > viewer_realm_idx or (
             p_realm_idx == viewer_realm_idx and p["cultivation"] > viewer_cultivation
         )
+        mark = f"{BOT_MARK} " if is_bot_id(p["discord_id"]) else ""
         if stronger:
-            lines.append(f"**{p['name']}** · ???　修为：???")
+            lines.append(f"{mark}**{p['name']}** · ???　修为：???")
         else:
-            lines.append(f"**{p['name']}** · {p['realm']}　修为：{p['cultivation']}")
+            lines.append(f"{mark}**{p['name']}** · {p['realm']}　修为：{p['cultivation']}")
     embed.description = "\n".join(lines)
+    if len(city_players) > PAGE_SIZE:
+        embed.set_footer(text=f"第 {page + 1}/{_page_count(city_players)} 页 · 共 {len(city_players)} 人")
     return embed
 
 
 class CityPlayersView(TimedView):
-    def __init__(self, author, city_players: list, viewer: dict, cog=None):
+    def __init__(self, author, city_players: list, viewer: dict, cog=None, page: int = 0):
         super().__init__()
         self.author = author
         self.cog = cog
+        self.city_players = city_players
+        self.viewer = viewer
+        self.page = max(0, min(page, _page_count(city_players) - 1))
         viewer_idx = get_realm_index(viewer["realm"]) if viewer else 0
-        for p in city_players[:5]:
+        for p in _ordered(city_players)[self.page * PAGE_SIZE:(self.page + 1) * PAGE_SIZE]:
             self.add_item(CityPlayerButton(p, viewer_idx))
+        if _page_count(city_players) > 1:
+            self.add_item(_PageButton("◀ 上一页", self, -1, disabled=self.page == 0))
+            self.add_item(_PageButton("下一页 ▶", self, 1, disabled=self.page >= _page_count(city_players) - 1))
         self.add_item(_BackToMenuButton(cog))
+
+
+class _PageButton(discord.ui.Button):
+    def __init__(self, label: str, owner: "CityPlayersView", step: int, disabled: bool):
+        super().__init__(label=label, style=discord.ButtonStyle.primary, disabled=disabled)
+        self.owner, self.step = owner, step
+
+    async def callback(self, interaction: discord.Interaction):
+        o = self.owner
+        page = o.page + self.step
+        await interaction.response.edit_message(
+            embed=_city_players_embed(o.city_players, o.viewer, page),
+            view=CityPlayersView(o.author, o.city_players, o.viewer, o.cog, page),
+        )
 
 
 class _BackToMenuButton(discord.ui.Button):
@@ -93,9 +130,13 @@ class CityPlayerButton(discord.ui.Button):
             f"寿元：{target['lifespan']} 年",
             f"宗门：{target['sect'] or '无'}",
         ]
-        if not in_pvp:
+        is_bot = is_bot_id(target["discord_id"])
+        if is_bot:
+            from utils.views.bot_actions import profile_lines
+            lines += await profile_lines(uid, target["discord_id"])
+        if not in_pvp and not is_bot:
             lines.append("\n*此地为安全区域，无法发起攻击。*")
-        embed = discord.Embed(title=f"✦ {target['name']} ✦", description="\n".join(lines), color=discord.Color.teal())
+        embed = discord.Embed(title=f"✦ {BOT_MARK + ' ' if is_bot else ''}{target['name']} ✦", description="\n".join(lines), color=discord.Color.teal())
         await interaction.response.send_message(
             embed=embed,
             view=PlayerActionView(interaction.user, viewer, target, in_pvp),

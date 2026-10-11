@@ -8,6 +8,10 @@
     <div class="label">在世修士</div>
   </div>
   <div class="stat-card">
+    <div class="num" style="color:var(--muted)">{{ bot_total }}</div>
+    <div class="label">机器人</div>
+  </div>
+  <div class="stat-card">
     <div class="num" style="color:var(--accent2)">{{ cultivating }}</div>
     <div class="label">闭关中</div>
   </div>
@@ -33,7 +37,7 @@
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <span style="width:130px;font-size:13px">{{ r.realm }}</span>
       <div style="flex:1;background:var(--border);border-radius:99px;height:8px;overflow:hidden">
-        <div style="width:{{ ((r.cnt / total) * 100) | int }}%;height:100%;background:var(--accent);border-radius:99px"></div>
+        <div style="width:{{ ((r.cnt / total) * 100) | int if total else 0 }}%;height:100%;background:var(--accent);border-radius:99px"></div>
       </div>
       <span style="color:var(--muted);font-size:12px;width:24px;text-align:right">{{ r.cnt }}</span>
     </div>
@@ -47,7 +51,7 @@
       <tbody>
       {% for p in recent %}
       <tr>
-        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a>{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</td>
         <td><span class="badge badge-purple">{{ p.realm }}</span></td>
         <td>{{ p.current_city }}</td>
         <td style="color:var(--muted);font-size:12px">{{ ts(p.last_active) }}</td>
@@ -69,7 +73,7 @@
       {% for p in top_stones %}
       <tr>
         <td style="color:var(--muted)">{{ loop.index }}</td>
-        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a>{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</td>
         <td><span class="badge badge-purple">{{ p.realm }}</span></td>
         <td style="color:var(--warning);font-weight:600">{{ p.spirit_stones }}</td>
       </tr>
@@ -86,7 +90,7 @@
       {% for p in top_stats %}
       <tr>
         <td style="color:var(--muted)">{{ loop.index }}</td>
-        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+        <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a>{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</td>
         <td><span class="badge badge-purple">{{ p.realm }}</span></td>
         <td style="color:var(--accent2);font-weight:600">{{ p.total }}</td>
       </tr>

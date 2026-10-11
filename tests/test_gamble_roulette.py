@@ -1,8 +1,8 @@
 """赌坊（utils/gamble.py）与轮转赌坊（utils/roulette.py）：账务、每日次数、概率配置，以及两个面板。
 
-B39 —— 轮转赌坊的期望收益是 +87.5%：12 格里 × 0 占 4 格，但 ×5、×10 各占 1 格、×2 占 2 格，
-  每转一次（押 500）平均净赚 437 灵石，每天 5 次就是凭空印钱。赌坊（gamble）的期望是 0.78，
-  这个是明显的数值失衡。需要定数值（见 ISSUES.md），这里先用测试把现状钉住，改配置时必须同步改这条断言。
+B39 —— 轮转赌坊原先的期望收益是 +87.5%（12 格里 ×0 只占 4 格，×5、×10 各占 1 格、×2 占 2 格，
+  每转一次押 500 平均净赚 437 灵石，每天 5 次凭空印钱）。已按你的决定改成「小亏」：格数 6/3/1/1/1/0
+  （×0 / ×0.5 / ×1 / ×2 / ×5 / ×10），期望 ≈ 0.79，与赌坊（0.78）同量级，庄家占优，去掉 ×10 大奖。
 """
 
 import asyncio
@@ -77,14 +77,31 @@ def test_轮转_转盘12格_与文案一致():
     assert len(roulette.WHEEL) == 12 and sum(s["count"] for s in roulette.SLOTS) == 12
 
 
-def test_轮转_期望收益钉住现状_B39():
-    """BALANCE：+87.5%/次，明显失衡，等数值定了再改这里（见 ISSUES.md B39）。"""
+def test_轮转_期望收益是小亏_B39():
+    """BALANCE：改配置时同步改这条。庄家必须占优，且与赌坊同量级。"""
     ev = sum(s["count"] * s["multiplier"] for s in roulette.SLOTS) / len(roulette.WHEEL)
-    assert ev == pytest.approx(1.875)
+    assert ev == pytest.approx(9.5 / 12) and 0.7 < ev < 0.85
+    gamble_total = sum(o["weight"] for o in gamble.CONFIG["outcomes"])
+    gamble_ev = sum(o["weight"] * o["multiplier"] for o in gamble.CONFIG["outcomes"]) / gamble_total
+    assert abs(ev - gamble_ev) < 0.1
+
+
+def test_轮转_各档格数():
+    counts = {s["multiplier"]: s["count"] for s in roulette.SLOTS}
+    assert counts == {0.0: 6, 0.5: 3, 1.0: 1, 2.0: 1, 5.0: 1, 10.0: 0}
+
+
+def test_轮转_长期回报低于押注():
+    """不固定随机数：连转很多次，平均回报必须低于押注（防止配置被改回印钞机）。"""
+    import random
+    random.seed(12345)
+    n = 20_000
+    total = sum(roulette.spin_wheel()["multiplier"] for _ in range(n))
+    assert total / n < 1.0
 
 
 def test_轮转_落点展示恰好一个括号():
-    for slot in roulette.SLOTS:
+    for slot in (s for s in roulette.SLOTS if s["count"] > 0):                 # 0 格的档位不会落点
         text = roulette.build_wheel_display(slot)
         assert text.count("[") == 1 and f"[{slot['emoji']}]" in text and len(text.split()) == 12
 
@@ -302,7 +319,8 @@ async def test_赌坊面板_返回城市(db):
 def test_轮转面板_文案与禁用():
     e = rv._wheel_overview_embed(player(roulette_daily_count=2))
     assert f"{roulette.DAILY_LIMIT - 2} / {roulette.DAILY_LIMIT}" in e.description and "12 格" in e.description
-    assert "33%" in e.description and "17%" in e.description                      # × 0 占 4/12，× 2 占 2/12
+    assert "50%" in e.description and "25%" in e.description and "8%" in e.description     # × 0 占 6/12，× 0.5 占 3/12，其余各 1/12
+    assert "× 10" not in e.description                                              # 0 格的档位不展示
     e = rv._wheel_overview_embed(player(roulette_daily_count=2, roulette_daily_reset=time.time() - 2 * DAY))
     assert f"{roulette.DAILY_LIMIT} / {roulette.DAILY_LIMIT}" in e.description
     assert rv.RouletteView(inter().user, player(spirit_stones=499), None).spin_btn.disabled
@@ -312,7 +330,7 @@ def test_轮转面板_文案与禁用():
 
 
 @pytest.mark.parametrize("mult,title,color_name", [
-    (10.0, "💎 大吉！× 10", "gold"), (5.0, "🔥 走运！× 5", "gold"), (2.0, "🟡 小赚 × 2", "green"),
+    (5.0, "🔥 走运！× 5", "gold"), (2.0, "🟡 小赚 × 2", "green"),
     (1.0, "⚪ 回本 × 1", "greyple"), (0.5, "🌑 小亏 × 0.5", "red"), (0.0, "💀 全输 × 0", "red"),
 ])
 async def test_轮转面板_转动结果(db, monkeypatch, mult, title, color_name):

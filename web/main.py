@@ -220,22 +220,20 @@ templates.env.globals["app_version"] = _APP_VERSION
 def index(request: Request):
     with get_conn() as conn:
         now = time.time()
-        total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0").fetchone()[
-            0
-        ]
-        dead = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=1").fetchone()[
-            0
-        ]
+        # 总览的数字都是「真人」：机器人单独一格（bot_total），不混进活跃 / 已坐化 / 境界分布 / 最近活跃
+        total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0 AND is_bot=0").fetchone()[0]
+        bot_total = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=0 AND is_bot=1").fetchone()[0]
+        dead = conn.execute("SELECT COUNT(*) FROM players WHERE is_dead=1 AND is_bot=0").fetchone()[0]
         cultivating = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE cultivating_until > ? AND is_dead=0",
+            "SELECT COUNT(*) FROM players WHERE cultivating_until > ? AND is_dead=0 AND is_bot=0",
             (now,),
         ).fetchone()[0]
         on_quest = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE active_quest IS NOT NULL AND quest_due > ? AND is_dead=0",
+            "SELECT COUNT(*) FROM players WHERE active_quest IS NOT NULL AND quest_due > ? AND is_dead=0 AND is_bot=0",
             (now,),
         ).fetchone()[0]
         gathering = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE gathering_until > ? AND is_dead=0",
+            "SELECT COUNT(*) FROM players WHERE gathering_until > ? AND is_dead=0 AND is_bot=0",
             (now,),
         ).fetchone()[0]
         events = conn.execute(
@@ -243,19 +241,19 @@ def index(request: Request):
         ).fetchall()
         events = [dict(e) for e in events]
         realm_dist = conn.execute(
-            "SELECT realm, COUNT(*) as cnt FROM players WHERE is_dead=0 GROUP BY realm ORDER BY cnt DESC"
+            "SELECT realm, COUNT(*) as cnt FROM players WHERE is_dead=0 AND is_bot=0 GROUP BY realm ORDER BY cnt DESC"
         ).fetchall()
         realm_dist = [dict(r) for r in realm_dist]
         recent = conn.execute(
-            "SELECT * FROM players WHERE is_dead=0 ORDER BY last_active DESC LIMIT 8"
+            "SELECT * FROM players WHERE is_dead=0 AND is_bot=0 ORDER BY last_active DESC LIMIT 8"
         ).fetchall()
         recent = [dict(r) for r in recent]
         top_stones = conn.execute(
-            "SELECT name, spirit_stones, realm, discord_id FROM players WHERE is_dead=0 ORDER BY spirit_stones DESC LIMIT 5"
+            "SELECT name, spirit_stones, realm, discord_id, is_bot FROM players WHERE is_dead=0 ORDER BY spirit_stones DESC LIMIT 5"
         ).fetchall()
         top_stones = [dict(r) for r in top_stones]
         top_stats = conn.execute(
-            "SELECT name, realm, discord_id, (comprehension+physique+fortune+bone+soul) as total "
+            "SELECT name, realm, discord_id, is_bot, (comprehension+physique+fortune+bone+soul) as total "
             "FROM players WHERE is_dead=0 ORDER BY total DESC LIMIT 5"
         ).fetchall()
         top_stats = [dict(r) for r in top_stats]
@@ -264,6 +262,7 @@ def index(request: Request):
         name="index.html",
         context={
             "total": total,
+            "bot_total": bot_total,
             "dead": dead,
             "cultivating": cultivating,
             "on_quest": on_quest,
@@ -284,7 +283,9 @@ def players(
     city: str = "",
     realm: str = "",
     sort: str = "cultivation",
+    bots: int = 0,
 ):
+    # `bots=1`（页面上的「含机器人」）才列出机器人，默认只看真人。
     # 用参数查表拿列名，进 SQL 的永远是这里的常量，不是用户传来的字符串。
     # 原先是校验完直接把 sort 拼进去，校验和拼接隔着十几行，改动时容易漏。
     sort_column = PLAYER_SORT_COLUMNS.get(sort)
@@ -292,6 +293,8 @@ def players(
         sort, sort_column = "cultivation", PLAYER_SORT_COLUMNS["cultivation"]
     with get_conn() as conn:
         where = ["is_dead = 0"]
+        if not bots:
+            where.append("is_bot = 0")
         params = []
         if q:
             where.append("(name LIKE ? OR discord_id LIKE ?)")
@@ -304,10 +307,11 @@ def players(
             params.append(f"%{realm}%")
         sql = f"SELECT * FROM players WHERE {' AND '.join(where)} ORDER BY {sort_column} DESC"
         rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+        city_filter = "" if bots else " AND is_bot=0"      # 下拉选项与结果一致
         cities = [
             r[0]
             for r in conn.execute(
-                "SELECT DISTINCT current_city FROM players WHERE is_dead=0 ORDER BY current_city"
+                f"SELECT DISTINCT current_city FROM players WHERE is_dead=0{city_filter} ORDER BY current_city"
             ).fetchall()
         ]
     return templates.TemplateResponse(
@@ -319,6 +323,7 @@ def players(
             "city": city,
             "realm": realm,
             "sort": sort,
+            "bots": 1 if bots else 0,
             "cities": cities,
         },
     )
@@ -480,7 +485,7 @@ def items_page(
 
 
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
+def stats(request: Request, sort: str = "cultivation", order: str = "desc", bots: int = 0):
     sort_column = STATS_SORT_COLUMNS.get(sort)
     if sort_column is None:
         sort, sort_column = "cultivation", STATS_SORT_COLUMNS["cultivation"]
@@ -488,7 +493,7 @@ def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
-            f"FROM players WHERE is_dead=0 ORDER BY {sort_column} {direction}"
+            f"FROM players WHERE is_dead=0{'' if bots else ' AND is_bot=0'} ORDER BY {sort_column} {direction}"
         ).fetchall()
     return templates.TemplateResponse(
         request=request,
@@ -497,6 +502,7 @@ def stats(request: Request, sort: str = "cultivation", order: str = "desc"):
             "players": [dict(r) for r in rows],
             "sort": sort,
             "order": order,
+            "bots": 1 if bots else 0,
         },
     )
 
@@ -670,7 +676,7 @@ def equipment_preview(
 def dead_players(request: Request):
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM players WHERE is_dead=1 ORDER BY last_active DESC"
+            "SELECT * FROM players WHERE is_dead=1 AND is_bot=0 ORDER BY last_active DESC"
         ).fetchall()
     return templates.TemplateResponse(
         request=request,
@@ -689,7 +695,10 @@ def realms_page(request: Request):
             "SELECT realm, COUNT(*) AS cnt FROM players WHERE is_dead = 0 GROUP BY realm"
         ).fetchall()
         dead_total = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE is_dead = 1"
+            "SELECT COUNT(*) FROM players WHERE is_dead = 1 AND is_bot = 0"
+        ).fetchone()[0]
+        bot_living = conn.execute(
+            "SELECT COUNT(*) FROM players WHERE is_dead = 0 AND is_bot = 1"
         ).fetchone()[0]
     counts = {r["realm"]: r["cnt"] for r in rows}
 
@@ -731,6 +740,7 @@ def realms_page(request: Request):
         context={
             "groups": groups,
             "living_total": living_total,
+            "bot_living": bot_living,
             "dead_total": dead_total,
             "major_count": len(REALM_GROUPS),
             "realm_count": sum(len(g["stages"]) for g in groups),

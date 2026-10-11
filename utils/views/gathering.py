@@ -171,7 +171,10 @@ class GatherButton(discord.ui.Button):
 
         from utils.buffs import get_gather_bonus, get_buff_value, consume_once_buff
         gather_bonus = get_gather_bonus(player)
-        cooldown_reduction = get_buff_value(player, "gather_cooldown_reduction", 0) / 100.0
+        # 速灵丹：限时 buff，24 小时内每次采集都生效，不消耗；百草增益丹：一次性，用一次就消耗（B56）。两者叠加。
+        timed_reduction = get_buff_value(player, "gather_cooldown_reduction", 0) / 100.0
+        once_reduction = get_buff_value(player, "gather_cooldown_reduction_once", 0) / 100.0
+        cooldown_reduction = min(0.9, timed_reduction + once_reduction)
 
         actual_years = self.years * (1 - cooldown_reduction)
         actual_years = max(0.25, actual_years)
@@ -185,8 +188,8 @@ class GatherButton(discord.ui.Button):
         if gather_bonus > 0:
             _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_bonus_once")
             buffs_changed = True
-        if cooldown_reduction > 0:
-            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_cooldown_reduction")
+        if once_reduction > 0:
+            _, active_buffs_raw = consume_once_buff(active_buffs_raw, "gather_cooldown_reduction_once")
             buffs_changed = True
 
         # 上面的检查是先读再判断，连点会两次都通过、把一次性 buff 用两遍。

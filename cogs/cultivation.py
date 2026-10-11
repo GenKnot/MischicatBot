@@ -14,6 +14,8 @@ from utils.views import MainMenuView, ProfileView, CultivateView, DualCultivateI
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
 from utils.world import CITIES
+from utils import rumors
+from utils.bots import send_dm
 from utils.tasks import loop_guard
 from utils.player import get_player, is_defending, settle_time, apply_updates, can_breakthrough
 
@@ -24,7 +26,6 @@ from utils.death_rebirth_logic import (
     should_trigger_yinyang, mark_yinyang_triggered, calculate_rebirth_bonus
 )
 from utils.breakthrough_logic import (
-    can_breakthrough as async_can_breakthrough,
     do_breakthrough_chain as async_do_breakthrough_chain,
     handle_zhuji_breakthrough, handle_ningdan_breakthrough, handle_huaying_breakthrough
 )
@@ -167,8 +168,10 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         player = await get_player(uid)
         if player["lifespan"] <= 0 or player["is_dead"]:
             async with AsyncSessionLocal() as session:
-                await session.execute(text("UPDATE players SET is_dead = 1 WHERE discord_id = :uid"), {"uid": uid})
+                res = await session.execute(text("UPDATE players SET is_dead = 1 WHERE discord_id = :uid AND is_dead = 0"), {"uid": uid})
                 await session.commit()
+            if res.rowcount == 1:                       # 这一下才真的坐化（已经坐化的重复查看不再记传闻）
+                await rumors.record_player_rumor("death_old", uid, realm=player["realm"])
             return await interaction.followup.send(
                 f"道友 **{player['name']}** 寿元已尽，魂归天道。\n可使用 `{COMMAND_PREFIX}创建角色` 重入修仙之路。"
             )
@@ -383,16 +386,13 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             )
 
         try:
-            user = await self.bot.fetch_user(int(result['partner_id']))
-            await user.send(
+            await send_dm(
+                self.bot, result['partner_id'],
                 f"✦ 双修中止 ✦\n"
                 f"因对方提前停止，你也已出关。\n"
                 f"实际修炼 **{result['partner_years']} 年**，获得修为 **+{result['partner_gain']}**。\n"
                 f"修为进度：{result['partner_cultivation']}/{result['partner_needed']}　寿元剩余：{result['partner_lifespan']} 年"
             )
-        except (discord.Forbidden, discord.NotFound):
-            # 对方关了私信 / 账号不在了是常态，不当错误处理
-            log.debug("私信发送失败", exc_info=True)
         except Exception:
             # 其余是我们自己的 bug，别吞成 debug（见 B5）；但不能影响本人已经完成的结算
             log.exception("双修中止通知失败：%s", result['partner_id'])
@@ -684,11 +684,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             embed.add_field(name="剩余寿元", value=f"{player['lifespan']} 年", inline=True)
             if can_bt:
                 embed.add_field(name="提示", value="修为已圆满，可尝试突破！", inline=False)
-            user = await self.bot.fetch_user(int(uid))
-            await user.send(embed=embed)
-        except (discord.Forbidden, discord.NotFound):
-            # 对方关了私信 / 账号不在了是常态，不当错误处理
-            log.debug("私信发送失败", exc_info=True)
+            await send_dm(self.bot, uid, embed=embed)
         except Exception:
             # 其余都是我们自己的 bug（曾经 row['name'] 在 SQLAlchemy 2 上抛 TypeError，
             # 被这里吞成 debug，所有人的出关通知悄悄丢了很久）
@@ -765,11 +761,7 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             total_value = sum(ITEMS.get(n, {}).get("sell_price", 0) * q for n, q in rewards)
             if total_value > 0:
                 embed.set_footer(text=f"材料总价值约 {total_value} 灵石（可使用 {COMMAND_PREFIX}出售 [材料名] 出售）")
-            user = await self.bot.fetch_user(int(uid))
-            await user.send(embed=embed)
-        except (discord.Forbidden, discord.NotFound):
-            # 对方关了私信 / 账号不在了是常态，不当错误处理
-            log.debug("私信发送失败", exc_info=True)
+            await send_dm(self.bot, uid, embed=embed)
         except Exception:
             log.exception("采集通知失败：%s", uid)
 

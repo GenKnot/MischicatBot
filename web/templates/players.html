@@ -116,6 +116,9 @@
       <option value="last_active" {% if sort == "last_active" %}selected{% endif %}>最近活跃</option>
       <option value="name" {% if sort == "name" %}selected{% endif %}>道号排序</option>
     </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)">
+      <input type="checkbox" name="bots" value="1" {% if bots %}checked{% endif %}> 含机器人
+    </label>
     <button type="submit">筛选</button>
     <a href="/players" style="padding:6px 12px;color:var(--muted);font-size:13px">重置</a>
   </form>
@@ -136,7 +139,7 @@
           {% for p in players %}
           {% set now_ts = now() %}
           <tr>
-            <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+            <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a>{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</td>
             <td>{{ p.gender }}</td>
             <td><span class="badge badge-purple">{{ p.realm }}</span></td>
             <td>{{ p.cultivation }}</td>
@@ -174,7 +177,7 @@
     <a class="player-card" href="/players/{{ p.discord_id }}">
       <div class="player-card-head">
         <div>
-          <div class="player-card-name">{{ p.name }}</div>
+          <div class="player-card-name">{{ p.name }}{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</div>
           <div class="player-card-sub">{{ p.gender }} · {{ p.current_city }}</div>
         </div>
         <div class="player-card-badges">

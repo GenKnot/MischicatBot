@@ -20,7 +20,8 @@ from utils.views.public_event_overview import PublicEventOverviewView
 
 import logging
 from utils.config import is_master
-from utils.tasks import loop_guard
+from utils import bot_events
+from utils.tasks import loop_guard, spawn
 
 log = logging.getLogger(__name__)
 
@@ -235,12 +236,16 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
 
         module = PUBLIC_EVENTS["spirit_rain"]
         await module.on_trigger(self.bot, channel, event_id, city)
+        # 机器人迁徙并参与（出错只记日志，不影响事件本身）
+        await bot_events.on_spirit_rain_start(event_id, city, has_beast_tide)
 
     async def _settle_event(self, event: dict):
         channel = _get_announce_channel(self.bot)
         module = PUBLIC_EVENTS.get(event["event_type"])
         if module:
             await module.on_settle(self.bot, channel, event)
+            if event["event_type"] == "spirit_rain":
+                await bot_events.on_spirit_rain_end(event)           # 参与的机器人回常驻城市
         self._preview_sent.clear()
 
     async def _wanbao_scheduler(self, now_mt, today_str: str, h: int, m: int):
@@ -319,12 +324,21 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             get_current_lot, settle_lot, advance_lot, get_lots, get_active_auction
         )
         channel = _get_announce_channel(self.bot)
+        bid_task = None
+        last_lot_id = None
         try:
             while True:
                 active = await get_active_auction()
                 if not active or active["status"] != "active" or active["auction_id"] != auction_id:
                     break
                 wait = active["ends_at"] - time.time()
+                cur = await get_current_lot(auction_id)
+                if cur and cur["lot_id"] != last_lot_id:
+                    # 新的一件开拍：让愿意且出得起的机器人在这件的窗口里出价（后台任务，随这件结束）
+                    last_lot_id = cur["lot_id"]
+                    if bid_task and not bid_task.done():
+                        bid_task.cancel()
+                    bid_task = spawn(bot_events.auction_round(auction_id, cur, max(0.0, wait)), log=log, name="机器人竞拍")
                 if wait > 0:
                     await asyncio.sleep(wait)
                 active = await get_active_auction()
@@ -361,6 +375,9 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             raise                      # 任务取消要往上传，别当成错误吞掉
         except Exception:
             log.exception("万宝楼 lot timer 异常")
+        finally:
+            if bid_task and not bid_task.done():
+                bid_task.cancel()
 
     async def _announce_lot_result(self, channel, result: dict, auction_id: str):
         lot = result["lot"]

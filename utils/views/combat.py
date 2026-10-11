@@ -1,6 +1,11 @@
 import logging
 import random
 import discord
+from utils import bot_economy as be, rumors
+from utils.bot_combat import cripple_bot, handle_captive, kill_bot, rob_bot
+from utils.bot_social import bot_gate, say as bot_say
+from utils.bots import BotUser, is_bot_id
+from utils.views.bot_actions import add_bot_buttons
 from utils.views.party import PartyInviteButton
 from utils.tasks import spawn
 from utils.views.base import TimedView
@@ -15,6 +20,7 @@ class PlayerActionView(TimedView):
         self.viewer = viewer
         self.target = target
         self.in_pvp_zone = in_pvp_zone
+        add_bot_buttons(self, target)
         self.add_item(PartyInviteButton(viewer, target))
 
         has_dual = self._check_dual_technique(viewer)
@@ -108,8 +114,20 @@ class PlayerActionView(TimedView):
 
         from utils.views.dual import DualCultivateInviteView
 
+        if is_bot_id(target_uid):
+            # 机器人没有 Discord 账号，不发邀请面板：好感与性格够了就当场答应，结算走同一个 do_dual_cultivate
+            if (refused := await bot_gate("dual", uid, target_uid)):
+                line = await bot_say("dual_refuse", uid, target_uid)
+                return await interaction.followup.send(f"「{line}」\n\n{refused}", ephemeral=True)
+            cultivation_cog = interaction.client.cogs.get("Cultivation")
+            if not cultivation_cog:
+                return await interaction.followup.send("系统异常。", ephemeral=True)
+            partner = BotUser(id=target_uid, display_name=target["name"])
+            await interaction.followup.send(f"**{target['name']}**：「{await bot_say('dual_accept', uid, target_uid)}」")
+            return await cultivation_cog.do_dual_cultivate(
+                interaction, interaction.user, partner, multiplier, both_virgin)
         try:
-            target_user = await interaction.client.fetch_user(int(target_uid))
+            target_user = await interaction.client.fetch_user(int(target_uid))     # 要的是 User 对象，不是私信
         except Exception:
             return await interaction.followup.send("无法找到对方用户。", ephemeral=True)
 
@@ -186,18 +204,37 @@ class PlayerActionView(TimedView):
             result_embed.description += f"**{atk['name']}** 胜！"
             await interaction.followup.send(embed=result_embed, view=VictoryActionView(interaction.user, atk, dfn), ephemeral=True)
         else:
-            escaped, escape_pct = await roll_escape(dfn)
+            # 败北的是攻击者，要逃离防守方的也是攻击者：掷攻击者自己的逃跑率（B63b）。
+            # 以前掷的是防守方的，文案还写「防守方趁乱逃脱」，说不通。
+            escaped, escape_pct = await roll_escape(atk)
             if escaped:
-                await consume_escape_buff(def_uid, dfn)
-                result_embed.description += f"**{atk['name']}** 败北！\n**{dfn['name']}** 趁乱逃脱（逃跑成功率 {escape_pct}%）。"
-                await interaction.followup.send(embed=result_embed, ephemeral=True)
+                await consume_escape_buff(uid, atk)
+                result_embed.description += f"**{atk['name']}** 败北！趁乱逃脱（逃跑成功率 {escape_pct}%）。"
             else:
-                result_embed.description += f"**{atk['name']}** 败北，但 **{dfn['name']}** 未能逃脱（逃跑成功率 {escape_pct}%）！"
+                result_embed.description += (
+                    f"**{atk['name']}** 败北，未能逃脱（逃跑成功率 {escape_pct}%），被 **{dfn['name']}** 擒获！"
+                )
                 result_embed.color = discord.Color.dark_red()
-                # 胜者是防守方，他不在场、没有任何交互可点；败北的攻击者不能拿到对自己的处置权（B63）。
-                # 只发战报；败者的『战斗回血』照旧。
-                _schedule_lifespan_restore(atk)
-                await interaction.followup.send(embed=result_embed, ephemeral=True)
+                if is_bot_id(def_uid):
+                    result_embed.description += await _bot_captive_text(uid, def_uid, dfn["name"])
+            # 胜者是防守方，他不在场、没有任何交互可点；败北的攻击者不能拿到对自己的处置权（B63）。
+            # 只发战报；败者的『战斗回血』照旧。
+            _schedule_lifespan_restore(atk)
+            await interaction.followup.send(embed=result_embed, ephemeral=True)
+
+
+async def _bot_captive_text(human_id: str, bot_id: str, bot_name: str) -> str:
+    """真人攻击机器人打输了又没逃掉：机器人按性格处置（放走 / 劫财 / 杀），返回要追加到战报里的文字。"""
+    res = await handle_captive(bot_id, human_id)
+    scene = {"release": "captive_release", "rob": "captive_rob", "kill": "captive_kill"}[res["outcome"]]
+    line = await bot_say(scene, human_id, bot_id)
+    text = f"\n\n**{bot_name}**：「{line}」"
+    if res["outcome"] == "rob":
+        text += f"\n你被搜走了 **{res['amount']} 灵石**。"
+    elif res["killed"]:
+        text += (f"\n💀 你被 **{bot_name}** 搜走了 **{res['amount']} 灵石**，随后一击毙命……"
+                 "你已坐化，可以重新入道轮回。")
+    return text
 
 
 async def _check_lifespan_restore(player: dict):
@@ -254,6 +291,34 @@ class VictoryActionView(TimedView):
     async def _check_lifespan_restore(self, player: dict):
         await _check_lifespan_restore(player)
 
+    async def _bot_choice(self, interaction: discord.Interaction, kind: str):
+        """对象是机器人时的打劫 / 废修为 / 击杀（规则与代价见 utils/bot_combat.py）。成功才算用掉这次选择。"""
+        uid, bot_id, name = str(interaction.user.id), self.loser["discord_id"], self.loser["name"]
+        cost = be.load_config()["combat"]["cost"]
+        if kind == "kill":
+            line = await bot_say("bot_killed", uid, bot_id)          # 先取台词：杀了之后它的好感记录就没了
+            res = await kill_bot(uid, bot_id)
+        elif kind == "cripple":
+            res = await cripple_bot(uid, bot_id)
+            line = await bot_say("bot_crippled", uid, bot_id) if res["ok"] else ""
+        else:
+            res = await rob_bot(uid, bot_id)
+            line = await bot_say("bot_robbed", uid, bot_id) if res["ok"] else ""
+        if not res["ok"]:
+            return await interaction.followup.send(res["reason"], ephemeral=True)
+        self.finish()
+        if kind == "kill":
+            loot = f"，从其身上夺得 **{res['amount']} 灵石**" if res["amount"] else ""
+            rep = cost["kill"]["reputation_tianjiao"] if res["tier"] == "天骄" else cost["kill"]["reputation"]
+            text = f"你取了 **{name}** 的性命{loot}。\n**{name}**：「{line}」\n*杀孽缠身，声望 -{rep}。*"
+        elif kind == "cripple":
+            text = (f"你强行打散了 **{name}** 的修为，其修为归零。\n**{name}**：「{line}」\n"
+                    f"*声望 -{cost['cripple']['reputation']}，**{name}** 对你恨之入骨。*")
+        else:
+            text = (f"你从 **{name}** 身上搜刮了 **{res['amount']} 灵石**。\n**{name}**：「{line}」\n"
+                    f"*声望 -{cost['rob']['reputation']}，**{name}** 对你怀恨在心。*")
+        await interaction.followup.send(text, ephemeral=True)
+
     @discord.ui.button(label="💰 打劫灵石", style=discord.ButtonStyle.danger)
     async def rob(self, interaction: discord.Interaction, button: discord.ui.Button):
         # 打劫可能落空（对方身上没钱了），落空不该用掉这次机会，所以用 hold/finish 而不是 try_claim。
@@ -262,6 +327,8 @@ class VictoryActionView(TimedView):
             return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
         try:
             await interaction.response.defer(ephemeral=True)
+            if is_bot_id(self.loser["discord_id"]):
+                return await self._bot_choice(interaction, "rob")
             from sqlalchemy import text
             from utils.db_async import AsyncSessionLocal
             def_uid = self.loser["discord_id"]
@@ -294,6 +361,8 @@ class VictoryActionView(TimedView):
             return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
         try:
             await interaction.response.defer(ephemeral=True)
+            if is_bot_id(self.loser["discord_id"]):
+                return await self._bot_choice(interaction, "cripple")
             from sqlalchemy import text
             from utils.db_async import AsyncSessionLocal
             async with AsyncSessionLocal() as session:
@@ -314,6 +383,8 @@ class VictoryActionView(TimedView):
             return await interaction.response.send_message("你已经做出了选择。", ephemeral=True)
         try:
             await interaction.response.defer(ephemeral=True)
+            if is_bot_id(self.loser["discord_id"]):
+                return await self._bot_choice(interaction, "kill")
             from sqlalchemy import text
             from utils.db_async import AsyncSessionLocal
             async with AsyncSessionLocal() as session:
@@ -324,6 +395,9 @@ class VictoryActionView(TimedView):
             if res.rowcount != 1:
                 return await interaction.followup.send("对方已坐化，无从下手。", ephemeral=True)
             self.finish()
+            await rumors.record_rumor("kill_human", self.loser["discord_id"], self.loser["name"],
+                                      target_id=self.winner["discord_id"], target=self.winner["name"],
+                                      city=self.loser.get("current_city", ""))
             await interaction.followup.send(f"你取了 **{self.loser['name']}** 的性命。其魂归天道，尘归尘，土归土。", ephemeral=True)
         finally:
             self.release_hold()

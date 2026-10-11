@@ -68,6 +68,9 @@ class Player(Base):
     cultivating_until: Mapped[float | None] = mapped_column(Float, nullable=True)
     cultivating_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_dead: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+    # 机器人修士（U1「江湖百态」）。discord_id 以 `bot_` 开头，不是真实 Discord 用户：
+    # 发私信、通知、公共事件报名等真人专属逻辑必须排除（见 utils/bots.py）
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
     rebirth_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     is_virgin: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
     sect: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -255,6 +258,84 @@ class BankDeposit(Base):
     deposited_at: Mapped[float] = mapped_column(Float, nullable=False)
     due_at: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[str] = mapped_column(String, default="active", server_default=text("'active'"))
+
+
+class BotPersonality(Base):
+    """机器人的性格与偏好（U1「江湖百态」）。一个机器人一行，随机生成后基本不变。
+
+    性格数值 0~100：善意（影响肯不肯组队 / 双修）、贪婪、好胜、健谈。
+    喜好 / 厌恶存成 JSON：{"categories": ["丹药", ...], "items": ["筑基丹", ...]}，
+    送礼时按它加减好感（见 utils/bot_social.py）。
+    """
+    __tablename__ = "bot_personality"
+
+    bot_id: Mapped[str] = mapped_column(String, primary_key=True)
+    archetype: Mapped[str] = mapped_column(String, nullable=False)
+    kindness: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))
+    greed: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))
+    pride: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))
+    talk: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))
+    likes: Mapped[str] = mapped_column(Text, default="{}", server_default=text("'{}'"))
+    dislikes: Mapped[str] = mapped_column(Text, default="{}", server_default=text("'{}'"))
+    tier: Mapped[str] = mapped_column(String, default="正常", server_default=text("'正常'"))   # 炮灰 / 正常 / 天骄
+    settled_day: Mapped[str] = mapped_column(String, default="", server_default=text("''"))    # 最后一次每日结算的日期
+    home_city: Mapped[str] = mapped_column(String, default="", server_default=text("''"))      # 常驻城市（去秘地历练后回这里）
+
+
+class BotWorldState(Base):
+    """机器人世界的全局状态（key/value）：目标人数 `target`、最后补员日 `refill_day`。"""
+    __tablename__ = "bot_world_state"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String, nullable=False, default="", server_default=text("''"))
+
+
+class Rumor(Base):
+    """江湖传闻（茶馆可查、频道按分值挑最精彩的一条广播）。保留 7 天。见 utils/rumors.py。"""
+    __tablename__ = "rumors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    subject_id: Mapped[str] = mapped_column(String, nullable=False)
+    subject_name: Mapped[str] = mapped_column(String, nullable=False)
+    is_human: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+    negative: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+    content: Mapped[str] = mapped_column(Text, nullable=False)       # 传闻正文（不叫 text：会盖掉 sqlalchemy.text）
+    city: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    broadcast_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))   # 0 = 没广播过
+
+
+class RumorOptout(Base):
+    """关闭了『我的事迹进传闻』的真人。"""
+    __tablename__ = "rumor_optout"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class BotRaid(Base):
+    """真人每天打劫 / 击杀机器人的次数（按日），用来限制每人每天的次数。"""
+    __tablename__ = "bot_raids"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    day: Mapped[str] = mapped_column(String, primary_key=True)
+    robs: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    kills: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+
+
+class BotRelation(Base):
+    """真人 × 机器人的关系：好感度（-100~100）与当日互动计数。"""
+    __tablename__ = "bot_relations"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(String, primary_key=True)
+    favor: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    last_interact: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    day: Mapped[str] = mapped_column(String, default="", server_default=text("''"))      # 下面三个计数属于哪一天
+    gifts_today: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    gift_gain_today: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    chatted_today: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
 
 
 class AdventureProgress(Base):

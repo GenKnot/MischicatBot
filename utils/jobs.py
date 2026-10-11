@@ -304,7 +304,7 @@ async def do_job(player: dict, job: dict) -> dict:
 
     from sqlalchemy import select, text
 
-    from utils.atomic import claim_cooldown, claim_daily_quota
+    from utils.atomic import claim_cooldown, claim_daily_quota, refuse_if_dead
     from utils.db_async import AsyncSessionLocal, Player
 
     uid = player["discord_id"]
@@ -313,6 +313,9 @@ async def do_job(player: dict, job: dict) -> dict:
     # 冷却和今日次数一次性占掉再掷奖励。原先分两个事务，连点能绕过；
     # 而且计数只加不跨日归零，第二天起每天只剩一次。
     async with AsyncSessionLocal() as session:
+        # 坐化与否以数据库为准，不信调用方传来的 player 字典（可能是旧快照）
+        if (refused := await refuse_if_dead(session, uid)):
+            return refused
         if not await claim_cooldown(session, uid, Player.job_cooldown_until, COOLDOWN_SECONDS, now=now):
             remaining = int((await session.scalar(
                 select(Player.job_cooldown_until).where(Player.discord_id == uid)

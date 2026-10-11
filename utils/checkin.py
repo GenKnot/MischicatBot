@@ -5,7 +5,7 @@ import time
 
 from sqlalchemy import or_, update
 
-from utils.atomic import grant_item, grant_stones
+from utils.atomic import DEAD_REASON, grant_item, grant_stones
 from utils.db_async import AsyncSessionLocal, Player
 
 _config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkin_config.json")
@@ -29,6 +29,8 @@ async def do_checkin(uid: str) -> dict:
         player = await session.get(Player, uid)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
+        if player.is_dead:
+            return {"ok": False, "reason": DEAD_REASON}
 
         # 原子占用今日签到名额：连点时只有一次能把日期改成今天，
         # 后续点击 rowcount 为 0，不会重复发奖。

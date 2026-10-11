@@ -53,10 +53,15 @@ def test_orm_模型的每个默认值都有对应的_server_default():
     )
 
 
+# 冻结的 utils/db.py::init_db 不再新增表：新表只通过 Alembic 迁移 / ORM 建，登记在这里。
+ALEMBIC_ONLY_TABLES = {"bot_personality", "bot_relations", "bot_world_state", "bot_raids", "rumors", "rumor_optout"}
+
+
 def test_两条建表路径的表集合一致(tmp_path, monkeypatch):
     orm = _orm_schema(tmp_path)
     legacy = _legacy_schema(tmp_path, monkeypatch)
-    assert _tables(orm) == _tables(legacy)
+    assert _tables(orm) - ALEMBIC_ONLY_TABLES == _tables(legacy)
+    assert not _tables(legacy) & ALEMBIC_ONLY_TABLES, "登记为只走 Alembic 的表却被 legacy 路径建了，从名单里去掉"
 
 
 def test_两条建表路径的默认值不分叉(tmp_path, monkeypatch):

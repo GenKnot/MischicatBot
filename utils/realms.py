@@ -121,8 +121,10 @@ def roll_failure_outcome(realm: str) -> str:
     return random.choices([FAIL_LIGHT, FAIL_HEAVY, FAIL_DEVIATE], weights=weights)[0]
 
 
-def roll_breakthrough(realm: str, physique: int, bone: int, cultivation: int) -> tuple[bool, str | None]:
-    rate = breakthrough_success_rate(realm, physique, bone, cultivation)
+def roll_breakthrough(realm: str, physique: int, bone: int, cultivation: int,
+                      bonus: float = 0.0) -> tuple[bool, str | None]:
+    """`bonus` 是额外的成功率（0.2 = +20 个百分点，例如破障丹），加完仍封顶 95%。"""
+    rate = min(0.95, breakthrough_success_rate(realm, physique, bone, cultivation) + bonus)
     if random.random() < rate:
         return True, None
 

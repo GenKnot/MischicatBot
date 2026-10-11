@@ -6,6 +6,7 @@
 <div class="card">
   <h2>{{ player.name }}
     <span class="badge badge-purple" style="margin-left:8px">{{ player.realm }}</span>
+    {% if player.is_bot %}<span class="badge badge-gray" style="margin-left:4px">机器人</span>{% endif %}
     {% if player.is_dead %}<span class="badge badge-red" style="margin-left:4px">已坐化</span>{% endif %}
     {% if player.sect %}<span class="badge badge-teal" style="margin-left:4px">{{ player.sect }} · {{ player.sect_rank }}</span>{% endif %}
   </h2>

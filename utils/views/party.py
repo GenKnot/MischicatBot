@@ -4,6 +4,8 @@ from utils.party import (
     get_party, get_party_members, accept_invite,
     remove_from_party, disband_party,
 )
+from utils.bot_social import say
+from utils.bots import is_bot_id, send_dm
 from utils.player import get_player
 from utils.views.base import TimedView
 
@@ -31,8 +33,7 @@ async def disband_party_func(uid: str, client) -> str:
         if mid == uid:
             continue
         try:
-            user = await client.fetch_user(int(mid))
-            await user.send("队长已解散队伍，你已退出。")
+            await send_dm(client, mid, "队长已解散队伍，你已退出。")
         except Exception:
             # 对方关了私信是常态
             log.debug("私信发送失败 uid=%s", mid, exc_info=True)
@@ -71,17 +72,38 @@ class PartyInviteButton(discord.ui.Button):
                 return await interaction.response.send_message("队伍已满（最多4人）。", ephemeral=True)
         if tgt.get("party_id"):
             return await interaction.response.send_message(f"**{tgt['name']}** 已在其他队伍中。", ephemeral=True)
+        if is_bot_id(target_uid):
+            return await self._invite_bot(interaction, uid, inv, tgt)
         embed = discord.Embed(
             title="🤝 组队邀请",
             description=f"**{inv['name']}** 邀请你加入队伍。\n当前位置：{inv['current_city']}",
             color=discord.Color.blue(),
         )
         try:
-            target_user = await interaction.client.fetch_user(int(target_uid))
-            await target_user.send(embed=embed, view=PartyInviteResponseView(inv, tgt, interaction.user))
-            await interaction.response.send_message(f"已向 **{tgt['name']}** 发送组队邀请。", ephemeral=True)
+            sent = await send_dm(interaction.client, target_uid, embed=embed,
+                                 view=PartyInviteResponseView(inv, tgt, interaction.user))
         except Exception:
+            sent = False
+        if sent:
+            await interaction.response.send_message(f"已向 **{tgt['name']}** 发送组队邀请。", ephemeral=True)
+        else:
             await interaction.response.send_message("无法发送邀请，对方可能关闭了私信。", ephemeral=True)
+
+
+    async def _invite_bot(self, interaction: discord.Interaction, uid: str, inv: dict, tgt: dict):
+        """机器人没有私信可收：好感与性格够了就当场答应（加入逻辑与真人接受邀请同一个 accept_invite）。"""
+        result = await accept_invite(uid, tgt["discord_id"])
+        if not result["ok"]:
+            reason = result["reason"]
+            if result.get("bot_refused"):
+                reason = f"「{await say('party_refuse', uid, tgt['discord_id'])}」\n\n{reason}"
+            return await interaction.response.send_message(reason, ephemeral=True)
+        members = await get_party_members(result["party_id"])
+        party = await get_party(result["party_id"])
+        embed = party_info_embed(members, party["leader_id"])
+        embed.title = "✦ 组队成功 ✦"
+        embed.description = f"**{tgt['name']}**：「{await say('party_accept', uid, tgt['discord_id'])}」\n欣然应允，与你结伴同行。"
+        await interaction.response.send_message(embed=embed)
 
 
 class PartyInviteResponseView(TimedView):

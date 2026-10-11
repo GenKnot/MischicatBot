@@ -2,6 +2,7 @@ import random
 import time
 import json
 from sqlalchemy import select
+from utils.bot_social import bot_gate
 from utils.db_async import AsyncSessionLocal, Player
 from utils.character import calc_cultivation_gain, years_to_seconds, get_cultivation_bonus
 from utils.realms import cultivation_needed
@@ -22,6 +23,8 @@ async def has_dual_technique(discord_id: str) -> bool:
 
 
 async def check_dual_requirements(inviter_id: str, target_id: str) -> dict:
+    if (refused := await bot_gate("dual", inviter_id, target_id)):
+        return {"success": False, "message": refused}
     async with AsyncSessionLocal() as session:
         inviter = await session.get(Player, inviter_id)
         target = await session.get(Player, target_id)
@@ -110,6 +113,8 @@ async def start_dual_cultivation(inviter_id: str, target_id: str, multiplier: fl
     若仍按旧的高倍率结算，同一份清白身就能兑现多次。所以倍率必须落在当前清白身状态对应的
     区间内，否则拒绝，请对方重新发起邀请。不传则由这里现掷（没有展示过的场合）。
     """
+    if (refused := await bot_gate("dual", inviter_id, target_id)):
+        return {"success": False, "message": refused}
     now = time.time()
     
     async with AsyncSessionLocal() as session:

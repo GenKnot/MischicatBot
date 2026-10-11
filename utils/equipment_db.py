@@ -56,6 +56,16 @@ async def get_equipped(discord_id: str) -> list[dict]:
         return [_row_to_dict(r) for r in result.scalars()]
 
 
+async def get_all_equipped() -> dict[str, list[dict]]:
+    """所有玩家已穿的装备，按 discord_id 分组。一次查询（战力榜用，避免逐人查装备的 N+1）。"""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Equipment).where(Equipment.equipped == True))  # noqa: E712
+        grouped: dict[str, list[dict]] = {}
+        for row in result.scalars():
+            grouped.setdefault(row.discord_id, []).append(_row_to_dict(row))
+    return grouped
+
+
 async def equip_item(discord_id: str, equip_id: str, player_tier: int) -> tuple[bool, str]:
     from utils.equipment import TIER_NAMES
     # 先在独立的会话里做只读校验：同一个会话里先读后写，另一个写事务提交后这边升级写锁会报快照过期

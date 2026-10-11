@@ -13,6 +13,7 @@ from utils.combat import calc_power
 from utils.character import years_to_seconds, seconds_to_years
 from utils import quest_logic
 from utils.logging_setup import audit
+from utils.bots import send_dm
 from utils.tasks import loop_guard
 from utils.views.base import TimedView
 
@@ -76,8 +77,7 @@ class TavernCog(commands.Cog, name="Tavern"):
         embed = self._build_result_embed(result)
         
         try:
-            user = await self.bot.fetch_user(int(uid))
-            await user.send(embed=embed)
+            await send_dm(self.bot, uid, embed=embed)
         except Exception:
             log.debug("私信发送失败 uid=%s", uid, exc_info=True)
 
@@ -197,7 +197,7 @@ class TavernCog(commands.Cog, name="Tavern"):
                     )
                 embed.add_field(name=f"── {tier}任务 ──", value="\n\n".join(lines), inline=False)
 
-            embed.set_footer(text="战斗任务耗时1年 · 采集任务耗时2年 · 任务期间无法闭关")
+            embed.set_footer(text=f"战斗任务耗时1年 · 采集任务耗时2年 · 任务期间无法闭关 · {COMMAND_PREFIX}传闻 听听江湖消息")
             await ctx.send(embed=embed, view=TavernView(ctx.author, quests, self))
 
     @commands.hybrid_command(name="交任务", aliases=["jrw"], description="在茶馆结算当前进行中的任务")

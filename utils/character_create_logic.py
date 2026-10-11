@@ -14,6 +14,7 @@ import time
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 
+from utils import rumors
 from utils.character import REALM_LIFESPAN, calc_stats, roll_spirit_root
 from utils.death_rebirth_logic import calculate_rebirth_bonus
 from utils.db_async import AsyncSessionLocal, Player
@@ -36,6 +37,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
             return None
 
         bonus: dict = {}
+        is_rebirth = old is not None
         if old is not None:
             if old.sect == "仙葬谷" or old.has_bahongchen:
                 bonus = calculate_rebirth_bonus({c.key: getattr(old, c.key) for c in old.__table__.columns})
@@ -74,5 +76,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
                 return None
             raise
 
+    if is_rebirth:
+        await rumors.record_rumor("rebirth", uid, name)
     return {"name": name, "gender": gender, "starting_city": city, "spirit_root": spirit_root,
             "root_type": root_type, "lifespan": lifespan, "stats": stats, "rebirth_bonus": bonus}

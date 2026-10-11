@@ -388,3 +388,12 @@ async def test_拒绝_通知邀请者(db):
 async def test_入队_队伍不存在不能入(db):
     await players(db, "1")
     assert await add_to_party("不存在的队伍", "1") is False and await pid(db, "1") is None
+
+
+async def test_邀请_机器人好感不够被拒_不私信(db):
+    """U1：好感不够的机器人不肯组队。机器人没有私信可收，不发邀请，当场给结果。"""
+    await players(db, "1", "bot_00001")
+    client = Client()
+    i = await invite(db, "1", "bot_00001", client)
+    assert "组队" in i.last and i.last.ephemeral
+    assert client.sent == []

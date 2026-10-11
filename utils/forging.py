@@ -4,7 +4,8 @@ from sqlalchemy import func
 
 from sqlalchemy import update
 
-from utils.atomic import (claim_daily_quota, consume_item, grant_item,
+from utils import rumors
+from utils.atomic import (DEAD_REASON, refuse_if_dead, claim_daily_quota, consume_item, grant_item,
                           peek_daily_used, spend_stones)
 from utils.db_async import AsyncSessionLocal, Player
 from utils.equipment import generate_equipment, QUALITY_ORDER
@@ -242,6 +243,8 @@ async def attempt_forge(
     # 今日次数和材料在同一个事务里一起占：任一不满足整组回滚（次数也退回）。
     # `inventory` 只是调用方的快照，真正的扣减以数据库为准。
     async with AsyncSessionLocal() as session:
+        if (refused := await refuse_if_dead(session, discord_id)):
+            return refused
         daily_count = await claim_daily_quota(
             session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, DAILY_LIMIT
         )
@@ -266,7 +269,7 @@ async def attempt_forge(
                     .values(lifespan=func.max(1, Player.lifespan - lifespan_loss))
                 )
                 await session.commit()
-        return {
+        result = {
             "ok": False,
             "success": False,
             "consequence": consequence,
@@ -275,6 +278,8 @@ async def attempt_forge(
             "success_rate": success_rate,
             "daily_count": daily_count,
         }
+        await rumors.on_forge(discord_id, result)
+        return result
 
     equip_tier = ORE_TO_EQUIP_TIER.get(ore_name, 0)
 
@@ -299,7 +304,7 @@ async def attempt_forge(
     else:
         new_level, new_exp, leveled_up = await add_forging_exp(discord_id, FORGING_EXP_PER_CRAFT)
 
-    return {
+    result = {
         "ok": True,
         "success": True,
         "equipment": equipment,
@@ -313,6 +318,8 @@ async def attempt_forge(
         "exam_passed": exam_passed,
         "daily_count": daily_count,
     }
+    await rumors.on_forge(discord_id, result)
+    return result
 
 
 async def attempt_reforge(
@@ -345,6 +352,8 @@ async def attempt_reforge(
     # 矿石与灵石在同一事务里一起扣：原先先扣矿石、再另开事务扣灵石，
     # 中途失败会白吞矿石。
     async with AsyncSessionLocal() as session:
+        if (refused := await refuse_if_dead(session, discord_id)):
+            return refused
         if not await consume_item(session, discord_id, ore_name, ore_qty):
             return {"ok": False, "reason": f"「{ore_name}」不足，需要 {ore_qty} 个。"}
         if not await spend_stones(session, discord_id, stone_cost):
@@ -382,6 +391,8 @@ async def start_forging_exam(discord_id: str) -> dict:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
+        if player.is_dead:
+            return {"ok": False, "reason": DEAD_REASON}
         if player.forging_level > 0:
             return {"ok": False, "reason": "你已经是炼器师了。"}
 

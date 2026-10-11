@@ -457,7 +457,7 @@
     "desc": "采药时服用，下次采集获得量 +30%，并缩短采集冷却20%，一次性消耗，不可叠加。",
     "rarity": "稀有",
     "stackable": false,
-    "effect": { "gather_bonus_once": 30, "gather_cooldown_reduction": 20 }
+    "effect": { "gather_bonus_once": 30, "gather_cooldown_reduction_once": 20 }
   },
 
   "行商赚宝丹": {

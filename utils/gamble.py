@@ -2,7 +2,7 @@ import json
 import os
 import random
 
-from utils.atomic import claim_daily_quota, grant_stones, spend_stones
+from utils.atomic import DEAD_REASON, claim_daily_quota, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player
 
 _config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "gamble_config.json")
@@ -21,6 +21,9 @@ async def do_gamble(uid: str, bet: int) -> dict:
         player = await session.get(Player, uid)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
+
+        if player.is_dead:
+            return {"ok": False, "reason": DEAD_REASON}
 
         if bet <= 0:
             return {"ok": False, "reason": "押注金额必须大于 0。"}

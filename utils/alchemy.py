@@ -5,7 +5,8 @@ import random
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from utils.atomic import claim_daily_quota, consume_item, peek_daily_used
+from utils import rumors
+from utils.atomic import claim_daily_quota, consume_item, peek_daily_used, refuse_if_dead
 from utils.db_async import AsyncSessionLocal, AlchemyMastery, Player, KnownRecipe
 
 import logging
@@ -250,6 +251,8 @@ async def attempt_alchemy(
         consumed[opt["item"]] = consumed.get(opt["item"], 0) + opt["qty"]
 
     async with AsyncSessionLocal() as session:
+        if (refused := await refuse_if_dead(session, discord_id)):
+            return refused
         for item_id, qty in consumed.items():
             if not await consume_item(session, discord_id, item_id, qty):
                 await session.rollback()
@@ -273,7 +276,7 @@ async def attempt_alchemy(
 
     if not success:
         consequence, lifespan_loss = roll_failure_consequence()
-        return {
+        result = {
             "ok": False,
             "success": False,
             "consequence": consequence,
@@ -282,6 +285,8 @@ async def attempt_alchemy(
             "success_rate": success_rate,
             "daily_count": count,
         }
+        await rumors.on_alchemy(discord_id, result)
+        return result
 
     quality_idx = calc_quality(recipe, player_soul, alchemy_level, aux_quality_bonus, mastery_count, has_yanhuo)
     quality_name = QUALITY_NAMES[quality_idx]
@@ -303,7 +308,7 @@ async def attempt_alchemy(
         exam_passed = True
         new_level = 1
 
-    return {
+    result = {
         "ok": True,
         "success": True,
         "pill": recipe["pill"],
@@ -320,3 +325,5 @@ async def attempt_alchemy(
         "daily_count": count,
         "exam_passed": exam_passed,
     }
+    await rumors.on_alchemy(discord_id, result)
+    return result

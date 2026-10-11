@@ -3,6 +3,7 @@ import random
 import time
 import uuid
 
+from utils import rumors
 from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
@@ -319,6 +320,8 @@ async def place_bid(auction_id: str, discord_id: str, amount: int) -> tuple[bool
         player = pr.fetchone()
         if not player:
             return False, "角色不存在。"
+        if player._mapping["is_dead"]:
+            return False, "道友已坐化，无法出价。"
 
         # 出价即托管（拍卖规则里写的是「出价时灵石自动冻结，被超越后立即解冻」）：
         # 出价时就把灵石扣走，被超越时立即退回。继续给自己加价时，之前托管的那份已经付过了，只补差额。
@@ -444,6 +447,8 @@ async def settle_lot(lot: dict) -> dict:
     result["winner_id"] = winner_id
     result["final_price"] = final_price
     result["seller_income"] = seller_income
+    if final_price >= rumors.load_config()["thresholds"]["auction_win_price"]:
+        await rumors.record_player_rumor("auction_win", winner_id, item=lot["item_name"], amount=final_price)
     return result
 
 

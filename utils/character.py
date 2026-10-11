@@ -119,26 +119,27 @@ BASE_STATS = {
 }
 
 
-def roll_spirit_root():
-    roll = random.random() * 100
+def roll_spirit_root(rng=random):
+    """`rng` 默认用全局 random；机器人生成传自己的 Random 以便复现。"""
+    roll = rng.random() * 100
     if roll < 1:
         root_type = "单灵根"
-        elements = [random.choice(SPIRIT_ROOT_TYPES)]
+        elements = [rng.choice(SPIRIT_ROOT_TYPES)]
     elif roll < 10:
         root_type = "双灵根"
-        elements = random.sample(SPIRIT_ROOT_TYPES, 2)
+        elements = rng.sample(SPIRIT_ROOT_TYPES, 2)
     elif roll < 30:
         root_type = "三灵根"
-        elements = random.sample(SPIRIT_ROOT_TYPES, 3)
+        elements = rng.sample(SPIRIT_ROOT_TYPES, 3)
     elif roll < 65:
         root_type = "四灵根"
-        elements = random.sample(SPIRIT_ROOT_TYPES, 4)
+        elements = rng.sample(SPIRIT_ROOT_TYPES, 4)
     elif roll < 95:
         root_type = "五灵根"
         elements = SPIRIT_ROOT_TYPES[:]
     else:
         root_type = "变异灵根"
-        elements = [random.choice(VARIANT_TYPES)]
+        elements = [rng.choice(VARIANT_TYPES)]
     return "·".join(elements), root_type
 
 

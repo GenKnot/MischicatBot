@@ -5,8 +5,8 @@
 B51 —— 突破用的丹药（筑基丹 / 凝丹丹 / 化婴丹 / 破障丹）只有 `breakthrough_bonus` 一个效果，而突破逻辑是在突破时
   自己从背包里取药（面板上的『服用筑基丹冲关』）。`使用 筑基丹` 却会扣掉一颗、回复『下次突破成功率 +40%』，
   实际没有记录任何加成 —— 一颗稀有丹药白白消失。现在直接拒绝并告诉玩家去突破面板用，丹药不扣。
-B52 —— `破障丹`（『提升所有境界突破成功率 20%』）在突破逻辑里根本没有接入，哪里都用不上。
-  这是游戏内容缺口，不是代码 bug：`使用` 对它给出明确提示，丹药不扣；要不要接入突破请你定。
+B52 —— `破障丹`（『提升所有境界突破成功率 20%』）原先在突破逻辑里根本没有接入。按你的决定接入：
+  `使用` 写入一次性 buff `breakthrough_bonus_once`，下一次任意境界的突破 +20%，成败都消耗（见 test_breakthrough_buff.py）。
 B53 —— `出售` 先扣物品、再另开事务加灵石：两步之间出错（崩溃、数据库锁）物品就白没了。改成同一个事务。
 """
 
@@ -289,9 +289,42 @@ async def test_使用_永久属性丹_不会超过上限(db, cog):
 BUFF_CASES = [
     ("聚灵丹", "cultivation_speed_bonus"), ("战魄丹", "combat_power_bonus"), ("遁形丹", "escape_bonus_once"),
     ("探灵丹", "explore_rare_bonus_once"), ("丰收丹", "gather_bonus_once"), ("速灵丹", "gather_cooldown_reduction"),
+    ("百草增益丹", "gather_cooldown_reduction_once"),
     ("回春丹", "combat_lifespan_restore"), ("财运丹", "spirit_stones_bonus_once"), ("声望丹", "reputation_bonus_once"),
     ("五行归元丹", "stat_temp"),
 ]
+
+
+def test_B56_百草增益丹与速灵丹用不同的冷却键():
+    assert ITEMS["速灵丹"]["effect"]["gather_cooldown_reduction"] == 30 and "gather_cooldown_reduction_once" not in ITEMS["速灵丹"]["effect"]
+    herb = ITEMS["百草增益丹"]["effect"]
+    assert herb["gather_cooldown_reduction_once"] == 20 and "gather_cooldown_reduction" not in herb
+
+
+async def test_B56_使用百草增益丹_写入一次性的两个buff(db, cog):
+    await _add(db, items={"百草增益丹": 1})
+    await use(cog, ctx(), "百草增益丹")
+    b = await buffs(db)
+    assert b["gather_bonus_once"] == {"value": 30} and b["gather_cooldown_reduction_once"] == {"value": 20}
+    assert "gather_cooldown_reduction" not in b
+
+
+async def test_B56_使用速灵丹_写入限时buff(db, cog):
+    await _add(db, items={"速灵丹": 1})
+    await use(cog, ctx(), "速灵丹")
+    entry = (await buffs(db))["gather_cooldown_reduction"]
+    assert entry["value"] == 30 and entry["expires_at"] == pytest.approx(time.time() + 24 * 3600, abs=30)
+
+
+def test_每个丹药效果键都有处理():
+    """新增丹药效果键却忘了在 `使用` 里处理，会像 B51/B52 那样：扣了药什么也没发生，或者根本用不了。"""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "cogs" / "equipment.py").read_text(encoding="utf-8")
+    handled = set(re.findall(r'"(\w+)" in effect', src))
+    helpers = {"buff_duration_hours", "stat_max", "trigger", "combat_buff_charges"}
+    used = {e for v in ITEMS.values() for e in v.get("effect", {})}
+    assert not (used - handled - helpers), used - handled - helpers
 
 
 @pytest.mark.parametrize("pill,key", BUFF_CASES)
@@ -364,11 +397,20 @@ async def test_B51_使用突破丹_拒绝并指路_不扣丹(db, cog, pill):
     assert c.said("突破") and await qty(db, pill) == 1 and c.said("冲关")
 
 
-async def test_B52_破障丹_明确提示暂未接入_不扣丹(db, cog):
-    await _add(db, items={"破障丹": 1})
+async def test_B52_使用破障丹_写入一次性突破加成_扣一颗(db, cog):
+    """按你的决定接入：下一次任意境界的突破 +20%（见 test_breakthrough_buff.py）。"""
+    await _add(db, items={"破障丹": 2})
     c = ctx()
     await use(cog, c, "破障丹")
-    assert c.said("暂未") and await qty(db, "破障丹") == 1
+    assert (await buffs(db))["breakthrough_bonus_once"] == {"value": 20}
+    assert await qty(db, "破障丹") == 1 and c.said("下次突破成功率 **+20%**") and c.said("任意境界")
+
+
+async def test_B52_重复使用破障丹_不叠加(db, cog):
+    await _add(db, items={"破障丹": 2})
+    await use(cog, ctx(), "破障丹")
+    await use(cog, ctx(), "破障丹")
+    assert (await buffs(db))["breakthrough_bonus_once"] == {"value": 20}      # 再吃是刷新，不是叠加
 
 
 # --- 出售 ---------------------------------------------------------------------

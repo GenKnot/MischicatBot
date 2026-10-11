@@ -15,7 +15,11 @@ def _parse_techniques(raw) -> list:
     return result
 
 
-async def calc_power(player: dict) -> float:
+async def calc_power(player: dict, equipped: list[dict] | None = None) -> float:
+    """玩家战力。`equipped` 是该玩家已穿装备的列表；不传就自己去查库（单个玩家的场合）。
+
+    批量算很多人（战力榜）时请一次性查出所有人的装备再逐个传进来，否则每人一次查询 = N+1。
+    """
     from utils.buffs import get_combat_power_bonus, get_stat_temp, get_fortune_permanent_bonus
     base = (
         player.get("comprehension", 5) +
@@ -42,9 +46,10 @@ async def calc_power(player: dict) -> float:
     )
     speed_bonus = bonus.get("cultivation_speed", 0)
 
-    from utils.equipment_db import get_equipped
     from utils.equipment import equip_stat_bonus
-    equipped = await get_equipped(player.get("discord_id", ""))
+    if equipped is None:
+        from utils.equipment_db import get_equipped
+        equipped = await get_equipped(player.get("discord_id", ""))
     equip_bonus = equip_stat_bonus(equipped)
     equip_stat = (
         equip_bonus.get("comprehension", 0) +
@@ -77,8 +82,9 @@ async def calc_escape_rate(player: dict) -> float:
 
 
 async def roll_combat(attacker: dict, defender: dict) -> tuple[bool, float, float]:
-    atk = (await calc_power(attacker)) * random.uniform(0.85, 1.15)
-    dfn = (await calc_power(defender)) * random.uniform(0.85, 1.15)
+    from utils.bot_combat import power_multiplier              # 机器人按档位有虚拟功法装备加成；真人是 1
+    atk = (await calc_power(attacker)) * (await power_multiplier(attacker)) * random.uniform(0.85, 1.15)
+    dfn = (await calc_power(defender)) * (await power_multiplier(defender)) * random.uniform(0.85, 1.15)
     won = atk > dfn
     return won, round(atk, 1), round(dfn, 1)
 

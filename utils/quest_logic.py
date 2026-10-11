@@ -8,6 +8,7 @@ from utils.db_async import AsyncSessionLocal, Player, Inventory, Equipment
 from utils.combat import calc_power
 from utils.equipment import generate_equipment
 from utils.character import years_to_seconds, seconds_to_years
+from utils import rumors
 from utils.realms import get_realm_index
 
 log = logging.getLogger(__name__)
@@ -262,15 +263,19 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
             tier = quest_data.get("tier", "普通")
             lifespan_loss = {"普通": 2, "精英": 5, "传说": 10}.get(tier, 2)
             
+            died = False
             async with AsyncSessionLocal() as session:
                 p = await session.get(Player, discord_id)
                 if p:
                     p.lifespan = max(0, p.lifespan - lifespan_loss)
                     p.active_quest = None
                     p.quest_due = None
-                    if p.lifespan <= 0:
+                    died = p.lifespan <= 0
+                    if died:
                         p.is_dead = True
                     await session.commit()
+            if died:
+                await rumors.record_player_rumor("death_quest", discord_id)
             
             return {
                 "success": True,
@@ -292,6 +297,7 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
                         p.active_quest = None
                         p.quest_due = None
                         await session.commit()
+                await rumors.record_player_rumor("death_quest", discord_id)
                 
                 return {
                     "success": True,

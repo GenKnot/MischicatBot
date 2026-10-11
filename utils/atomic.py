@@ -170,6 +170,21 @@ async def claim_cooldown(session, discord_id: str, cooldown_col, seconds: float,
     return result.rowcount == 1
 
 
+DEAD_REASON = "道友已坐化，无法进行此操作。"
+
+
+async def refuse_if_dead(session, discord_id: str) -> dict | None:
+    """玩家已坐化时返回现成的拒绝结果 `{"ok": False, "reason": …}`，否则返回 None。
+
+    逻辑层（赌坊、打工、签到、炼丹、锻造、钱庄、交易坊……）自己拒绝已坐化的玩家，不能只靠面板入口挡：
+    机器人 / 斜杠命令等别的入口会直接调逻辑层。玩家不存在时也返回 None —— 交给调用方自己的「角色不存在」处理。
+    """
+    dead = await session.scalar(select(Player.is_dead).where(Player.discord_id == discord_id))
+    if dead:
+        return {"ok": False, "reason": DEAD_REASON}
+    return None
+
+
 def daily_used_today(used: int | None, reset_ts: float | None, now: float | None = None) -> int:
     """已读出来的『今日已用次数』按 UTC 日界折算：不是今天记录的就算 0。
 

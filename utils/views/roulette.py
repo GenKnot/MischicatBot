@@ -16,16 +16,17 @@ def _wheel_overview_embed(player: dict) -> discord.Embed:
     remaining = DAILY_LIMIT - daily_count
     wheel_str = " ".join(s["emoji"] for s in WHEEL)
 
+    total_cells = len(WHEEL)
     slot_lines = "\n".join(
-        f"{s['emoji']} **{s['label']}** — {s['count']} 格（{round(s['count']/12*100)}%）"
-        for s in SLOTS
+        f"{s['emoji']} **{s['label']}** — {s['count']} 格（{round(s['count'] / total_cells * 100)}%）"
+        for s in SLOTS if s["count"] > 0
     )
 
     embed = discord.Embed(
         title="🎡 轮转赌坊",
         description=(
             f"{wheel_str}\n\n"
-            "转盘共 12 格，固定押注 **500 灵石**，转到哪格算哪格。\n\n"
+            f"转盘共 {total_cells} 格，固定押注 **{BET} 灵石**，转到哪格算哪格。\n\n"
             f"{slot_lines}\n\n"
             f"今日剩余：**{remaining} / {DAILY_LIMIT}**　　灵石：**{player.get('spirit_stones', 0):,}**"
         ),

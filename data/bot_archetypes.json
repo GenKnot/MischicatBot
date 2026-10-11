@@ -1,0 +1,21 @@
+{
+  "_说明": "机器人性格原型。数值范围 [最小, 最大]（0~100），生成时在范围内随机；喜好 / 厌恶的物品类别从 likes / dislikes 池里抽。类别名见 utils/bot_social.CATEGORY_OF_TYPE。",
+  "archetypes": {
+    "豪爽": {"kindness": [55, 90], "greed": [20, 60], "pride": [30, 70], "talk": [50, 90],
+             "likes": ["矿石", "灵鱼", "丹药"], "dislikes": ["灵木"]},
+    "阴鸷": {"kindness": [5, 35], "greed": [40, 80], "pride": [60, 95], "talk": [10, 40],
+             "likes": ["矿石", "药材"], "dislikes": ["灵鱼", "丹药"]},
+    "贪财": {"kindness": [25, 60], "greed": [70, 100], "pride": [20, 60], "talk": [40, 80],
+             "likes": ["矿石", "灵木", "丹药"], "dislikes": ["药材"]},
+    "痴丹": {"kindness": [40, 75], "greed": [20, 60], "pride": [30, 70], "talk": [20, 60],
+             "likes": ["药材", "丹药"], "dislikes": ["矿石", "灵鱼"]},
+    "迂腐": {"kindness": [40, 70], "greed": [5, 35], "pride": [60, 90], "talk": [40, 80],
+             "likes": ["灵木", "药材"], "dislikes": ["矿石"]},
+    "话痨": {"kindness": [50, 85], "greed": [30, 70], "pride": [10, 50], "talk": [80, 100],
+             "likes": ["灵鱼", "灵木"], "dislikes": ["矿石"]},
+    "高冷": {"kindness": [10, 45], "greed": [10, 50], "pride": [70, 100], "talk": [0, 25],
+             "likes": ["丹药", "灵木"], "dislikes": ["灵鱼", "矿石"]},
+    "憨直": {"kindness": [60, 95], "greed": [5, 40], "pride": [10, 50], "talk": [30, 70],
+             "likes": ["灵鱼", "矿石", "灵木"], "dislikes": ["丹药"]}
+  }
+}

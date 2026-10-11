@@ -6,9 +6,10 @@ B55 —— 点『开始采集』时只检查了闭关 / 采集中 / 寿元，其
   · 守城期间、万宝楼拍卖进行中也能采集（菜单入口挡了，旧面板里的按钮没挡）；
   · 闭关的检查只在读库之后，写入的 UPDATE 里没有这个条件。
   现在这些条件统一写进 UPDATE 的 WHERE，并补上守城 / 拍卖检查。
-B56 —— 观察（未改）：`速灵丹` 的描述是『持续 24 小时』的限时 buff，但开始采集时 `consume_once_buff` 把它当一次性的
-  用掉了，24 小时里只有第一次采集受益。`百草增益丹` 描述是一次性，却和它用同一个 buff 键、也带 24 小时到期。
-  到底该限时还是一次性要你定（两种丹药的描述互相矛盾），这里先把现状钉住。
+B56 —— `速灵丹` 的描述是『持续 24 小时』的限时 buff，但开始采集时 `consume_once_buff` 把它当一次性的用掉了，
+  24 小时里只有第一次采集受益；`百草增益丹` 描述是一次性，却和它共用 `gather_cooldown_reduction` 这个键、也带 24 小时到期。
+  按你的决定拆成两个键：速灵丹仍是限时的 `gather_cooldown_reduction`（24 小时内每次采集都生效，不消耗）；
+  百草增益丹改用一次性的 `gather_cooldown_reduction_once`（用一次消耗）。
 """
 
 import asyncio
@@ -331,11 +332,46 @@ async def test_采集冷却缩短_不会短过3个月(db):
     assert (await row(db)).gathering_until == pytest.approx(time.time() + 0.25 * YEAR, abs=5)
 
 
-async def test_B56_限时冷却buff现状_第一次采集就被用掉(db):
-    """现状钉住：速灵丹描述『持续 24 小时』，实际第一次采集就把 buff 消耗掉了。要不要改见 ISSUES.md B56。"""
-    await _add(db, active_buffs=buffs_json(gather_cooldown_reduction={"value": 30, "expires_at": time.time() + 86400}))
+async def test_B56_限时冷却buff_24小时内每次采集都生效_不被消耗(db):
+    exp = time.time() + 86400
+    await _add(db, active_buffs=buffs_json(gather_cooldown_reduction={"value": 50, "expires_at": exp}), lifespan=100)
+    await start(2)
+    p = await row(db)
+    assert p.gathering_until == pytest.approx(time.time() + 1 * YEAR, abs=5)
+    assert json.loads(p.active_buffs)["gather_cooldown_reduction"]["expires_at"] == exp               # 还在
+    from sqlalchemy import update
+    D = db["db_async"]
+    async with D.AsyncSessionLocal() as s2:                                                          # 上一次采集结束了
+        await s2.execute(update(D.Player).values(gathering_until=None))
+        await s2.commit()
+    await start(2)
+    assert (await row(db)).lifespan == 100 - 1 - 1                                                    # 第二次同样享受缩短（各扣 1 年）
+
+
+async def test_B56_一次性冷却缩短_用一次就消耗(db):
+    await _add(db, active_buffs=buffs_json(gather_cooldown_reduction_once={"value": 20}), lifespan=100)
+    i, _ = await start(2)
+    p = await row(db)
+    assert p.gathering_until == pytest.approx(time.time() + 1.6 * YEAR, abs=5) and "时间缩短 20%" in i.last
+    assert "gather_cooldown_reduction_once" not in json.loads(p.active_buffs)
+
+
+async def test_B56_限时与一次性同时存在_叠加_只消耗一次性的(db):
+    exp = time.time() + 3600
+    await _add(db, active_buffs=buffs_json(gather_cooldown_reduction={"value": 30, "expires_at": exp},
+                                           gather_cooldown_reduction_once={"value": 20}))
+    await start(2)
+    p = await row(db)
+    assert p.gathering_until == pytest.approx(time.time() + 1.0 * YEAR, abs=5)                          # 2 × (1 - 0.5)
+    left = json.loads(p.active_buffs)
+    assert "gather_cooldown_reduction" in left and "gather_cooldown_reduction_once" not in left
+
+
+async def test_B56_缩短比例封顶_不会把时长压成负数(db):
+    await _add(db, active_buffs=buffs_json(gather_cooldown_reduction={"value": 80, "expires_at": time.time() + 3600},
+                                           gather_cooldown_reduction_once={"value": 80}))
     await start(1)
-    assert "gather_cooldown_reduction" not in json.loads((await row(db)).active_buffs)
+    assert (await row(db)).gathering_until >= time.time() + 0.25 * YEAR - 5                             # 最短仍是 3 个月
 
 
 async def test_过期的buff不生效(db):

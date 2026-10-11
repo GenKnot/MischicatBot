@@ -20,14 +20,17 @@
 
 <div class="card">
   <h2>属性榜（{{ players | length }} 人）</h2>
+  <p style="font-size:13px;color:var(--muted)">
+    {% if bots %}<a href="/stats?sort={{ sort }}&order={{ order }}">只看真人</a>{% else %}<a href="/stats?sort={{ sort }}&order={{ order }}&bots=1">含机器人</a>{% endif %}
+  </p>
 
   {% macro sort_link(col, label) %}
     {% if sort == col %}
       {% set next_order = "asc" if order == "desc" else "desc" %}
       {% set arrow = "▲" if order == "asc" else "▼" %}
-      <a href="/stats?sort={{ col }}&order={{ next_order }}" class="active">{{ label }} {{ arrow }}</a>
+      <a href="/stats?sort={{ col }}&order={{ next_order }}{% if bots %}&bots=1{% endif %}" class="active">{{ label }} {{ arrow }}</a>
     {% else %}
-      <a href="/stats?sort={{ col }}&order=desc">{{ label }}</a>
+      <a href="/stats?sort={{ col }}&order=desc{% if bots %}&bots=1{% endif %}">{{ label }}</a>
     {% endif %}
   {% endmacro %}
 
@@ -57,7 +60,7 @@
     {% for p in players %}
     <tr>
       <td style="color:var(--muted)">{{ loop.index }}</td>
-      <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a></td>
+      <td><a href="/players/{{ p.discord_id }}">{{ p.name }}</a>{% if p.is_bot %} <span class="badge badge-gray">机器人</span>{% endif %}</td>
       <td><span class="badge badge-purple">{{ p.realm }}</span></td>
       <td class="num-cell">{{ p.cultivation }}</td>
       <td class="num-cell">{{ p.lifespan }} / {{ p.lifespan_max }}</td>

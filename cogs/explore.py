@@ -9,7 +9,8 @@ from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 from utils.player import get_player
 from utils.equipment_db import give_equipment
-from utils.events import get_event_pool
+from utils import rumors
+from utils.events import RARE_EVENTS, get_event_pool
 from utils.character import seconds_to_years, get_explore_limit_bonus
 from utils.adventure_chain import get_chain_progress, get_available_chains, get_trigger_chance
 from utils.events.adventure_chains import ALL_CHAINS
@@ -268,6 +269,8 @@ class ExploreResultView(TimedView):
             )
             embed.set_footer(text=f"本轮探险次数：{count}/{limit} ｜ 奇遇触发")
             from utils.views.adventure_chain import ChainStageView
+            if stage_idx == 0:
+                await rumors.record_player_rumor("adventure_chain", uid, chain=chain["name"])
             return await interaction.followup.send(
                 interaction.user.mention,
                 embed=embed,
@@ -275,6 +278,8 @@ class ExploreResultView(TimedView):
             )
 
         event = get_event_pool(dict(player))
+        if event in RARE_EVENTS:
+            await rumors.record_player_rumor("rare_event", uid, title=event["title"])
         embed = discord.Embed(
             title=f"✦ {event['title']} ✦",
             description=event["desc"],

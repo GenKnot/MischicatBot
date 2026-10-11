@@ -3,7 +3,7 @@ import uuid
 
 from sqlalchemy import select, update
 
-from utils.atomic import grant_stones, spend_stones
+from utils.atomic import DEAD_REASON, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player, BankDeposit
 from utils.character import years_to_seconds, seconds_to_years
 
@@ -23,6 +23,13 @@ TERM_OPTIONS = [
 MIN_DEPOSIT = 20000
 TRANSFER_FEE_RATE = 0.02
 TRANSFER_MAX = 50000
+
+
+def _bank_refusal(player) -> dict | None:
+    """钱庄的统一前置：已坐化、或人不在钱庄城市时给出拒绝结果，否则 None。"""
+    if player.is_dead:
+        return {"ok": False, "reason": DEAD_REASON}
+    return _not_in_bank_city(player)
 
 
 def _not_in_bank_city(player) -> dict | None:
@@ -82,7 +89,7 @@ async def deposit_demand(discord_id: str, amount: int) -> dict:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
-        if (refused := _not_in_bank_city(player)):
+        if (refused := _bank_refusal(player)):
             return refused
         if amount <= 0:
             return {"ok": False, "reason": "存入金额必须大于 0。"}
@@ -114,10 +121,10 @@ async def withdraw_demand(discord_id: str, amount: int) -> dict:
     async with AsyncSessionLocal() as session:
         player = await session.get(Player, discord_id)
         acc = await session.get(BankAccount, discord_id)
+        if player and (refused := _bank_refusal(player)):     # 先看坐化 / 所在地，再看有没有账户
+            return refused
         if not player or not acc:
             return {"ok": False, "reason": "账户不存在。"}
-        if (refused := _not_in_bank_city(player)):
-            return refused
 
         now = time.time()
         seen_balance, seen_at = acc.demand_balance, acc.demand_deposited_at
@@ -141,7 +148,7 @@ async def deposit_term(discord_id: str, amount: int, term_years: int) -> dict:
         player = await session.get(Player, discord_id)
         if not player:
             return {"ok": False, "reason": "角色不存在。"}
-        if (refused := _not_in_bank_city(player)):
+        if (refused := _bank_refusal(player)):
             return refused
         if amount < MIN_DEPOSIT:
             return {"ok": False, "reason": f"定期存款每笔最低 {MIN_DEPOSIT:,} 灵石。"}
@@ -177,10 +184,10 @@ async def withdraw_term(discord_id: str, deposit_id: str) -> dict:
     async with AsyncSessionLocal() as session:
         player = await session.get(Player, discord_id)
         dep = await session.get(BankDeposit, deposit_id)
+        if player and (refused := _bank_refusal(player)):
+            return refused
         if not player or not dep or dep.discord_id != discord_id:
             return {"ok": False, "reason": "存款记录不存在。"}
-        if (refused := _not_in_bank_city(player)):
-            return refused
         if dep.status != "active":
             return {"ok": False, "reason": "该存款已结算。"}
 
@@ -222,8 +229,10 @@ async def transfer(sender_id: str, receiver_id: str, amount: int) -> dict:
             return {"ok": False, "reason": "角色不存在。"}
         if not receiver:
             return {"ok": False, "reason": "对方角色不存在。"}
-        if (refused := _not_in_bank_city(sender)):
+        if (refused := _bank_refusal(sender)):
             return refused
+        if receiver.is_dead:
+            return {"ok": False, "reason": "对方已坐化，无法收款。"}
         if amount <= 0 or amount > TRANSFER_MAX:
             return {"ok": False, "reason": f"单次转账上限 {TRANSFER_MAX:,} 灵石。"}
         fee = max(1, int(amount * TRANSFER_FEE_RATE))

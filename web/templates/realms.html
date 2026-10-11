@@ -5,7 +5,7 @@
 <div class="stats-grid" style="margin-bottom:32px">
   <div class="stat-card"><div class="num">{{ major_count }}</div><div class="label">大境</div></div>
   <div class="stat-card"><div class="num" style="color:var(--accent2)">{{ realm_count }}</div><div class="label">小境</div></div>
-  <div class="stat-card"><div class="num" style="color:var(--success)">{{ living_total }}</div><div class="label">在世修士</div></div>
+  <div class="stat-card"><div class="num" style="color:var(--success)">{{ living_total }}</div><div class="label">在世修士{% if bot_living %}（其中机器人 {{ bot_living }}）{% endif %}</div></div>
   <div class="stat-card"><div class="num" style="color:var(--muted)">{{ dead_total }}</div><div class="label">已坐化</div></div>
 </div>
 

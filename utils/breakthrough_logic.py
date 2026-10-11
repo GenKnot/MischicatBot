@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 from sqlalchemy import update
@@ -8,11 +9,28 @@ from utils.realms import (
     roll_breakthrough, roll_failure_outcome, apply_failure
 )
 from utils.adventure_chain import try_fox_charm
+from utils import rumors
+from utils.buffs import consume_once_buff, get_buff_value
+
+log = logging.getLogger(__name__)
 
 STALE_MESSAGE = "状态已变化，请重新尝试突破。"
 
 
-async def can_breakthrough(discord_id: str) -> tuple[bool, dict | None]:
+async def _rumor(player_dict: dict, result: dict) -> None:
+    """突破结算之后记传闻（旁路：出错不影响突破）。"""
+    try:
+        await rumors.on_breakthrough(player_dict, result)
+    except Exception:
+        log.warning("突破传闻失败", exc_info=True)
+
+
+async def load_breakthrough_state(discord_id: str) -> tuple[bool, dict | None]:
+    """按玩家 id 读库，返回 (修为是否已圆满, 玩家字典)；玩家不存在返回 (False, None)。
+
+    注意和 `utils.player.can_breakthrough(player: dict) -> bool` 区分：那个是不查库的纯判断，吃字典。
+    以前两个函数同名、签名不同，容易 import 错（ISSUES.md S8 的遗留）。
+    """
     async with AsyncSessionLocal() as session:
         player = await session.get(Player, discord_id)
         if not player:
@@ -24,6 +42,22 @@ async def can_breakthrough(discord_id: str) -> tuple[bool, dict | None]:
         player_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}
 
         return can_bt, player_dict
+
+
+BONUS_BUFF = "breakthrough_bonus_once"
+
+
+def _take_breakthrough_bonus(player_dict: dict) -> tuple[float, dict]:
+    """破障丹的一次性突破加成（B52）：返回 (加成比例, 落库时要一并写入的字段)。
+
+    没有这个 buff 时返回 (0, {})，不动 buff 表。有的话，把它从 buff 表里去掉的新值交给结算的条件写一起落库 ——
+    成败都消耗；结算若因陈旧快照被拒，整体回滚，buff 原样保留。
+    """
+    pct = get_buff_value(player_dict, BONUS_BUFF, 0)
+    if not pct or pct <= 0:
+        return 0.0, {}
+    _, raw = consume_once_buff(player_dict.get("active_buffs") or "{}", BONUS_BUFF)
+    return pct / 100.0, {"active_buffs": raw}
 
 
 async def _cas_update(session, discord_id: str, player_dict: dict, values: dict) -> str | None:
@@ -51,7 +85,8 @@ async def _cas_update(session, discord_id: str, player_dict: dict, values: dict)
     return STALE_MESSAGE
 
 
-async def _settle_success(session, discord_id: str, player_dict: dict, nxt: str) -> tuple[int, int, int] | str:
+async def _settle_success(session, discord_id: str, player_dict: dict, nxt: str,
+                          extra: dict | None = None) -> tuple[int, int, int] | str:
     """突破成功的落库：晋级、结转溢出修为、补寿元上限的增量。**不 commit**。
 
     返回 (新寿元, 新寿元上限, 寿元增量)；失败时返回原因字符串。
@@ -68,6 +103,7 @@ async def _settle_success(session, discord_id: str, player_dict: dict, nxt: str)
         "lifespan_max": new_lifespan_max,
         "cultivation": overflow,
         "last_active": time.time(),
+        **(extra or {}),
     })
     if error:
         return error
@@ -75,7 +111,7 @@ async def _settle_success(session, discord_id: str, player_dict: dict, nxt: str)
 
 
 async def _settle_failure(session, discord_id: str, player_dict: dict,
-                          new_cultivation: int, new_lifespan: int) -> dict | str:
+                          new_cultivation: int, new_lifespan: int, extra: dict | None = None) -> dict | str:
     """突破失败的落库。寿元耗尽时先看狐符能不能续命，不能才标记死亡。**不 commit**。
 
     返回的 lifespan / is_dead 是**结算之后**的真实状态 —— 狐符会把寿元救回 1 年，
@@ -86,6 +122,7 @@ async def _settle_failure(session, discord_id: str, player_dict: dict,
         "cultivation": new_cultivation,
         "lifespan": new_lifespan,
         "last_active": time.time(),
+        **(extra or {}),
     })
     if error:
         return error
@@ -107,22 +144,24 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
     if not nxt:
         return {"success": False, "message": "已至大道巅峰"}
 
+    bonus, extra = _take_breakthrough_bonus(player_dict)
     success, outcome = roll_breakthrough(
         realm,
         player_dict["physique"],
         player_dict["bone"],
-        player_dict["cultivation"]
+        player_dict["cultivation"],
+        bonus=bonus,
     )
 
     if success:
         async with AsyncSessionLocal() as session:
-            settled = await _settle_success(session, discord_id, player_dict, nxt)
+            settled = await _settle_success(session, discord_id, player_dict, nxt, extra)
             if isinstance(settled, str):
                 return {"success": False, "message": settled}
             await session.commit()
         new_lifespan, new_lifespan_max, lifespan_gain = settled
 
-        return {
+        result = {
             "success": True,
             "breakthrough": True,
             "old_realm": realm,
@@ -131,6 +170,8 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
             "lifespan_max": new_lifespan_max,
             "lifespan_gain": lifespan_gain
         }
+        await _rumor(player_dict, result)
+        return result
     else:
         new_cultivation, new_lifespan, fail_msg = apply_failure(
             player_dict["cultivation"],
@@ -138,12 +179,12 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
             outcome
         )
         async with AsyncSessionLocal() as session:
-            settled = await _settle_failure(session, discord_id, player_dict, new_cultivation, new_lifespan)
+            settled = await _settle_failure(session, discord_id, player_dict, new_cultivation, new_lifespan, extra)
             if isinstance(settled, str):
                 return {"success": False, "message": settled}
             await session.commit()
 
-        return {
+        result = {
             "success": True,
             "breakthrough": False,
             "fail_msg": fail_msg,
@@ -153,12 +194,14 @@ async def do_single_breakthrough(discord_id: str, player_dict: dict) -> dict:
             "is_dead": settled["is_dead"],
             "saved_by_charm": settled["saved_by_charm"],
         }
+        await _rumor(player_dict, result)
+        return result
 
 
 async def do_breakthrough_chain(discord_id: str) -> dict:
     chain = []
 
-    can_bt, player_dict = await can_breakthrough(discord_id)
+    can_bt, player_dict = await load_breakthrough_state(discord_id)
     if not can_bt or not player_dict:
         return {"success": False, "message": "修为未圆满"}
 
@@ -177,7 +220,7 @@ async def do_breakthrough_chain(discord_id: str) -> dict:
             )
             chain.append(f"**{result['old_realm']}** ➜ **{result['new_realm']}**（{lifespan_line}）")
 
-            can_bt, player_dict = await can_breakthrough(discord_id)
+            can_bt, player_dict = await load_breakthrough_state(discord_id)
             if not can_bt:
                 break
         else:
@@ -237,17 +280,18 @@ async def _pill_breakthrough(
             await session.rollback()
             return {"success": False, "message": f"背包中无{pill}"}
 
-        rate = rate_fn(player_dict, use_pill=use_pill)
+        bonus, extra = _take_breakthrough_bonus(player_dict)
+        rate = min(95, rate_fn(player_dict, use_pill=use_pill) + round(bonus * 100))
         success = random.random() * 100 < rate
 
         if success:
-            settled = await _settle_success(session, discord_id, player_dict, target_realm)
+            settled = await _settle_success(session, discord_id, player_dict, target_realm, extra)
             if isinstance(settled, str):
                 return {"success": False, "message": settled}
             await session.commit()
             new_lifespan, new_lifespan_max, lifespan_gain = settled
 
-            return {
+            result = {
                 "success": True,
                 "breakthrough": True,
                 "name": player_dict["name"],
@@ -257,16 +301,18 @@ async def _pill_breakthrough(
                 "lifespan_max": new_lifespan_max,
                 "lifespan_gain": lifespan_gain,
             }
+            await _rumor(player_dict, result)
+            return result
 
         new_cultivation, new_lifespan, fail_msg = apply_failure(
             player_dict["cultivation"], player_dict["lifespan"], roll_failure_outcome(from_realm)
         )
-        settled = await _settle_failure(session, discord_id, player_dict, new_cultivation, new_lifespan)
+        settled = await _settle_failure(session, discord_id, player_dict, new_cultivation, new_lifespan, extra)
         if isinstance(settled, str):
             return {"success": False, "message": settled}
         await session.commit()
 
-    return {
+    result = {
         "success": True,
         "breakthrough": False,
         "name": player_dict["name"],
@@ -277,6 +323,8 @@ async def _pill_breakthrough(
         "is_dead": settled["is_dead"],
         "saved_by_charm": settled["saved_by_charm"],
     }
+    await _rumor(player_dict, result)
+    return result
 
 
 async def handle_zhuji_breakthrough(discord_id: str, use_pill: bool) -> dict:

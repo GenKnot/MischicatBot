@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import delete, select, update
 
-from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
+from utils.atomic import DEAD_REASON, consume_item, grant_item, grant_stones, spend_stones
 from utils.equipment_db import new_equipment_row
 from utils.db_async import AsyncSessionLocal, Equipment, MarketListing, Player
 
@@ -21,6 +21,8 @@ async def _not_in_market_city(session, discord_id: str) -> dict | None:
     所以上架 / 购买在逻辑层自己再查一遍。下架 / 领回不查：走远了也不能把货困在摊位里。
     """
     player = await session.get(Player, discord_id)
+    if player is not None and player.is_dead:
+        return {"ok": False, "reason": DEAD_REASON}
     if player is not None and player.current_city in MARKET_CITIES:
         return None
     return {"ok": False, "reason": f"交易坊只在以下城市营业：{'、'.join(MARKET_CITIES)}"}

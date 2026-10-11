@@ -1,0 +1,365 @@
+{
+ "_说明": "江湖传闻。每个事件种类：score=基础分值（决定能不能上广播）、negative=是否算『丢脸 / 不幸』的事（同一人每天最多广播 1 条）、vars=模板里允许用的占位符、templates=模板。模板的格式与校验见 data/rumor_templates_README.md。",
+ "retention_days": 7,
+ "broadcast": {
+  "enabled": true,
+  "interval_hours": 2,
+  "slots_per_day": 12,
+  "human_quota": 3,
+  "human_weight": 2.0,
+  "min_score": 10,
+  "cold_hours": 3,
+  "window_hours": 6,
+  "max_per_subject_per_day": 2,
+  "negative_per_human_per_day": 1,
+  "bot_tier_weight": {
+   "炮灰": 0.5,
+   "正常": 1.0,
+   "天骄": 1.5
+  }
+ },
+ "list_size": 8,
+ "kinds": {
+  "breakthrough_minor": {
+   "score": 6,
+   "negative": false,
+   "desc": "小层突破成功",
+   "vars": [
+    "name",
+    "city",
+    "realm"
+   ],
+   "templates": [
+    "听闻{city}的{name}修为精进，已踏入{realm}。",
+    "{name}在{city}闭关有成，如今是{realm}修士了。",
+    "{city}近日传出喜讯：{name}破境，登临{realm}。",
+    "茶馆里都在说，{name}又上一层楼，到了{realm}。"
+   ]
+  },
+  "breakthrough_major": {
+   "score": 40,
+   "negative": false,
+   "desc": "跨大境的突破成功",
+   "vars": [
+    "name",
+    "city",
+    "realm"
+   ],
+   "templates": [
+    "天地灵气为之一荡！{name}在{city}破开大境，晋入{realm}，江湖又添一位人物。",
+    "{city}上空异象频生——{name}突破大境，迈入{realm}！",
+    "听闻{name}于{city}渡过大关，如今已是{realm}，可喜可贺。",
+    "{name}在{city}一举踏入{realm}，众修士无不侧目。"
+   ]
+  },
+  "breakthrough_fail": {
+   "score": 10,
+   "negative": true,
+   "desc": "突破失败",
+   "vars": [
+    "name",
+    "city",
+    "realm"
+   ],
+   "templates": [
+    "{city}传来消息，{name}冲击{realm}失利，据说灰头土脸地回去继续闭关了。",
+    "{name}在{city}尝试突破，天不遂人愿，只好卷土重来。",
+    "听闻{name}冲关未果，修为折损，好在人没事，来日方长。",
+    "{city}的{name}这回没能迈过那道坎，旁人都劝他稳一稳。"
+   ]
+  },
+  "death_old": {
+   "score": 30,
+   "negative": true,
+   "desc": "寿元耗尽坐化",
+   "vars": [
+    "name",
+    "city",
+    "realm"
+   ],
+   "templates": [
+    "{city}的{realm}修士{name}寿元耗尽，安然坐化。江湖少了一位故人。",
+    "{name}在{city}坐化，一生修行，终归大道。",
+    "听闻{realm}修士{name}于{city}寿尽，愿其魂归天道。",
+    "{city}传来噩耗：{name}寿元已尽，坐化而去。"
+   ]
+  },
+  "death_breakthrough": {
+   "score": 45,
+   "negative": true,
+   "desc": "突破失败而死",
+   "vars": [
+    "name",
+    "city",
+    "realm"
+   ],
+   "templates": [
+    "{name}冲击大道失败，在{city}陨落，江湖少了一位敢拼的修士。",
+    "听闻{name}于{city}强行破境，走火入魔，魂归天道。",
+    "{city}的{realm}修士{name}冲关失败，不幸陨落。",
+    "{name}在{city}逆天而行，终究功亏一篑，愿其安息。"
+   ]
+  },
+  "death_quest": {
+   "score": 40,
+   "negative": true,
+   "desc": "任务中陨落",
+   "vars": [
+    "name",
+    "city"
+   ],
+   "templates": [
+    "{name}在执行任务途中遭遇不测，陨落于{city}之外，江湖少了一位好汉。",
+    "听闻{name}接了一桩凶险的差事，再没回来。",
+    "{city}的{name}死于任务之中，愿其一路走好。"
+   ]
+  },
+  "kill_human": {
+   "score": 60,
+   "negative": true,
+   "desc": "真人被真人击杀",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "{city}一带血案：{name}被{target}击杀，魂归天道。",
+    "听闻{target}在{city}取了{name}的性命，江湖恩怨，难分对错。",
+    "{name}败于{target}之手，陨落于{city}。"
+   ]
+  },
+  "rob_bot": {
+   "score": 25,
+   "negative": false,
+   "desc": "真人打劫机器人",
+   "vars": [
+    "name",
+    "target",
+    "city",
+    "amount"
+   ],
+   "templates": [
+    "{city}外有人传言，{name}劫了散修{target}一把，夺走灵石{amount}。",
+    "听闻{name}在{city}截住散修{target}，搜走灵石{amount}，{target}怀恨在心。",
+    "{target}在{city}被{name}劫去灵石{amount}，不知这仇会记多久。"
+   ]
+  },
+  "cripple_bot": {
+   "score": 30,
+   "negative": false,
+   "desc": "真人废机器人修为",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "听闻{name}在{city}打散了散修{target}的一身修为，下手之狠，令人侧目。",
+    "{target}被{name}废去修为，{city}一带的散修都对{name}多了几分戒心。",
+    "{name}出手废了{target}的修为，这笔账，{target}怕是要记一辈子。"
+   ]
+  },
+  "kill_bot": {
+   "score": 55,
+   "negative": false,
+   "desc": "真人击杀机器人",
+   "vars": [
+    "name",
+    "target",
+    "city",
+    "amount"
+   ],
+   "templates": [
+    "{city}传出一桩血案：{name}击杀散修{target}，夺灵石{amount}。江湖中人皆道其杀伐果断。",
+    "{target}陨落于{city}，凶手正是{name}。",
+    "听闻{name}在{city}取了散修{target}的性命，夺得灵石{amount}，杀孽缠身。"
+   ]
+  },
+  "bot_robs_human": {
+   "score": 28,
+   "negative": true,
+   "desc": "真人被机器人劫财",
+   "vars": [
+    "name",
+    "target",
+    "city",
+    "amount"
+   ],
+   "templates": [
+    "{name}在{city}败给散修{target}，被搜去灵石{amount}，只好认栽。",
+    "听闻散修{target}在{city}劫了{name}灵石{amount}，{name}悻悻而去。",
+    "{name}挑战{target}不成，反被劫去灵石{amount}，江湖路险，且行且珍重。"
+   ]
+  },
+  "bot_kills_human": {
+   "score": 85,
+   "negative": true,
+   "desc": "真人被机器人击杀",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "噩耗！{name}在{city}败于散修{target}之手，不幸陨落。江湖路远，谨记量力而行。",
+    "听闻{name}挑战散修{target}失败，魂归天道。愿其安息。",
+    "{city}一战：{name}败，{target}胜，{name}陨落。"
+   ]
+  },
+  "alchemy_great": {
+   "score": 28,
+   "negative": false,
+   "desc": "炼出高品质丹药",
+   "vars": [
+    "name",
+    "pill",
+    "quality"
+   ],
+   "templates": [
+    "{name}开炉炼丹，竟炼出{quality}品质的{pill}，丹香满室，引来邻里侧目。",
+    "听闻{name}炼出一炉{quality}品质的{pill}，丹道天赋可见一斑。",
+    "{name}的丹炉里飞出{quality}{pill}，茶馆里都在议论这位新晋的丹道好手。"
+   ]
+  },
+  "alchemy_levelup": {
+   "score": 22,
+   "negative": false,
+   "desc": "炼丹师升品",
+   "vars": [
+    "name",
+    "level"
+   ],
+   "templates": [
+    "{name}丹道精进，晋升为{level}品炼丹师。",
+    "听闻{name}的炼丹之术又上一层，如今已是{level}品。",
+    "丹阁传来消息：{name}成为{level}品炼丹师。"
+   ]
+  },
+  "alchemy_fail": {
+   "score": 14,
+   "negative": true,
+   "desc": "炼丹失败（炉毁 / 丹毒）",
+   "vars": [
+    "name",
+    "city"
+   ],
+   "templates": [
+    "{city}的{name}开炉炼丹，一声闷响，据说丹房的屋顶这回是真没了。",
+    "听闻{name}的丹炉又炸了，药材化为一缕青烟，人倒是没事。",
+    "{name}炼丹失手，满屋黑烟，邻居纷纷表示最近不想靠近那间丹房。"
+   ]
+  },
+  "forge_great": {
+   "score": 30,
+   "negative": false,
+   "desc": "锻出史诗 / 传说装备",
+   "vars": [
+    "name",
+    "item",
+    "quality"
+   ],
+   "templates": [
+    "{name}锻出{quality}品质的{item}，炉火映红了半条街。",
+    "听闻铸造铺里诞生了一件{quality}{item}，出自{name}之手。",
+    "{name}一锤定音，打出{quality}{item}，同行都说这手艺不得了。"
+   ]
+  },
+  "forge_fail": {
+   "score": 8,
+   "negative": true,
+   "desc": "锻造失败",
+   "vars": [
+    "name"
+   ],
+   "templates": [
+    "{name}开炉锻造，炉温没控好，一堆好矿熔成了废铁。",
+    "听闻{name}锻造失败，矿石白白化作铁水，唉声叹气了一整天。"
+   ]
+  },
+  "rare_event": {
+   "score": 35,
+   "negative": false,
+   "desc": "探险遇到稀有事件",
+   "vars": [
+    "name",
+    "title",
+    "city"
+   ],
+   "templates": [
+    "{city}一带出了桩奇事：{name}撞上「{title}」，旁人都说这是天大的机缘。",
+    "听闻{name}在{city}遇上「{title}」，不知得了什么好处。",
+    "{name}在外探险，偶遇「{title}」，一时传为谈资。"
+   ]
+  },
+  "adventure_chain": {
+   "score": 45,
+   "negative": false,
+   "desc": "触发奇遇链",
+   "vars": [
+    "name",
+    "chain",
+    "city"
+   ],
+   "templates": [
+    "{name}踏入「{chain}」的奇遇，{city}的修士们都在猜他能走到哪一步。",
+    "听闻{name}在{city}触发奇遇「{chain}」，江湖又添一桩传说。"
+   ]
+  },
+  "rebirth": {
+   "score": 20,
+   "negative": false,
+   "desc": "坐化后重新入道",
+   "vars": [
+    "name"
+   ],
+   "templates": [
+    "{name}重入轮回，从头来过，江湖路上又添一位新人。",
+    "听闻{name}转世重修，愿这一世修得大道。",
+    "旧人已去，{name}重入仙途，一切都将从炼气期重新开始。"
+   ]
+  },
+  "beast_tide_hero": {
+   "score": 50,
+   "negative": false,
+   "desc": "兽潮守城贡献第一",
+   "vars": [
+    "name",
+    "city"
+   ],
+   "templates": [
+    "{city}兽潮来袭，{name}一马当先，守城贡献居首，众修士无不敬佩。",
+    "听闻妖兽围攻{city}，{name}力挽狂澜，当居首功。",
+    "{city}之战，{name}的名字被写在了贡献榜的最前面。",
+    "万兽齐鸣之夜，{name}守住了{city}的城门，这份功劳谁也抢不走。"
+   ]
+  },
+  "auction_win": {
+   "score": 30,
+   "negative": false,
+   "desc": "万宝楼拍得高价拍品",
+   "vars": [
+    "name",
+    "item",
+    "amount"
+   ],
+   "templates": [
+    "万宝楼一场激烈竞拍，{name}以{amount}灵石拍得{item}，一掷千金。",
+    "听闻{name}在万宝楼拍下{item}，价码是{amount}灵石，旁人只有艳羡的份。",
+    "{item}花落{name}家，成交价{amount}灵石，万宝楼里议论了好一阵。"
+   ]
+  }
+ },
+ "thresholds": {
+  "alchemy_great_quality_idx": 9,
+  "forge_great_qualities": [
+   "史诗",
+   "传说"
+  ],
+  "alchemy_fail_consequences": [
+   "炉毁",
+   "丹毒反噬"
+  ],
+  "auction_win_price": 3000
+ }
+}
