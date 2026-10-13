@@ -348,6 +348,108 @@
     "听闻{name}在万宝楼拍下{item}，价码是{amount}灵石，旁人只有艳羡的份。",
     "{item}花落{name}家，成交价{amount}灵石，万宝楼里议论了好一阵。"
    ]
+  },
+  "tianjiao_debut": {
+   "score": 45,
+   "negative": false,
+   "desc": "天骄出世（补位的新秀）",
+   "vars": [
+    "name",
+    "epithet",
+    "legend",
+    "city"
+   ],
+   "templates": [
+    "江湖上新出了一位天骄：人称「{epithet}」的{name}。{legend}",
+    "「{epithet}」{name}横空出世，{city}一带的修士都在打听这位新秀的来历。",
+    "又一位天骄崭露头角——「{epithet}」{name}。{legend}",
+    "听闻{city}出了位人物，名号「{epithet}」，本名{name}，众人议论纷纷。"
+   ]
+  },
+  "tianjiao_rise": {
+   "score": 70,
+   "negative": false,
+   "desc": "天骄跨大境突破",
+   "vars": [
+    "name",
+    "epithet",
+    "realm",
+    "city"
+   ],
+   "templates": [
+    "天骄「{epithet}」{name}在{city}破开大境，晋入{realm}，江湖为之侧目。",
+    "「{epithet}」{name}再进一步，已是{realm}修士。有人说，这一代的天骄，就数他走得最稳。",
+    "听闻「{epithet}」{name}于{city}突破，入了{realm}。后来者，要追上他可不容易。",
+    "{city}上空灵气翻涌，「{epithet}」{name}登临{realm}，天骄之名，实至名归。"
+   ]
+  },
+  "tianjiao_fall_old": {
+   "score": 55,
+   "negative": true,
+   "desc": "天骄寿尽坐化",
+   "vars": [
+    "name",
+    "epithet",
+    "realm",
+    "city"
+   ],
+   "templates": [
+    "一代天骄「{epithet}」{name}寿元耗尽，坐化于{city}。曾经的{realm}修士，终究敌不过岁月。",
+    "听闻「{epithet}」{name}在{city}坐化，江湖少了一位传奇。",
+    "「{epithet}」{name}寿尽陨落，{city}的茶馆里，今夜多了几声叹息。",
+    "天骄「{epithet}」{name}的一生，在{city}画上了句号。愿其安息。"
+   ]
+  },
+  "tianjiao_fall_breakthrough": {
+   "score": 70,
+   "negative": true,
+   "desc": "天骄突破失败而死",
+   "vars": [
+    "name",
+    "epithet",
+    "realm",
+    "city"
+   ],
+   "templates": [
+    "天骄「{epithet}」{name}强行冲关，不幸陨落于{city}。有人说，这是天骄的宿命。",
+    "「{epithet}」{name}冲击大道失败，魂归天道，江湖叹息不已。",
+    "听闻「{epithet}」{name}在{city}走火入魔，一代天骄，就此陨落。",
+    "「{epithet}」{name}倒在了破境的路上，{city}的修士们沉默了许久。"
+   ]
+  },
+  "tianjiao_ascend": {
+   "score": 90,
+   "negative": false,
+   "desc": "天骄飞升",
+   "vars": [
+    "name",
+    "epithet",
+    "realm",
+    "city"
+   ],
+   "templates": [
+    "{city}上空异象频生，天骄「{epithet}」{name}破碎虚空，飞升而去！",
+    "听闻「{epithet}」{name}于{city}渡劫飞升，留下一段传说，江湖再无此人。",
+    "「{epithet}」{name}在{realm}登峰造极，白日飞升。后来者仰望天空，久久不语。",
+    "一代天骄「{epithet}」{name}飞升了，茶馆里的说书人，又多了一段新故事。"
+   ]
+  },
+  "tianjiao_killed": {
+   "score": 95,
+   "negative": false,
+   "desc": "真人击杀天骄",
+   "vars": [
+    "name",
+    "target",
+    "epithet",
+    "city"
+   ],
+   "templates": [
+    "{city}传出惊人消息：{name}击杀了天骄「{epithet}」{target}！江湖震动。",
+    "天骄「{epithet}」{target}陨落于{city}，凶手正是{name}。此事，怕是要传很久。",
+    "听闻{name}在{city}一战斩了「{epithet}」{target}，从此名声大噪。",
+    "「{epithet}」{target}败亡于{name}之手，天骄不再不可战胜。"
+   ]
   }
  },
  "thresholds": {

@@ -1,0 +1,30 @@
+{
+ "_说明": "机器人的『行为画像』（U1·江湖百态 P1）。在 8 个性格原型和 kindness（善意，已有）之外再加几条轴，决定它在交友、结仇、复仇、处置敌人时『怎么做』。每条轴 0~100：lawful=守序（100 守序 / 0 混乱）、impulse=冲动（100 冲动 / 0 谨慎）、loyalty=义气（重情义程度）、vengeful=记仇、capacity=关系容量（认识的人上限，0~50）。deviance=偏离概率（0~1）：每次做决定时有这么大的概率『反常』—— 善恶、守序混乱倒过来（善良的人也会一时冲动做坏事）。archetypes 里给每个原型每条轴一个 [最小, 最大]；origin_mods 是出身对轴的加减（可省略，缺省为 0）。新增原型时这里要补一份（测试会检查）。",
+ "archetypes": {
+  "豪爽": {"lawful": [20, 60], "impulse": [55, 90], "loyalty": [70, 100], "vengeful": [30, 60], "capacity": [10, 50], "deviance": [0.05, 0.2]},
+  "憨直": {"lawful": [55, 90], "impulse": [30, 70], "loyalty": [60, 95], "vengeful": [20, 55], "capacity": [5, 35], "deviance": [0.02, 0.1]},
+  "痴丹": {"lawful": [40, 80], "impulse": [20, 50], "loyalty": [20, 50], "vengeful": [10, 35], "capacity": [0, 15], "deviance": [0.02, 0.1]},
+  "话痨": {"lawful": [20, 60], "impulse": [50, 85], "loyalty": [40, 75], "vengeful": [10, 40], "capacity": [15, 50], "deviance": [0.08, 0.2]},
+  "迂腐": {"lawful": [75, 100], "impulse": [5, 35], "loyalty": [40, 75], "vengeful": [25, 55], "capacity": [3, 25], "deviance": [0.01, 0.06]},
+  "高冷": {"lawful": [40, 75], "impulse": [10, 40], "loyalty": [15, 50], "vengeful": [20, 55], "capacity": [0, 12], "deviance": [0.03, 0.12]},
+  "贪财": {"lawful": [10, 50], "impulse": [40, 75], "loyalty": [10, 45], "vengeful": [30, 65], "capacity": [5, 40], "deviance": [0.05, 0.2]},
+  "阴鸷": {"lawful": [15, 55], "impulse": [5, 35], "loyalty": [30, 70], "vengeful": [70, 100], "capacity": [2, 25], "deviance": [0.03, 0.12]}
+ },
+ "origin_mods": {
+  "农户": {"lawful": 10, "impulse": -5},
+  "书香": {"lawful": 10, "impulse": -10},
+  "商贾": {"loyalty": -5, "vengeful": 5},
+  "将门": {"lawful": 10, "loyalty": 10, "impulse": 5},
+  "孤儿": {"loyalty": 10, "vengeful": 10, "lawful": -5},
+  "没落世家": {"vengeful": 10, "lawful": 5},
+  "宗门弃徒": {"lawful": -10, "vengeful": 10, "loyalty": -5},
+  "卖艺人": {"impulse": 10, "lawful": -5},
+  "渔村": {"impulse": 5, "loyalty": 5},
+  "矿工之子": {"loyalty": 5, "lawful": 5},
+  "药铺学徒": {"lawful": 5, "impulse": -5},
+  "流浪": {"lawful": -10, "loyalty": -5, "impulse": 5},
+  "官宦": {"lawful": 10, "vengeful": 5},
+  "猎户": {"impulse": 5, "vengeful": 5}
+ },
+ "thresholds": {"high": 60, "low": 40}
+}

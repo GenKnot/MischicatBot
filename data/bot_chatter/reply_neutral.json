@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "reply_neutral",
+ "rules": [
+  {
+   "lines": [
+    "哦。",
+    "嗯，是吗。",
+    "这样啊。"
+   ]
+  },
+  {
+   "lines": [
+    "哦？行吧。"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……哦。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "嗯。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哦，这样啊……然后呢？"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "原来如此。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哦。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

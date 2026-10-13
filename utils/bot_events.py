@@ -20,7 +20,7 @@ import time
 from sqlalchemy import func, select, text, update
 
 from utils import bot_economy as be
-from utils import bot_social
+from utils import bot_chatter, bot_social, bot_ties
 from utils.db_async import AsyncSessionLocal, BotPersonality, Player
 
 log = logging.getLogger(__name__)
@@ -95,6 +95,7 @@ async def join_spirit_rain(event_id: str, city: str, beast_tide: bool, rng: rand
     out = {"joined": 0, "activities": 0, "defenders": 0, "stones": 0, "skipped_budget": 0}
     budget = cfg["activity_reward_budget_per_event"]
     now = time.time()
+    present = []                                              # 这场活动里碰了面的机器人（共同经历，会互相认识）
     async with AsyncSessionLocal() as session:
         bots = [{c.key: getattr(p, c.key) for c in p.__table__.columns} for p in await _alive_bots(session, in_city=city)]
         tiers = dict((await session.execute(select(BotPersonality.bot_id, BotPersonality.tier))).all())
@@ -124,8 +125,11 @@ async def join_spirit_rain(event_id: str, city: str, beast_tide: bool, rng: rand
             if took_part:
                 await _clamp_stats(uid, stat_cap(tiers.get(uid) or "正常", full))
             out["joined"] += took_part
+            if took_part:
+                present.append(uid)
         except Exception:
             log.exception("机器人参与灵雨失败：%s", uid)
+    await bot_ties.meet_group(present, "公共事件", rng, max_pairs=cfg.get("meet_pairs_per_event", 40))
     return out
 
 
@@ -135,6 +139,7 @@ async def on_spirit_rain_start(event_id: str, city: str, beast_tide: bool, rng: 
         moved = await migrate_to_city(city, rng)
         out = await join_spirit_rain(event_id, city, beast_tide, rng)
         out["migrated"] = moved
+        await bot_chatter.queue_event(event_id, city, "before", beast_tide, rng)           # 在场的熟人说两句
         log.info("机器人参与灵雨 %s：%s", event_id, out)
         return out
     except Exception:
@@ -161,6 +166,7 @@ async def send_home(event_id: str, city: str) -> int:
 async def on_spirit_rain_end(event: dict) -> int:
     try:
         data = json.loads(event.get("data") or "{}")
+        await bot_chatter.queue_event(event["event_id"], data.get("city", ""), "after", bool(data.get("beast_tide")))
         return await send_home(event["event_id"], data.get("city", ""))
     except Exception:
         log.exception("机器人回城失败：%s", event.get("event_id"))

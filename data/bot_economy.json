@@ -139,7 +139,7 @@
       "share": 0.15,
       "cap": 150
     },
-    "can_kill_humans": false,
+    "can_kill_humans": true,
     "kill_protect_below": "筑基期1层"
   },
   "public_events": {
@@ -173,5 +173,9 @@
     },
     "stat_cap_over_tier": 3,
     "bots_compete_for_defense_rewards": true
+  },
+  "tianjiao": {
+    "ascend_after_days": 14,
+    "ascend_chance": 0.3
   }
 }

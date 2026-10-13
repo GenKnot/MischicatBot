@@ -14,6 +14,7 @@ import random
 import time
 from pathlib import Path
 
+from utils import bot_grudges, bot_memory, bot_ties
 from utils.atomic import consume_item, grant_item, refuse_if_dead
 from utils.bot_dialogue import get_line
 from utils.bots import bot_refusal, is_bot_id
@@ -88,7 +89,7 @@ async def save_personality(bot_id: str, p: dict) -> None:
 
 
 def _personality_dict(row: BotPersonality) -> dict:
-    return {"archetype": row.archetype, "tier": row.tier, "kindness": row.kindness, "greed": row.greed, "pride": row.pride,
+    return {"traits": json.loads(row.traits) if row.traits else None, "profile": json.loads(row.profile) if row.profile else None, "epithet": row.epithet, "backstory": row.backstory, "archetype": row.archetype, "tier": row.tier, "kindness": row.kindness, "greed": row.greed, "pride": row.pride,
             "talk": row.talk, "likes": json.loads(row.likes or "{}"), "dislikes": json.loads(row.dislikes or "{}")}
 
 
@@ -145,7 +146,9 @@ async def adjust_favor(player_id: str, bot_id: str, delta: int) -> int:
         row.favor = _clamp(row.favor + delta)
         row.last_interact = time.time()
         await session.commit()
-        return row.favor
+        favor = row.favor
+    await bot_ties.sync_player_tie(player_id, bot_id, favor)          # 好感到了线：相识 → 朋友 / 仇敌
+    return favor
 
 
 async def _touch(session) -> None:
@@ -212,9 +215,13 @@ async def give_gift(player_id: str, bot_id: str, item_name: str) -> dict:
         rel.favor = _clamp(rel.favor + delta)
         rel.last_interact = time.time()
         await session.commit()
-        return {"ok": True, "reaction": reaction, "delta": delta, "favor": rel.favor,
-                "tier": favor_tier(rel.favor), "bot_name": bot.name,
-                "gifts_left": MAX_GIFTS_PER_DAY - rel.gifts_today}
+        result = {"ok": True, "reaction": reaction, "delta": delta, "favor": rel.favor,
+                  "tier": favor_tier(rel.favor), "bot_name": bot.name,
+                  "gifts_left": MAX_GIFTS_PER_DAY - rel.gifts_today}
+    await bot_memory.remember(player_id, bot_id, "gift", item_name, reaction)       # 记住这份礼（提交之后；旁路）
+    await bot_ties.sync_player_tie(player_id, bot_id, result["favor"])
+    await bot_grudges.on_gift(player_id, bot_id, result["delta"])           # 好礼能让对方消点气
+    return result
 
 
 async def chat(player_id: str, bot_id: str) -> dict:
@@ -226,6 +233,8 @@ async def chat(player_id: str, bot_id: str) -> dict:
             return {"ok": False, "reason": reason}
         rel = await _relation(session, player_id, bot_id, _today())
         delta = 0
+        first_today = not rel.chatted_today
+        city = bot.current_city
         if not rel.chatted_today:
             row = await session.get(BotPersonality, bot_id)
             delta = CHAT_DELTA_TALKATIVE if row and row.talk >= TALKATIVE_AT else CHAT_DELTA
@@ -233,7 +242,11 @@ async def chat(player_id: str, bot_id: str) -> dict:
             rel.favor = _clamp(rel.favor + delta)
         rel.last_interact = time.time()
         await session.commit()
-        return {"ok": True, "delta": delta, "favor": rel.favor, "tier": favor_tier(rel.favor), "bot_name": bot.name}
+        result = {"ok": True, "delta": delta, "favor": rel.favor, "tier": favor_tier(rel.favor), "bot_name": bot.name}
+    if first_today:                                          # 每天只记一次（重复点『搭话』不算多聊）
+        await bot_memory.remember(player_id, bot_id, "chat", "", city)
+    await bot_ties.sync_player_tie(player_id, bot_id, result["favor"])
+    return result
 
 
 # ---- 台词 -------------------------------------------------------------------
@@ -244,8 +257,16 @@ async def say(scene: str, player_id: str, bot_id: str, **fmt) -> str:
         row = await session.get(BotPersonality, bot_id)
         rel = await session.get(BotRelation, (player_id, bot_id))
         player, bot = await session.get(Player, player_id), await session.get(Player, bot_id)
-    return get_line(row.archetype if row else None, scene, favor_tier(rel.favor if rel else 0),
-                    player=player.name if player else "道友", bot=bot.name if bot else "在下", **fmt)
+    traits = json.loads(row.traits) if row and row.traits else None
+    archetype, tier = row.archetype if row else None, favor_tier(rel.favor if rel else 0)
+    names = {"player": player.name if player else "道友", "bot": bot.name if bot else "在下"}
+    line = get_line(archetype, scene, tier, traits=traits, **names, **fmt)
+    if scene in bot_memory.RECALL_SCENES:                    # 偶尔追加一句回忆（纯文案）
+        picked = bot_memory.pick_recall(await bot_memory.recall(player_id, bot_id), scene, tier,
+                                        (traits or {}).get("introversion", "中性"))
+        if picked:
+            line += get_line(archetype, picked[0], tier, traits=traits, **names, **picked[1])
+    return line
 
 
 # ---- 闸门 -------------------------------------------------------------------

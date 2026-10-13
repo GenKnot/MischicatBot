@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_ask_borrow_item",
+ "rules": [
+  {
+   "lines": [
+    "{player}，能把你的{item}借我用用吗？",
+    "{player}，借我一{item}，用完就还。",
+    "{player}，我缺一{item}，你那儿有吗？借我使使。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，借我一{item}使使，回头还你！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，我想借你的{item}，用完马上还。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，借我{item}，我炼丹正缺这个。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！你有{item}吧？借我用用，我跟你说，我真的很需要！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，在下欲借{item}一用，不日奉还。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……借我{item}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，借我{item}，我有门路，转手就还你双份。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，你手里那件{item}……借我吧。"
+   ]
+  }
+ ]
+}

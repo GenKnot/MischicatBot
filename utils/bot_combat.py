@@ -6,13 +6,14 @@
 · **废修为**：机器人修为归零；声望 -2，好感 -60；和打劫共用每天 3 次。
 · **击杀**：拿机器人随身灵石的 30%（单次 ≤300），钱庄里的钱随人消失；每个真人每天最多 5 次，**全服每天最多 10 个**
   （补员每天只补得起这么多，真人猎杀太快世界会塌陷，见 .gk/ISSUES.md「劫杀」）；声望 -5（天骄 -10）。
-· **打输了被擒获**（逃跑没成功）：机器人按性格处置 —— 放走 / 劫你随身 15%（≤150）/ 杀（**总开关 combat.can_kill_humans 默认关**，
-  且对方境界低于 kill_protect_below 的永远不杀）。
+· **打输了被擒获**（逃跑没成功）：机器人按性格处置 —— 放走 / 劫你随身 15%（≤150）/ 杀（**要同时满足：世界模式是『真实』（utils/world_settings）、
+  combat.can_kill_humans 没被配置关掉、对方境界不低于 kill_protect_below**）。
 
 所有数值在 data/bot_economy.json 的 combat 里。每个动作是一个事务：计数、扣钱、给钱、声望一起提交或一起回滚，
 落空（机器人身上没钱、已经死了）不占用当天次数。
 """
 
+import json
 import logging
 import random
 
@@ -20,7 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from utils import bot_economy as be
-from utils import bot_social, bot_world, rumors
+from utils import bot_chatter, bot_grudges, bot_memory, bot_profile, bot_social, bot_world, rumors, world_settings
 from utils.atomic import grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, BotPersonality, BotRaid, Player
 from utils.realms import get_realm_index
@@ -96,11 +97,14 @@ async def rob_bot(human_id: str, bot_id: str) -> dict:
         amount = min(int(bot.spirit_stones * cfg["rob"]["share"]), cfg["rob"]["cap"])
         if amount <= 0 or not await spend_stones(session, bot_id, amount):
             await session.rollback()
+            await bot_grudges.on_offense(human_id, bot_id, "rob_fail")      # 没劫到钱也算冒犯（轻一些）
             return {"ok": False, "reason": f"**{name}** 身上已经没什么油水了。"}
         await grant_stones(session, human_id, amount)
         await _lose_reputation(session, human_id, cfg["cost"]["rob"]["reputation"])
         await session.commit()
     favor = await bot_social.adjust_favor(human_id, bot_id, cfg["cost"]["rob"]["favor"])
+    await bot_memory.remember(human_id, bot_id, "robbed", "", str(amount))
+    await bot_chatter.queue_conflict(human_id, bot_id, "rob", await bot_grudges.on_offense(human_id, bot_id, "rob"))
     await rumors.record_rumor("rob_bot", human_id, hname, target=name, city=city, amount=amount)
     return {"ok": True, "amount": amount, "bot_name": name, "favor": favor}
 
@@ -123,6 +127,8 @@ async def cripple_bot(human_id: str, bot_id: str) -> dict:
         await _lose_reputation(session, human_id, cfg["cost"]["cripple"]["reputation"])
         await session.commit()
     favor = await bot_social.adjust_favor(human_id, bot_id, cfg["cost"]["cripple"]["favor"])
+    await bot_memory.remember(human_id, bot_id, "crippled")
+    await bot_chatter.queue_conflict(human_id, bot_id, "cripple", await bot_grudges.on_offense(human_id, bot_id, "cripple"))
     await rumors.record_rumor("cripple_bot", human_id, hname, target=name, city=city)
     return {"ok": True, "bot_name": name, "favor": favor}
 
@@ -143,7 +149,8 @@ async def kill_bot(human_id: str, bot_id: str) -> dict:
         if not await _claim_raid(session, ALL, "kills", cfg["kill"]["global_per_day"]):
             await session.rollback()                          # 同时撤销上面占的个人次数
             return {"ok": False, "reason": f"今天全服已有 {cfg['kill']['global_per_day']} 名散修被击杀，江湖需要休养生息，明日再来。"}
-        tier = await session.scalar(select(BotPersonality.tier).where(BotPersonality.bot_id == bot_id))
+        tier, epithet = (await session.execute(select(BotPersonality.tier, BotPersonality.epithet)
+                                                .where(BotPersonality.bot_id == bot_id))).one_or_none() or (None, "")
         res = await session.execute(update(Player).where(Player.discord_id == bot_id, Player.is_dead == False)  # noqa: E712
                                     .values(is_dead=True, lifespan=0))
         if res.rowcount != 1:
@@ -157,8 +164,13 @@ async def kill_bot(human_id: str, bot_id: str) -> dict:
         cost = cfg["cost"]["kill"]
         await _lose_reputation(session, human_id, cost["reputation_tianjiao"] if tier == "天骄" else cost["reputation"])
         await session.commit()
+    holders = await bot_grudges.on_offense(human_id, bot_id, "kill")      # 必须在清理之前：它的朋友要从关系网里找
+    await bot_chatter.queue_conflict(human_id, bot_id, "kill", holders)
     await bot_world.remove_bots([bot_id])                 # 名下的东西、钱庄、好感记录一起清走；失败了下次结算也会清死掉的机器人
-    await rumors.record_rumor("kill_bot", human_id, hname, target=name, city=city, amount=reward)
+    if tier == "天骄":                                        # 击杀天骄是大新闻，用专门的种类（带称号）
+        await rumors.record_rumor("tianjiao_killed", human_id, hname, target=name, epithet=epithet or name, city=city)
+    else:
+        await rumors.record_rumor("kill_bot", human_id, hname, target=name, city=city, amount=reward)
     return {"ok": True, "amount": reward, "bot_name": name, "tier": tier}
 
 
@@ -166,6 +178,7 @@ async def handle_captive(bot_id: str, human_id: str, rng: random.Random | None =
     """真人攻击机器人打输了、又没逃掉：机器人按性格处置。返回 {"outcome": release/rob/kill, "amount", "killed"}。"""
     rng = rng or random.Random()
     cfg = be.load_config()["combat"]
+    mode_allows_kill = await world_settings.bots_can_kill_humans()
     async with AsyncSessionLocal() as session:
         await _lock(session)
         pair = await _check_pair(session, human_id, bot_id)
@@ -177,8 +190,10 @@ async def handle_captive(bot_id: str, human_id: str, rng: random.Random | None =
         persona = await session.get(BotPersonality, bot_id)
         archetype = persona.archetype if persona else "憨直"
         protected = get_realm_index(human.realm) < get_realm_index(cfg["kill_protect_below"])
-        can_kill = bool(cfg["can_kill_humans"]) and not protected
-        outcome = be.captive_outcome(archetype, be.load_config(), can_kill=can_kill, rng=rng)
+        can_kill = bool(cfg["can_kill_humans"]) and mode_allows_kill and not protected
+        profile = json.loads(persona.profile) if persona and persona.profile else None
+        shift = bot_profile.captive_shift(persona.kindness if persona else 50, profile, rng)      # 善恶 / 守序混乱 / 偶尔反常
+        outcome = be.captive_outcome(archetype, be.load_config(), can_kill=can_kill, rng=rng, shift=shift)
         amount = 0
         if outcome in ("rob", "kill"):
             amount = min(int(human.spirit_stones * cfg["captive_rob"]["share"]), cfg["captive_rob"]["cap"])
@@ -196,6 +211,12 @@ async def handle_captive(bot_id: str, human_id: str, rng: random.Random | None =
         elif outcome == "rob" and amount == 0:
             outcome = "release"                             # 身上没钱可劫，只好放走
         await session.commit()
+    if not killed:
+        await bot_memory.remember(human_id, bot_id, "defeated", "", outcome)
+    if killed:                                              # 机器人杀了真人：他的朋友（关系网里的人）记仇，他自己记进前世仇人
+        await bot_grudges.on_offense(bot_id, human_id, "kill")
+    elif outcome == "rob":
+        await bot_grudges.on_offense(bot_id, human_id, "rob")
     if killed:
         await rumors.record_rumor("bot_kills_human", human_id, hname, target=bname, city=city)
     elif outcome == "rob":

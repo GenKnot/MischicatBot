@@ -1,0 +1,120 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_event_after",
+ "rules": [
+  {
+   "lines": [
+    "{event}结束了，{player}，辛苦了。",
+    "{player}，刚才的{event}你也在吧？"
+   ]
+  },
+  {
+   "lines": [
+    "兽潮退了，{player}，这回多亏了你。"
+   ],
+   "when": {
+    "event": [
+     "兽潮"
+    ],
+    "tier": [
+     "熟识",
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "兽潮散了。你还活着，不错。"
+   ],
+   "when": {
+    "event": [
+     "兽潮"
+    ],
+    "tier": [
+     "仇视",
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}过后，{player}，来喝一杯，说说你的战绩！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}结束了，{player}，你没受伤吧？"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}后灵气还没散，{player}，别浪费了。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！刚才{event}你看到了没？我跟你说，场面那叫一个……"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}已毕，诸位辛苦了。{player}，可曾有所得？"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}结束了。……还行。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}结束了，{player}，收成怎么样？分我点？"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}结束了……{player}，你的表现，我都看在眼里。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

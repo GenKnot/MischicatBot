@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_gather_done",
+ "rules": [
+  {
+   "lines": [
+    "{player}，今天{what}，多亏有你。",
+    "{player}，一起{what}，收获不错。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "痛快！{player}，一起{what}，兄弟记着你的好！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，谢谢你陪我{what}，我不怕了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，{what}顺利，药材够用一阵了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！今天{what}太开心了，我跟你说下回还一起！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，同行{what}，受益良多。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{what}，不错。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，{what}收获可观，说好五五分，拿着。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，{what}……有你在，很好。"
+   ]
+  }
+ ]
+}

@@ -14,6 +14,7 @@ import time
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 
+from utils import bot_memory
 from utils import rumors
 from utils.character import REALM_LIFESPAN, calc_stats, roll_spirit_root
 from utils.death_rebirth_logic import calculate_rebirth_bonus
@@ -38,6 +39,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
 
         bonus: dict = {}
         is_rebirth = old is not None
+        old_created = old.created_at if old is not None else 0
         if old is not None:
             if old.sect == "仙葬谷" or old.has_bahongchen:
                 bonus = calculate_rebirth_bonus({c.key: getattr(old, c.key) for c in old.__table__.columns})
@@ -48,7 +50,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
                 cultivation=0, realm="炼气期1层", cultivating_until=None, cultivating_years=None,
                 is_dead=False, is_virgin=True, sect=None, sect_rank=None, techniques="[]",
                 dual_partner_id=None, cultivation_overflow=0, current_city=city,
-                explore_count=0, explore_reset_year=0, reputation=0, cave=None,
+                explore_count=0, explore_reset_year=0, reputation=0, fame=0, cave=None,
                 active_quest=None, quest_due=None, gathering_until=None, gathering_type=None,
                 created_at=now, last_active=now,
             )
@@ -59,6 +61,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
             if res.rowcount != 1:
                 await session.rollback()
                 return None
+            await bot_memory.forget_player(session, uid, life=int(old_created))        # 新的一世：机器人不认识你了
         else:
             session.add(Player(
                 discord_id=uid, name=name, gender=gender,

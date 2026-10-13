@@ -256,6 +256,10 @@ class ExploreResultView(TimedView):
             return await interaction.followup.send("探险次数已用尽，请稍后再试。", ephemeral=True)
         player = await get_player(uid)
 
+        from utils.views.ambush import run_hook
+        if await run_hook(interaction.followup.send, interaction.user, "explore"):          # 记仇的人找上门：打断这次探险
+            return
+
         # 优先检查奇遇链
         chain, stage_idx = await _try_adventure_chain(dict(player))
         if chain is not None:
@@ -489,6 +493,10 @@ class ExploreCog(commands.Cog, name="Explore"):
         if not await _increment_explore(uid, player):
             return await ctx.send(f"{ctx.author.mention} 探险次数已用尽，请稍后再试。")
         player = await get_player(uid)
+
+        from utils.views.ambush import run_hook
+        if await run_hook(ctx.send, ctx.author, "explore"):          # 记仇的人找上门：打断这次探险
+            return
 
         # 优先检查奇遇链
         chain, stage_idx = await _try_adventure_chain(dict(player))

@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_repay_plus",
+ "rules": [
+  {
+   "lines": [
+    "{player}，借你的灵石，连本带谢意共{amount}灵石，收下吧。",
+    "{player}，当年多亏你，这是{amount}灵石，多出来的算谢礼。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}！当年多亏你，这是{amount}灵石，多出的是兄弟的心意！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，这是{amount}灵石，多的是谢你的。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石，多出来的是谢你的。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！我特地多还了点，一共{amount}灵石，你可得收下！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，奉还{amount}灵石，其中薄礼，聊表谢意。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{amount}灵石，多的算谢你。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，连本带利{amount}灵石，下回还找我借啊。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石……多出的是利息，别嫌少。"
+   ]
+  }
+ ]
+}

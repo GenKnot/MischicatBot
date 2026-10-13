@@ -238,3 +238,7 @@ class GatherButton(discord.ui.Button):
             f"采集结束后将收到通知。"
         )
         view.stop()
+        from utils.views.ambush import run_hook
+        await run_hook(interaction.followup.send, interaction.user, "gathering")     # 采集到一半，记仇的人找上门
+        from utils.views.requests import run_gather
+        await run_gather(interaction.followup.send, interaction.user, player["current_city"])      # 约好陪采集的机器人一起去

@@ -113,13 +113,16 @@ async def test_打劫_比例与单次上限(db, stones, expect):
     assert res["ok"] is (expect > 0) and res.get("amount", 0) == expect
 
 
-async def test_打劫_落空不占次数_不扣声望_不记仇(db):
+async def test_打劫_落空不占次数_不扣声望_不改好感_但记一笔轻仇(db):
+    from utils import bot_grudges
     await mk_human(db)
     await mk_bot(db, stones=0)
     res = await bc.rob_bot(H, B)
     assert res["ok"] is False and "没什么油水" in res["reason"]
     assert await raids(db) == (0, 0) and (await get(db, H)).reputation == 10
     assert await bot_social.get_favor(H, B) == 0
+    (g,) = await bot_grudges.grudges_of(B)
+    assert g["kind"] == "rob_fail" and g["target"] == H and "曾想打劫你" in g["reason"] and g["severity"] < 20
 
 
 async def test_打劫_每人每天三次_第二天重新算(db, monkeypatch):
@@ -276,18 +279,40 @@ async def test_擒获_身上没钱可劫就放走(db, reaction):
     assert (await bc.handle_captive(B, H, random.Random(0)))["outcome"] == "release"
 
 
-async def test_擒获_杀人的总开关默认关(db, reaction):
-    assert be.load_config()["combat"]["can_kill_humans"] is False
+async def test_擒获_默认的正常模式机器人不杀人(db, reaction):
+    """现网升级默认『正常』模式：机器人不杀玩家（配置里的 can_kill_humans 只是硬上限，默认放开）。"""
+    assert be.load_config()["combat"]["can_kill_humans"] is True
     reaction("阴鸷", kill=100)
     await mk_human(db, stones=1000, realm="筑基期5层")
     await mk_bot(db, archetype="阴鸷")
     res = await bc.handle_captive(B, H, random.Random(0))
-    assert res["outcome"] == "rob" and res["killed"] is False, "开关关着：杀的权重并入劫财"
+    assert res["outcome"] == "rob" and res["killed"] is False, "模式不允许：杀的权重并入劫财"
     assert not (await get(db, H)).is_dead
 
 
-async def test_擒获_开关打开_高境界的真人会被杀(db, reaction, cfg, caplog):
-    cfg(combat={"can_kill_humans": True})
+@pytest.mark.parametrize("mode,kills", [("幸福", False), ("正常", False), ("真实", True)])
+async def test_擒获_只有真实模式才杀(db, reaction, mode, kills):
+    from utils import world_settings
+    await world_settings.set_values(mode=mode)
+    reaction("阴鸷", kill=100)
+    await mk_human(db, stones=1000, realm="筑基期5层")
+    await mk_bot(db, archetype="阴鸷")
+    assert (await bc.handle_captive(B, H, random.Random(0)))["killed"] is kills
+
+
+async def test_擒获_配置里关掉can_kill_humans_真实模式也不杀(db, reaction, cfg):
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
+    cfg(combat={"can_kill_humans": False})
+    reaction("阴鸷", kill=100)
+    await mk_human(db, stones=1000, realm="筑基期5层")
+    await mk_bot(db, archetype="阴鸷")
+    assert (await bc.handle_captive(B, H, random.Random(0)))["killed"] is False
+
+
+async def test_擒获_真实模式_高境界的真人会被杀(db, reaction, caplog):
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
     reaction("阴鸷", kill=100)
     await mk_human(db, stones=1000, realm="筑基期5层")
     await mk_bot(db, archetype="阴鸷", stones=0)
@@ -299,8 +324,9 @@ async def test_擒获_开关打开_高境界的真人会被杀(db, reaction, cfg
     assert "击杀了真人" in caplog.text
 
 
-async def test_擒获_新手受保护_永远不杀(db, reaction, cfg):
-    cfg(combat={"can_kill_humans": True})
+async def test_擒获_新手受保护_永远不杀(db, reaction):
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
     reaction("阴鸷", kill=100)
     await mk_human(db, stones=1000, realm="炼气期9层")                        # 低于 kill_protect_below（筑基期1层）
     await mk_bot(db, archetype="阴鸷")
@@ -310,8 +336,9 @@ async def test_擒获_新手受保护_永远不杀(db, reaction, cfg):
     assert not (await get(db, H)).is_dead
 
 
-async def test_擒获_不在同一个地方就放走(db, reaction, cfg):
-    cfg(combat={"can_kill_humans": True})
+async def test_擒获_不在同一个地方就放走(db, reaction):
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
     reaction("阴鸷", kill=100)
     await mk_human(db, realm="筑基期5层")
     await mk_bot(db, archetype="阴鸷", city=CITY)
@@ -416,6 +443,8 @@ async def test_攻击机器人_输了但逃脱_不被处置(db, monkeypatch):
 
 
 async def test_攻击机器人_输了被杀_战报写明(db, monkeypatch):
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
     await mk_human(db, stones=1000, realm="筑基期5层")
     await mk_bot(db, archetype="阴鸷", stones=0)
     fix_fight(monkeypatch, False, escaped=False)

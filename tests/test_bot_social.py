@@ -111,7 +111,7 @@ def test_不同种子的性格有差别():
 
 async def test_性格存取往返(db):
     await bs.save_personality(BOT, PERSONA)
-    assert await bs.get_personality(BOT) == {**PERSONA, "tier": "正常"}
+    assert await bs.get_personality(BOT) == {**PERSONA, "tier": "正常", "epithet": "", "backstory": "", "traits": None, "profile": None}
     assert await bs.get_personality("bot_99999") is None
     await bs.save_personality(BOT, {**PERSONA, "kindness": 7})          # 覆盖而不是重复
     assert (await bs.get_personality(BOT))["kindness"] == 7

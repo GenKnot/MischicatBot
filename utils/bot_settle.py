@@ -13,6 +13,7 @@
 一个机器人出错只记日志、不影响别的机器人（和闭关 / 采集结算同样的隔离，B24）。
 """
 
+import json
 import logging
 import random
 import time
@@ -23,6 +24,8 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from utils import bot_economy as be
 from utils import bot_world, rumors
+from utils import bot_grudges, bot_profile, bot_ties, bot_traits
+from utils.bot_legends import make_legend
 from utils.atomic import grant_item, increment_player, spend_stones
 from utils.breakthrough_logic import (do_single_breakthrough, handle_huaying_breakthrough,
                                       handle_ningdan_breakthrough, handle_zhuji_breakthrough,
@@ -36,7 +39,7 @@ log = logging.getLogger(__name__)
 PILL_HANDLERS = {"筑基丹": handle_zhuji_breakthrough, "凝丹丹": handle_ningdan_breakthrough,
                  "化婴丹": handle_huaying_breakthrough}
 SUMMARY_KEYS = ("bots", "settled", "skipped", "errors", "income", "upkeep", "pills", "materials_value",
-                "breakthroughs", "bt_failures", "gate_wait", "capped", "deaths", "refilled", "wild_trips", "cleaned")
+                "breakthroughs", "bt_failures", "gate_wait", "capped", "deaths", "ascended", "refilled", "wild_trips", "cleaned")
 RAID_KEEP_DAYS = 3                                           # 打劫 / 击杀次数的记录只留最近几天
 
 
@@ -135,6 +138,15 @@ async def _settle_economy(bot_id: str, tier: str, archetype: str, day: str, forc
         persona = await session.get(BotPersonality, bot_id)
         if not persona.home_city and player.current_city not in be.WILD_NAMES:
             persona.home_city = player.current_city          # 老机器人补上常驻城市
+        if not persona.traits:                               # 老机器人补上说话特质（按 id 做种子，可复现）
+            persona.traits = json.dumps(bot_traits.roll_traits(archetype, persona.talk, random.Random(f"{bot_id}:traits")),
+                                        ensure_ascii=False)
+        if not persona.profile:                              # 老机器人补上行为画像（同样按 id 做种子）
+            origin = (json.loads(persona.traits) if persona.traits else {}).get("origin")
+            persona.profile = json.dumps(bot_profile.roll_profile(archetype, origin, random.Random(f"{bot_id}:profile")))
+        if tier == "天骄" and not persona.epithet:           # 老天骄补上称号和背景
+            persona.epithet, persona.backstory = make_legend(archetype, persona.home_city or player.current_city,
+                                                             random.Random(bot_id))
         if player.current_city in be.WILD_NAMES:
             player.current_city = persona.home_city or player.current_city
         elif not dead and not (player.cultivating_until and player.cultivating_until > time.time()):
@@ -145,17 +157,45 @@ async def _settle_economy(bot_id: str, tier: str, archetype: str, day: str, forc
     return dead
 
 
-async def _breakthrough(bot_id: str, cfg: dict, ceiling_idx: int, sm: Counter) -> bool:
-    """尝试一次突破。返回 True = 这个机器人死了。"""
+async def _set_capped_days(bot_id: str, days: int | None) -> int:
+    """天骄『顶在天花板上』的连续天数：None = 清零，否则 +1。返回新的天数。"""
+    async with AsyncSessionLocal() as session:
+        await _lock(session)
+        value = BotPersonality.capped_days + 1 if days is not None else 0
+        await session.execute(update(BotPersonality).where(BotPersonality.bot_id == bot_id).values(capped_days=value))
+        n = await session.scalar(select(BotPersonality.capped_days).where(BotPersonality.bot_id == bot_id))
+        await session.commit()
+    return n or 0
+
+
+async def _try_ascend(bot_id: str, tier: str, player: dict, cfg: dict, rng: random.Random) -> bool:
+    """天骄顶在天花板上够了日子，每天有一定几率飞升。飞升的传闻在这里记（人还在，查得到称号）。"""
+    if tier != "天骄":
+        return False
+    days = await _set_capped_days(bot_id, 1)
+    tj = cfg["tianjiao"]
+    if days < tj["ascend_after_days"] or rng.random() >= tj["ascend_chance"]:
+        return False
+    epithet = await rumors.tianjiao_epithet(bot_id)
+    await rumors.record_player_rumor("tianjiao_ascend", bot_id, epithet=epithet or player["name"], realm=player["realm"])
+    return True
+
+
+async def _breakthrough(bot_id: str, tier: str, cfg: dict, ceiling_idx: int, rng: random.Random, sm: Counter) -> str | None:
+    """尝试一次突破。返回 "dead"（死了）/ "ascended"（天骄飞升）/ None。"""
     can_bt, player = await load_breakthrough_state(bot_id)
     if not can_bt or not player:
-        return False
+        if tier == "天骄":
+            await _set_capped_days(bot_id, None)
+        return None
     nxt = next_realm(player["realm"])
     if not nxt or get_realm_index(nxt) > ceiling_idx:
         sm["capped"] += 1                                    # 到了天花板：攒着修为等真人先走一步
-        return False
+        return "ascended" if await _try_ascend(bot_id, tier, player, cfg, rng) else None
+    if tier == "天骄":
+        await _set_capped_days(bot_id, None)
     if player.get("cultivating_until") and player["cultivating_until"] > time.time():
-        return False                                         # 正在闭关 / 双修，不打扰
+        return None                                          # 正在闭关 / 双修，不打扰
 
     gate = be.gate_price(player["realm"], cfg)
     refund = None
@@ -167,7 +207,7 @@ async def _breakthrough(bot_id: str, cfg: dict, ceiling_idx: int, sm: Counter) -
             if refund is None:
                 await session.rollback()
                 sm["gate_wait"] += 1                         # 买不起丹，继续等
-                return False
+                return None
             await grant_item(session, bot_id, pill, 1)
             await session.commit()
         result = await PILL_HANDLERS[pill](bot_id, True)
@@ -189,12 +229,12 @@ async def _breakthrough(bot_id: str, cfg: dict, ceiling_idx: int, sm: Counter) -
 
     if not result.get("success"):
         log.info("机器人 %s 突破未能进行：%s", bot_id, result.get("message"))
-        return False
+        return None
     if result.get("breakthrough"):
         sm["breakthroughs"] += 1
-        return False
+        return None
     sm["bt_failures"] += 1
-    return bool(result.get("is_dead"))
+    return "dead" if result.get("is_dead") else None
 
 
 async def _settle_bot(bot_id: str, tier: str, archetype: str, day: str, force: bool, cfg: dict, scale: float,
@@ -204,13 +244,15 @@ async def _settle_bot(bot_id: str, tier: str, archetype: str, day: str, force: b
         sm["skipped"] += 1
         return
     sm["settled"] += 1
+    fate = None
     if dead:
-        await rumors.record_player_rumor("death_old", bot_id)          # 寿元耗尽（突破致死的传闻在突破逻辑里记）
+        await rumors.on_bot_old_age(bot_id)                  # 寿元耗尽（突破致死的传闻在突破逻辑里记）；天骄用专门的种类
+        fate = "dead"
     else:
-        dead = await _breakthrough(bot_id, cfg, ceiling_idx, sm)
-    if dead:
-        await bot_world.remove_bots([bot_id])                # 遗产随人消失
-        sm["deaths"] += 1
+        fate = await _breakthrough(bot_id, tier, cfg, ceiling_idx, rng, sm)
+    if fate:
+        await bot_world.remove_bots([bot_id])                # 遗产随人消失；天骄离场会留一个空缺，补员时补新秀
+        sm["ascended" if fate == "ascended" else "deaths"] += 1
 
 
 async def _cleanup(day: str) -> int:
@@ -236,7 +278,7 @@ async def _refill(day: str, force: bool, cfg: dict, rng: random.Random, sm: Coun
         count = min(target - alive, be.refill_cap(target, cfg))
         await bot_world.set_state(session, "refill_day", day)
         await session.commit()
-    res = await bot_world.generate_bots(count, rng, track_target=False)
+    res = await bot_world.generate_bots(count, rng, track_target=False, fill_vacancies=True)
     if res["ok"]:
         sm["refilled"] += len(res["created"])
     else:
@@ -274,6 +316,8 @@ async def run_settlement(*, force: bool = False, rng: random.Random | None = Non
         sm["errors"] += 1
         log.exception("机器人补员失败")
     out = dict(sm)
+    out["social"] = await bot_ties.social_day(day, rng, force=force)
+    out["grudges"] = await bot_grudges.grudge_day(day, rng, force=force)         # 仇恨：续期 / 潜伏 / 淡去        # 一天的社交：碰面、反目、和解、结拜
     out["ceiling_index"] = ceiling_idx
     if sm["settled"] or sm["refilled"] or sm["errors"]:
         log.info("机器人每日结算：%s", out)

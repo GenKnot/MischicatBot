@@ -2,6 +2,8 @@ import random
 import time
 import json
 from sqlalchemy import select
+from utils import bot_memory
+from utils.bots import is_bot_id
 from utils.bot_social import bot_gate
 from utils.db_async import AsyncSessionLocal, Player
 from utils.character import calc_cultivation_gain, years_to_seconds, get_cultivation_bonus
@@ -219,6 +221,10 @@ async def start_dual_cultivation(inviter_id: str, target_id: str, multiplier: fl
                 "修为略有提升（**1.2倍**）"
             )
         
+        for human, bot in ((inviter_id, target_id), (target_id, inviter_id)):      # 和机器人双修：它会记住
+            if is_bot_id(bot) and not is_bot_id(human):
+                await bot_memory.remember(human, bot, "dual")
+
         return {
             "success": True,
             "flavor": flavor,

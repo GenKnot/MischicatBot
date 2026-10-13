@@ -1,0 +1,129 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_event_before",
+ "rules": [
+  {
+   "lines": [
+    "{city}要有{event}了，{player}，你也来吧。",
+    "{event}将临{city}，别错过了。"
+   ]
+  },
+  {
+   "lines": [
+    "兽潮来了，{player}，守城的时候我给你压阵。"
+   ],
+   "when": {
+    "event": [
+     "兽潮"
+    ],
+    "tier": [
+     "熟识",
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "兽潮……各自保重吧。"
+   ],
+   "when": {
+    "event": [
+     "兽潮"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}？那是你们的事。"
+   ],
+   "when": {
+    "event": [
+     "灵雨"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{city}要有{event}了！痛快，咱们去凑个热闹！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}要来了，{city}这边我会守着。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}？灵气浓郁，正适合炼丹。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "听说{city}要有{event}了！你去不去？快去快去！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}将至，诸位当有序而行，莫要争抢。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}。我会去。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}来了，{city}又有好东西可捞了。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{event}……有趣，有的人要倒霉了。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

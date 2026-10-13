@@ -146,6 +146,14 @@ class TravelCog(commands.Cog, name="Travel"):
             from utils.views.travel import TravelAfterMoveView
             view = TravelAfterMoveView(ctx.author, menu_cog)
         await _out(ctx.author.mention, embed=embed, view=view)
+        channel = getattr(component_interaction, "channel", None)
+        send = channel.send if channel is not None else ctx.send
+        if get_region(target["name"]):                       # 进了秘地：记仇的人可能已经在等
+            from utils.views.ambush import run_hook
+            await run_hook(send, ctx.author, "travel_wild")
+        else:                                                # 进了城：熟人可能迎上来打个招呼
+            from utils.views.chatter import run_arrive
+            await run_arrive(send, ctx.author, target["name"])
 
     @commands.hybrid_command(name="世界", aliases=["sj"], description="查看天下城市与区域分布")
     async def world_map(self, ctx):

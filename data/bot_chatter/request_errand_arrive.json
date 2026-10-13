@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_errand_arrive",
+ "rules": [
+  {
+   "lines": [
+    "{player}，你替{asker}送的信我收到了，多谢。",
+    "是{asker}托你带的信吧？辛苦你了，{player}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "哈哈，{asker}那小子的信！{player}，辛苦了，一起喝一杯！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "是{asker}的信……谢谢你，{player}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{asker}的信？{player}，多谢你跑一趟。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "哎呀{asker}的信！{player}你可算送到了，我跟你说我等了好久！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{asker}之信，劳阁下远送，感激不尽。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{asker}的信。收到了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{asker}的信？{player}，这点辛苦钱收下。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "呵，{asker}的信……{player}，辛苦了。"
+   ]
+  }
+ ]
+}

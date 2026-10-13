@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_ask_gather_together",
+ "rules": [
+  {
+   "lines": [
+    "{player}，陪我去{what}吧，一个人怪闷的。",
+    "{player}，有空陪我去{what}吗？人多有个照应。",
+    "{player}，一起去{what}怎么样？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，走，陪兄弟去{what}，回来喝酒！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，你……你陪我去{what}好不好？我一个人有点怕。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，陪我去{what}吧，我要找几味药材。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！陪我去{what}吧，路上我跟你说说最近的新鲜事！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，在下欲往{what}，阁下可愿同行？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{player}，陪我去{what}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，陪我去{what}，收获五五分。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，陪我去{what}……有你在，我放心些。"
+   ]
+  }
+ ]
+}

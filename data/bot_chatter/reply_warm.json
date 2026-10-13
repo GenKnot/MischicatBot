@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "reply_warm",
+ "rules": [
+  {
+   "lines": [
+    "哈哈，好！{player}，你这人我喜欢！",
+    "你这么说，我心里踏实多了。",
+    "谢谢你，{player}，能遇见你真好。"
+   ]
+  },
+  {
+   "lines": [
+    "痛快！{player}，改天一起喝酒！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "嗯！{player}，我记住了。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哦？那下回我分你一颗丹。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哎呀太好了，我跟你说，我现在心情特别好！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "阁下厚爱，在下愧不敢当，感激不尽。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……谢谢。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哈哈，{player}，有你这句话，值千金。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，{player}，我记下了。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

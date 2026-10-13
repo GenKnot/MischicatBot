@@ -9,6 +9,7 @@ from utils.realms import (
     roll_breakthrough, roll_failure_outcome, apply_failure
 )
 from utils.adventure_chain import try_fox_charm
+from utils import bot_chatter
 from utils import rumors
 from utils.buffs import consume_once_buff, get_buff_value
 
@@ -23,6 +24,7 @@ async def _rumor(player_dict: dict, result: dict) -> None:
         await rumors.on_breakthrough(player_dict, result)
     except Exception:
         log.warning("突破传闻失败", exc_info=True)
+    await bot_chatter.on_breakthrough(player_dict, result)            # 熟人道贺（旁路，自己兜住错误）
 
 
 async def load_breakthrough_state(discord_id: str) -> tuple[bool, dict | None]:

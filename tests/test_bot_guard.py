@@ -231,6 +231,9 @@ REAL_ONLY, INCLUDE_BOTS = "REAL_ONLY", "INCLUDE_BOTS"
 TRAVERSALS = {
     "utils/events/public/spirit_rain.py": {REAL_ONLY: 1},
     "utils/bot_events.py": {INCLUDE_BOTS: 1},
+    "utils/bot_chatter.py": {INCLUDE_BOTS: 1},          # 道贺：按熟人 ID 列表取在世的机器人，不是全表遍历
+    "utils/bot_ambush.py": {INCLUDE_BOTS: 2},           # 拦路：按 ID 取玩家 / 同伴的名字；组团时取拦路者亲友和同城路人，不是全表遍历
+    "utils/bot_grudges.py": {INCLUDE_BOTS: 1},          # on_offense 里按 ID 列表取关系网上的人（受害者的朋友们），不是全表遍历
     "cogs/cultivation.py": {INCLUDE_BOTS: 4},
     "cogs/tavern.py": {INCLUDE_BOTS: 1},
     "cogs/explore.py": {INCLUDE_BOTS: 1},

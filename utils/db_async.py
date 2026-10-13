@@ -63,6 +63,8 @@ class Player(Base):
     realm: Mapped[str] = mapped_column(String, default="炼气期1层", server_default=text("'炼气期1层'"))
     spirit_stones: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     reputation: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    # 知名度（和 reputation 道德声望分开）：决定一件事传多远，见 utils/fame.py
+    fame: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
     last_active: Mapped[float] = mapped_column(Float, nullable=False)
     cultivating_until: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -280,6 +282,155 @@ class BotPersonality(Base):
     tier: Mapped[str] = mapped_column(String, default="正常", server_default=text("'正常'"))   # 炮灰 / 正常 / 天骄
     settled_day: Mapped[str] = mapped_column(String, default="", server_default=text("''"))    # 最后一次每日结算的日期
     home_city: Mapped[str] = mapped_column(String, default="", server_default=text("''"))      # 常驻城市（去秘地历练后回这里）
+    epithet: Mapped[str] = mapped_column(String, default="", server_default=text("''"))        # 天骄的称号
+    backstory: Mapped[str] = mapped_column(Text, default="", server_default=text("''"))        # 天骄的一句话背景
+    capped_days: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))     # 连续顶在天花板上的天数
+    traits: Mapped[str] = mapped_column(Text, default="", server_default=text("''"))           # 说话特质（JSON，见 utils/bot_traits.py）
+    profile: Mapped[str] = mapped_column(Text, default="", server_default=text("''"))          # 行为画像（JSON，见 utils/bot_profile.py）
+
+
+class BotTie(Base):
+    """人与人之间的关系（U1·江湖百态 P2）：一对人一行（a_id < b_id），机器人 × 机器人，或真人 × 机器人。
+
+    kind：相识 / 朋友 / 结拜 / 同门 / 仇敌；strength 0~100；bond_id 是结拜 / 同门的『团体』编号（多人结拜共用一个）；
+    note 记当初怎么认识的（同城 / 组队 / 公共事件 / 出生）。
+    """
+    __tablename__ = "bot_ties"
+
+    a_id: Mapped[str] = mapped_column(String, primary_key=True)
+    b_id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="相识", server_default=text("'相识'"))
+    strength: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    since: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    last_event: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    bond_id: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    note: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+
+
+class BotGrudge(Base):
+    """仇恨账本（U1·江湖百态 P3）：holder 恨 target，为了 victim（被冒犯的人；holder 自己就是受害者时 victim == holder）。
+
+    reason 是写给玩家看的具体原因（『王某杀害了你的结拜兄弟李某』）；severity 0~100 累加；
+    state：active（蹲守中）/ dormant（窗口到期、没再续，但仇恨还在，新事件或相遇会重新激活）；
+    known_at：holder 得知此事的时间（受害者没名气时朋友要过一阵才知道）；window_until：蹲守窗口结束时间；
+    style：直接 / 隐忍 / 等待时机（性格决定的复仇方式）；stubborn：少数『执着』的人，窗口特别长。
+    """
+    __tablename__ = "bot_grudges"
+
+    holder_id: Mapped[str] = mapped_column(String, primary_key=True)
+    target_id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    victim_id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    reason: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    severity: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    events: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    state: Mapped[str] = mapped_column(String, default="active", server_default=text("'active'"))
+    style: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    stubborn: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+    created_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    known_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    window_until: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    renewals: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    last_ambush_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    last_apology: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+
+
+class PlayerEnemy(Base):
+    """玩家前世的仇人（转世 / 重建角色后还在）：玩家记得是谁杀了自己，机器人却不认识新的他。"""
+    __tablename__ = "player_enemies"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    enemy_id: Mapped[str] = mapped_column(String, primary_key=True)
+    life: Mapped[int] = mapped_column(Integer, primary_key=True, default=1, server_default=text("1"))
+    enemy_name: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    reason: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    since: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+
+
+class BotEncounter(Base):
+    """一次拦路遭遇（U1·江湖百态 P4）。stage：choose（等玩家选逃跑 / 迎战，超时算逃跑）→ bargain（玩家败了，交涉中，超时算拒绝）→ done。
+    状态存库，bot 重启后由后台循环收尾，不会让玩家卡在半路。"""
+    __tablename__ = "bot_encounters"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    target_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    leader_id: Mapped[str] = mapped_column(String, nullable=False)
+    companions: Mapped[str] = mapped_column(Text, default="[]", server_default=text("'[]'"))
+    rescuer_id: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    victim_id: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    reason: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    severity: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    context: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    stage: Mapped[str] = mapped_column(String, default="choose", server_default=text("'choose'"))
+    created_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    expires_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    channel_id: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    message_id: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    price: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    result: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+
+
+class PlayerAmbush(Base):
+    """玩家最近一次被拦路的时间（全局冷却）和保护期（被废 / 被杀之后一段时间不再被拦）。"""
+    __tablename__ = "player_ambush"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    last_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    protect_until: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+
+
+class ChatterState(Base):
+    """玩家收到机器人主动搭话的计数（每天上限）和屏蔽开关（U1·江湖百态 P5）。屏蔽只管搭话消息，不管仇恨 / 拦路。"""
+    __tablename__ = "chatter_state"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    day: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    muted: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
+
+
+class ChatterPair(Base):
+    """某机器人最近一次主动找某玩家说话的时间（同一对之间的冷却）。"""
+    __tablename__ = "chatter_pair"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(String, primary_key=True)
+    last_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+
+
+class ChatterQueue(Base):
+    """延迟发送的搭话：突破道贺、公共事件前后、冲突后放话。到点由 cogs/chatter.py 的后台循环发（台词在发送时才生成）。"""
+    __tablename__ = "chatter_queue"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    player_id: Mapped[str] = mapped_column(String, nullable=False)
+    speaker_id: Mapped[str] = mapped_column(String, nullable=False)
+    scene: Mapped[str] = mapped_column(String, nullable=False)
+    fmt: Mapped[str] = mapped_column(Text, default="{}", server_default=text("'{}'"))
+    due_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), index=True)
+    sent_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    outcome: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+
+
+class BotRequest(Base):
+    """机器人对熟人（真人）提的请求 / 委托：借灵石、借物品、送信、陪着采集……（数据驱动，模板在 data/bot_requests.json）。
+
+    state：offered（刚提出，等玩家答复）→ active（答应了：借出去的钱 / 物品等着还，送信 / 陪采集等着办）→ done / defaulted（赖账）/ failed（没办成）/
+    declined / expired。params 随模板不同：amount、item、target_bot、city、what……；due_at：到期时间（还钱 / 办完的期限）。
+    """
+    __tablename__ = "bot_requests"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(String, nullable=False)
+    player_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    template: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[str] = mapped_column(String, default="offered", server_default=text("'offered'"))
+    params: Mapped[str] = mapped_column(Text, default="{}", server_default=text("'{}'"))
+    created_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    due_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    updated_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    note: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
 
 
 class BotWorldState(Base):
@@ -312,6 +463,24 @@ class RumorOptout(Base):
     __tablename__ = "rumor_optout"
 
     player_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class BotMemory(Base):
+    """机器人对某个真人的记忆（U1·关系记忆）：送过的礼物、聊天、被打劫、一起组队双修、被你攻击失败……
+
+    一个 (真人, 机器人, 种类, 细节) 一行：count 次数，extra 补充（礼物的反应 / 打劫的灵石 / 上次见面的城市……），
+    prev_at 是『上一次』的时间（用来说『好久不见』），last_at 是最近一次。机器人没了，记忆也跟着没了。"""
+    __tablename__ = "bot_memories"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, primary_key=True)
+    detail: Mapped[str] = mapped_column(String, primary_key=True, default="", server_default=text("''"))
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    extra: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    first_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    prev_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    last_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
 
 
 class BotRaid(Base):

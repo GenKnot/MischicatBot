@@ -28,7 +28,7 @@ def test_配置是拷贝_改了不影响别人():
 
 
 def test_杀人开关默认关():
-    assert CFG["combat"]["can_kill_humans"] is False and CFG["combat"]["kill_protect_below"] == "筑基期1层"
+    assert CFG["combat"]["can_kill_humans"] is True and CFG["combat"]["kill_protect_below"] == "筑基期1层"
 
 
 def test_配置里是用户定下的数值():

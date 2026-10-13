@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_ask_borrow_stones",
+ "rules": [
+  {
+   "lines": [
+    "{player}，能借我{amount}灵石周转一下吗？",
+    "{player}，手头有点紧，借我{amount}灵石，行吗？",
+    "{player}，借我{amount}灵石，我很快还你。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，兄弟手头紧，借我{amount}灵石！改日加倍请你喝酒！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，我……能不能借我{amount}灵石？我会还的。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，我炼丹缺材料，借我{amount}灵石，行吗？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！我跟你说，最近真是手头紧，能借我{amount}灵石不？我保证很快还！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，在下囊中羞涩，欲借{amount}灵石，来日必当奉还。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{player}，借我{amount}灵石。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，借我{amount}灵石，我有笔好买卖，回头分你一成。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，借我{amount}灵石……你不会拒绝吧？"
+   ]
+  }
+ ]
+}

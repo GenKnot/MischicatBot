@@ -1,0 +1,160 @@
+{
+ "_说明": "拦路遭遇的配置（U1·江湖百态 P4）。只在玩家在线、做『野外动作』（探险 / 前往秘地 / 采集）的当下判定一次。幸福模式不拦路；正常模式最重废修为；真实模式才可能杀人。chance：按拦路者与玩家的大境界差给基础概率，多个人一起找你时叠加（上限 multi_cap）；global_cooldown_years：同一个玩家两次被拦的间隔（用户定 3 游戏年，1 年 = 现实 2 小时）；per_pair_years：同一个蹲守者对同一个玩家至少隔多久。outcome：赢了之后的处置权重（按性格），再乘仇恨轻重、对方的行为画像、玩家的回应。 companions：同伴不设人数上限（max=null）；谁会加入——拦路者的结拜 / 同门 / 朋友（按关系和各自义气，不同城打折）、城里爱打抱不平的路人、同样记恨你的其它蹲守者；人多了战力加成和逃跑难度按幂递减（power_exponent / flee_exponent）。",
+ "modes": [
+  "正常",
+  "真实"
+ ],
+ "contexts": {
+  "explore": 1.0,
+  "travel_wild": 1.0,
+  "gathering": 1.0
+ },
+ "chance": {
+  "stronger": 0.65,
+  "equal": 0.4,
+  "weaker": 0.2,
+  "multi_cap": 0.9,
+  "other_city_factor": 0.5
+ },
+ "global_cooldown_years": 3,
+ "per_pair_years": 1,
+ "timeouts": {
+  "choose_seconds": 60,
+  "bargain_seconds": 60
+ },
+ "companions": {
+  "max": null,
+  "join_chance": 0.5,
+  "relation_weight": {
+   "结拜": 1.0,
+   "同门": 0.9,
+   "朋友": 0.7
+  },
+  "other_city_factor": 0.5,
+  "bystander_chance": 0.15,
+  "grudge_holder_chance": 0.6,
+  "power_bonus": 0.25,
+  "power_exponent": 0.7,
+  "flee_penalty": 0.05,
+  "flee_exponent": 0.5,
+  "show_names": 8
+ },
+ "rescue": {
+  "sworn": 0.35,
+  "friend": 0.15,
+  "power_bonus": 0.2,
+  "flee_bonus": 0.2,
+  "cap": 0.8,
+  "loyalty_base": 0.5
+ },
+ "flee": {
+  "gap_per_major": 0.08,
+  "min": 0.05,
+  "max": 0.9
+ },
+ "outcome": {
+  "豪爽": {
+   "release": 60,
+   "rob": 10,
+   "cripple": 25,
+   "kill": 5
+  },
+  "憨直": {
+   "release": 70,
+   "rob": 5,
+   "cripple": 25
+  },
+  "痴丹": {
+   "release": 80,
+   "rob": 10,
+   "cripple": 10
+  },
+  "话痨": {
+   "release": 70,
+   "rob": 20,
+   "cripple": 10
+  },
+  "迂腐": {
+   "release": 55,
+   "rob": 10,
+   "cripple": 30,
+   "kill": 5
+  },
+  "高冷": {
+   "release": 50,
+   "rob": 10,
+   "cripple": 30,
+   "kill": 10
+  },
+  "贪财": {
+   "release": 10,
+   "rob": 70,
+   "cripple": 10,
+   "kill": 10
+  },
+  "阴鸷": {
+   "release": 5,
+   "rob": 25,
+   "cripple": 35,
+   "kill": 35
+  }
+ },
+ "severity_weight": {
+  "cripple": 1.0,
+  "kill": 1.0,
+  "release_floor": 0.4
+ },
+ "kill_grudge_bonus": 1.5,
+ "responses": {
+  "apologize": {
+   "release": 2.5,
+   "rob": 1.0,
+   "cripple": 0.6,
+   "kill": 0.3,
+   "label": "诚恳道歉"
+  },
+  "perfunctory": {
+   "release": 1.0,
+   "rob": 1.0,
+   "cripple": 1.0,
+   "kill": 1.0,
+   "label": "敷衍认错"
+  },
+  "refuse": {
+   "release": 0.8,
+   "rob": 1.0,
+   "cripple": 1.2,
+   "kill": 1.3,
+   "label": "拒绝道歉"
+  },
+  "provoke": {
+   "release": 0.3,
+   "rob": 1.0,
+   "cripple": 1.5,
+   "kill": 2.0,
+   "label": "继续挑衅"
+  }
+ },
+ "rob": {
+  "share": 0.3,
+  "cap": 600
+ },
+ "buyout": {
+  "share": 0.4,
+  "cap": 3000,
+  "accept": {
+   "贪财": 0.9,
+   "痴丹": 0.8,
+   "话痨": 0.7,
+   "豪爽": 0.5,
+   "高冷": 0.4,
+   "阴鸷": 0.35,
+   "憨直": 0.3,
+   "迂腐": 0.2
+  }
+ },
+ "safe_city_after": [
+  "cripple",
+  "kill"
+ ]
+}

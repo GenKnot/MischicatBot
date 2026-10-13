@@ -241,13 +241,14 @@ async def test_命令_生成_回报档位并留审计(db, caplog):
     assert any("spawn_bots" in r.getMessage() and "count=12" in r.getMessage() for r in caplog.records)
 
 
-async def test_命令_生成_默认三十个_超限提示(db):
+async def test_命令_生成_默认两千个_超限提示(db):
     cog, c = make_cog(), FakeContext(user_id=1)
-    await cog.spawn_bots.callback(cog, c)
+    assert bw.DEFAULT_COUNT == 2000 and bw.MAX_BOTS == 20000
+    await cog.spawn_bots.callback(cog, c, 30)
     assert len(await bots_of(db)) == 30
     c2 = FakeContext(user_id=1)
-    await cog.spawn_bots.callback(cog, c2, 999)
-    assert c2.said("1~200") and len(await bots_of(db)) == 30
+    await cog.spawn_bots.callback(cog, c2, bw.MAX_PER_BATCH + 1)
+    assert c2.said(f"1~{bw.MAX_PER_BATCH}") and len(await bots_of(db)) == 30
 
 
 async def test_命令_清除_必须确认(db, caplog):

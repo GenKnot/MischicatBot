@@ -24,6 +24,7 @@ from pathlib import Path
 
 from sqlalchemy import delete, func, select, update
 
+from utils import fame
 from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, BotPersonality, Player, Rumor, RumorOptout
 from utils.tasks import spawn
@@ -31,7 +32,7 @@ from utils.tasks import spawn
 log = logging.getLogger(__name__)
 
 _CONFIG = Path(__file__).resolve().parent.parent / "data" / "rumors.json"
-PLACEHOLDERS = {"name", "city", "realm", "target", "amount", "pill", "quality", "item", "title", "chain", "level"}
+PLACEHOLDERS = {"name", "city", "realm", "target", "amount", "pill", "quality", "item", "title", "chain", "level", "epithet", "legend"}
 MAX_TEXT_LEN = 90
 MIN_TEMPLATES = 2
 
@@ -151,6 +152,7 @@ async def record_rumor(kind: str, subject_id: str, subject_name: str, *, target_
                         is_human=not is_bot_id(subject_id), negative=k["negative"], content=text,
                         city=str(values.get("city", "")), broadcast_at=0)
             session.add(row)
+            await fame.add_fame(subject_id, max(1, score // 2), session)        # 出了事迹就更出名（恶名也是名）
             await session.commit()
             return row.id
     except Exception:
@@ -186,15 +188,43 @@ async def record_player_rumor(kind: str, player_id: str, **values) -> int | None
         return None
 
 
+async def tianjiao_epithet(bot_id: str) -> str | None:
+    """机器人是天骄就返回它的称号（没有称号用道号兜底），不是天骄返回 None。"""
+    if not is_bot_id(bot_id):
+        return None
+    async with AsyncSessionLocal() as session:
+        row = (await session.execute(select(BotPersonality.tier, BotPersonality.epithet, Player.name)
+                                     .join(Player, Player.discord_id == BotPersonality.bot_id)
+                                     .where(BotPersonality.bot_id == bot_id))).first()
+    return (row.epithet or row.name) if row and row.tier == "天骄" else None
+
+
+async def on_bot_old_age(bot_id: str) -> None:
+    """机器人寿尽坐化：天骄用专门的、更郑重的种类。"""
+    epithet = await tianjiao_epithet(bot_id)
+    if epithet:
+        await record_player_rumor("tianjiao_fall_old", bot_id, epithet=epithet)
+    else:
+        await record_player_rumor("death_old", bot_id)
+
+
 async def on_breakthrough(player: dict, result: dict) -> None:
-    """突破结算之后调：成功（小层 / 大境）、失败、失败致死。`player` 是突破前的玩家字典。"""
+    """突破结算之后调：成功（小层 / 大境）、失败、失败致死。`player` 是突破前的玩家字典。
+    天骄跨大境、突破致死用专门的种类（带称号）。"""
     from utils.realms import major_realm
     uid, name, city = player["discord_id"], player["name"], player.get("current_city", "")
+    epithet = await tianjiao_epithet(uid)
     if result.get("breakthrough"):
         new = result["new_realm"]
-        kind = "breakthrough_major" if major_realm(new) != major_realm(result["old_realm"]) else "breakthrough_minor"
-        await record_rumor(kind, uid, name, city=city, realm=new)
+        major = major_realm(new) != major_realm(result["old_realm"])
+        if major and epithet:
+            await record_rumor("tianjiao_rise", uid, name, city=city, realm=new, epithet=epithet)
+            return
+        await record_rumor("breakthrough_major" if major else "breakthrough_minor", uid, name, city=city, realm=new)
     elif result.get("is_dead"):
+        if epithet:
+            await record_rumor("tianjiao_fall_breakthrough", uid, name, city=city, realm=player["realm"], epithet=epithet)
+            return
         await record_rumor("death_breakthrough", uid, name, city=city, realm=player["realm"])
     elif result.get("breakthrough") is False:
         await record_rumor("breakthrough_fail", uid, name, city=city, realm=player["realm"])

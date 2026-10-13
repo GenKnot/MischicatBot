@@ -1,6 +1,7 @@
 import uuid
 import time
 from sqlalchemy import exists, func, select, update
+from utils import bot_memory, bot_ties
 from utils.bot_social import bot_gate
 from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, Party, Player
@@ -39,6 +40,13 @@ async def create_party(leader_id: str, city: str) -> str:
 MAX_PARTY_SIZE = 4
 
 
+async def _teammates_meet(party_id: str) -> None:
+    """队里的几个机器人因为组了队而互相认识（共同经历）。"""
+    async with AsyncSessionLocal() as session:
+        ids = list((await session.execute(select(Player.discord_id).where(Player.party_id == party_id))).scalars())
+    await bot_ties.meet_group(ids, "组队")
+
+
 async def add_to_party(party_id: str, uid: str) -> bool:
     """把玩家加入队伍。一条带条件的 UPDATE：队伍存在、人数不足 4、玩家活着且还没有队伍。
 
@@ -56,6 +64,10 @@ async def add_to_party(party_id: str, uid: str) -> bool:
             .values(party_id=party_id)
         )
         await session.commit()
+    if res.rowcount == 1 and is_bot_id(uid) and not is_bot_id(leader["leader_id"]):    # 机器人进了真人的队：它会记住
+        await bot_memory.remember(leader["leader_id"], uid, "party")
+    if res.rowcount == 1 and is_bot_id(uid):
+        await _teammates_meet(party_id)
     return res.rowcount == 1
 
 
@@ -99,6 +111,9 @@ async def accept_invite(inviter_id: str, target_id: str) -> dict:
                 return {"ok": False, "reason": "队伍已满，无法加入。"}
         tgt.party_id = party_id
         await session.commit()
+    if is_bot_id(target_id):                                  # 和机器人一起组队：它会记住（机器人不能当邀请者）
+        await bot_memory.remember(inviter_id, target_id, "party")
+        await _teammates_meet(party_id)
     return {"ok": True, "party_id": party_id}
 
 

@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "reply_cold",
+ "rules": [
+  {
+   "lines": [
+    "……既然如此，不打扰了。",
+    "哼，随你。",
+    "{player}，话不投机半句多。"
+   ]
+  },
+  {
+   "lines": [
+    "哼，没意思！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……好吧，我走了。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "那算了，别耽误我炼丹。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哎，你这人怎么这样！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "言尽于此，告辞。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……随你。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哼，没生意可谈就别站着。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，记下了。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

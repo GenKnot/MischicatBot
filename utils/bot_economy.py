@@ -120,6 +120,9 @@ def validate_config(cfg: dict) -> list[str]:
         errors.append("public_events.auction.interest 应有 equipment / technique，且是已有的性格原型")
     if mat.get("keep_equipment", 0) < 1:
         errors.append("materials.keep_equipment 应 ≥ 1")
+    tj = cfg.get("tianjiao", {})
+    if not (isinstance(tj.get("ascend_after_days"), int) and tj["ascend_after_days"] >= 1 and 0 < tj.get("ascend_chance", 0) <= 1):
+        errors.append("tianjiao.ascend_after_days 应为正整数，ascend_chance 应在 (0, 1] 之间")
     wild = cfg.get("wild", {})
     if not 0 <= wild.get("trip_chance", -1) <= 1:
         errors.append("wild.trip_chance 应在 0~1 之间")
@@ -220,10 +223,13 @@ def pick_wild_trip(realm: str, cfg: dict, rng=random) -> str | None:
 WILD_NAMES = frozenset(r["name"] for r in SPECIAL_REGIONS)        # 能被攻击的地方（秘地），城市是安全区
 
 
-def captive_outcome(archetype: str, cfg: dict, *, can_kill: bool, rng=random) -> str:
+def captive_outcome(archetype: str, cfg: dict, *, can_kill: bool, rng=random, shift: dict | None = None) -> str:
     """打输了的真人被擒获之后，这个机器人怎么处置：release（放走）/ rob（劫一点灵石）/ kill（杀）。
     杀不被允许（总开关关着，或对方受保护）时，杀的权重并入 rob。"""
     weights = dict(cfg["combat"]["reaction"][archetype])
+    for name, factor in (shift or {}).items():                  # 行为画像的修正（善恶 / 守序混乱，见 bot_profile.captive_shift）
+        if name in weights:
+            weights[name] = weights[name] * factor
     if not can_kill and "kill" in weights:
         weights["rob"] = weights.get("rob", 0) + weights.pop("kill")
     names = list(weights)

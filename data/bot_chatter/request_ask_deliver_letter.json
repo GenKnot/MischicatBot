@@ -1,0 +1,93 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。请求 / 委托相关场景。",
+ "scene": "request_ask_deliver_letter",
+ "rules": [
+  {
+   "lines": [
+    "{player}，能替我给{city}的{target}捎封信吗？",
+    "{player}，劳烦你把这封信带给{city}的{target}。",
+    "{player}，你要是路过{city}，帮我给{target}送封信。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，兄弟帮个忙，替我给{city}的{target}送封信，回头请你吃酒！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，你能帮我给{city}的{target}送封信吗？我不会写太多字，但我很想他。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，帮我把这封信送到{city}的{target}手上，顺便问问他有没有新的丹方。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！你去{city}的话，帮我给{target}捎封信，我跟你说这信里可有大事！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，鸿雁传书，劳烦阁下将此信送至{city}的{target}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{player}，把这封信给{city}的{target}。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，替我给{city}的{target}送封信，事成之后有赏钱。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，替我给{city}的{target}送封信……别拆开看。"
+   ]
+  }
+ ]
+}

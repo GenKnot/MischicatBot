@@ -1,0 +1,106 @@
+{
+ "_说明": "仇恨账本的配置（U1·江湖百态 P3）。kinds：每种冒犯的基础仇恨值（severity，累加，上限 100）和描述模板；relation：和受害者的关系越近，替他出头的分量越重；windows：蹲守窗口，按性格给游戏年数（1 年 = 现实 2 小时），结拜的 ×sworn_window_mult，少数『执着』的人再 ×stubborn.mult；renew：窗口到期后继续蹲的概率（按性格，用户说待定，这是我的默认）；reach_delay_years：受害者名望低时，朋友多久才得知 / 得知的概率；ready：谨慎的人要等自己的大境界不低于对方多少才动手；appease：化解仇怨的方式；ambush：拦路的全局冷却等（P4 用）。",
+ "kinds": {
+  "rob_fail": {
+   "severity": 8,
+   "self": "{actor}曾想打劫你",
+   "third": "{actor}曾想打劫你的{rel}{victim}"
+  },
+  "rob": {
+   "severity": 20,
+   "self": "{actor}劫走了你的灵石",
+   "third": "{actor}劫了你的{rel}{victim}"
+  },
+  "cripple": {
+   "severity": 45,
+   "self": "{actor}废了你的修为",
+   "third": "{actor}废了你的{rel}{victim}的修为"
+  },
+  "kill": {
+   "severity": 80,
+   "self": "{actor}杀害了你",
+   "third": "{actor}杀害了你的{rel}{victim}"
+  },
+  "debt": {
+   "severity": 8,
+   "self": "{actor}欠你的账一直不还",
+   "third": "{actor}欠了你的{rel}{victim}的账不还"
+  }
+ },
+ "relation": {
+  "self": 1.0,
+  "结拜": 0.9,
+  "同门": 0.7,
+  "朋友": 0.6,
+  "相识": 0.15
+ },
+ "relation_names": {
+  "结拜": "结拜兄弟",
+  "同门": "同门",
+  "朋友": "朋友",
+  "相识": "熟人"
+ },
+ "third_party_scale": 60,
+ "min_severity": 5,
+ "windows": {
+  "豪爽": 10,
+  "憨直": 8,
+  "阴鸷": 30,
+  "贪财": 6,
+  "迂腐": 4,
+  "高冷": 2,
+  "话痨": 1,
+  "痴丹": 1
+ },
+ "sworn_window_mult": 1.5,
+ "stubborn": {
+  "share": 0.05,
+  "loyalty_min": 60,
+  "mult": 5
+ },
+ "renew": {
+  "豪爽": 0.7,
+  "憨直": 0.6,
+  "阴鸷": 0.85,
+  "贪财": 0.35,
+  "迂腐": 0.3,
+  "高冷": 0.15,
+  "话痨": 0.1,
+  "痴丹": 0.1,
+  "severity_bonus_per_100": 0.15,
+  "max_renewals": null
+ },
+ "reach_delay_years": {
+  "city_other": 1,
+  "none": [
+   1,
+   4
+  ],
+  "none_learn_chance": 0.5
+ },
+ "decay": {
+  "dormant_per_day": 0.5
+ },
+ "ready": {
+  "直接": 99,
+  "等待时机": 1,
+  "隐忍": 0
+ },
+ "appease": {
+  "stones_per_point": 10,
+  "max_stones": 5000,
+  "gift_factor": 1.5,
+  "apology": {
+   "base": 0.25,
+   "kind_weight": 0.2,
+   "vengeful_weight": 0.25,
+   "reduce": 30,
+   "backfire": 5,
+   "cooldown_hours": 12
+  }
+ },
+ "ambush": {
+  "global_cooldown_years": 3,
+  "per_target_years": 1
+ }
+}

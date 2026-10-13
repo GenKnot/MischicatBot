@@ -1,0 +1,131 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_conflict_friend",
+ "rules": [
+  {
+   "lines": [
+    "{player}，你对{victim}做的事，江湖上不会忘。"
+   ]
+  },
+  {
+   "lines": [
+    "{player}，{victim}是我的结拜兄弟，你给我记着！"
+   ],
+   "when": {
+    "bond": [
+     "结拜"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，同门师兄弟的仇，不能不报。"
+   ],
+   "when": {
+    "bond": [
+     "同门"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}是我的朋友，你这事做得不地道。"
+   ],
+   "when": {
+    "bond": [
+     "朋友"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，虽然和{victim}只是点头之交，但这事我看不下去。"
+   ],
+   "when": {
+    "bond": [
+     "相识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！你欺负我兄弟{victim}，我饶不了你！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你伤了{victim}，我不能不管。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}的事我本不想管，但你太过分了。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！{victim}的事我可全听说了，你太过分了！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，阁下对{victim}所为，实乃有违道义。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}。{victim}的事，我记下了。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}的损失，你得赔。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}的账……我会替他算。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

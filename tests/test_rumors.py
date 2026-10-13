@@ -502,9 +502,10 @@ async def test_埋点_机器人处置真人(db, monkeypatch):
     from utils import bot_combat as bc
     from utils import bot_economy as be
     cfg = be.load_config()
-    cfg["combat"]["can_kill_humans"] = True
     cfg["combat"]["reaction"]["阴鸷"] = {"kill": 100}
     monkeypatch.setattr(be, "load_config", lambda: json.loads(json.dumps(cfg)))
+    from utils import world_settings
+    await world_settings.set_values(mode="真实")
     await player(db, H, name="败者", city="万妖岭", realm="筑基期5层", spirit_stones=1000)
     await player(db, B, name="散修甲", city="万妖岭")
     D = db["db_async"]

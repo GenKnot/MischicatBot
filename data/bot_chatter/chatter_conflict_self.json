@@ -1,0 +1,266 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_conflict_self",
+ "rules": [
+  {
+   "lines": [
+    "{player}，你给我记着！",
+    "这笔账，迟早要算！"
+   ],
+   "when": {
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}……你怎么能这样对我？"
+   ]
+  },
+  {
+   "lines": [
+    "{player}，咱们之间，没完。"
+   ],
+   "when": {
+    "tags": [
+     "记仇"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！劫我的钱？这笔账我记着！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！废我修为，这仇不共戴天！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你为什么要劫我……我做错了什么？"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你废了我的修为……我不明白。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你抢走的是我买药材的钱！"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你废了我的修为，我炼丹怎么办！"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！你抢我的钱，我要跟全城的人说你的事！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你废了我的修为，我要把这事说遍整个江湖！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，抢劫非君子所为，在下记下了。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，废人修为，有违天道，你好自为之。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……你劫我。记着了。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "你废了我。这笔账，我会还。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，我的灵石！这笔账连本带利！"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你废我修为，断我财路，这仇大了！"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，{player}，劫我的钱……我记着，一分一厘。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "kind": [
+     "rob"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，废我修为……我会让你知道代价。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "kind": [
+     "cripple"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你我也算相识一场，为何下此毒手？"
+   ],
+   "when": {
+    "tier": [
+     "熟识",
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}……我不怪你，只是心里很难过。"
+   ],
+   "when": {
+    "tier": [
+     "至交"
+    ],
+    "tags": [
+     "守序善良",
+     "中立善良",
+     "混乱善良"
+    ]
+   }
+  }
+ ]
+}

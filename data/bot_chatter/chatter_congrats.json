@@ -1,0 +1,497 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_congrats",
+ "rules": [
+  {
+   "lines": [
+    "恭喜{player}突破到{realm}！"
+   ],
+   "when": {
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，到{realm}了啊……不过尔尔。"
+   ],
+   "when": {
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，等着瞧，我很快就追上你。"
+   ],
+   "when": {
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？身上想必有不少好东西。"
+   ],
+   "when": {
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，听说你突破到{realm}了，恭喜。"
+   ]
+  },
+  {
+   "lines": [
+    "{player}！突破到{realm}了？痛快，我敬你一杯！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？哼，运气罢了。"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}？有本事再来比一场！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了啊……好东西，不拿出来分分？"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，恭喜你，到{realm}了，我替你高兴。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你到{realm}了……我还在原地呢。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，到{realm}了？下回我也不会输。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，到{realm}了，你是不是有什么门路？"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，到{realm}了？恭喜，该服哪种丹了？"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了，药效不错嘛。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？我炼的丹可比你的天赋靠谱。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}，那你一定有不少好药材吧？"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！听说你突破到{realm}了！我就知道你行，我跟人说了好几遍！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哎，{player}，{realm}了？早知道我也去闭关了。"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了是吧？我跟你说，这有什么了不起……"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？快说说，是不是得了什么宝贝？"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，恭贺阁下破境至{realm}，实乃可喜可贺。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，阁下破境，在下……惭愧。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，破境{realm}？不过侥幸耳，不足为奇。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，阁下到了{realm}，想必机缘不浅。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了。恭喜。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……{realm}了。哼。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？下次见分晓。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了。你身上有不少东西吧。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了！恭喜发财，有好东西记得想着我。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了啊，你花了多少灵石才换来的？"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了？不过是多烧了灵石罢了。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了，那你身家想必不菲。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，{player}，恭喜你到{realm}了。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了啊……真好，真好。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "attitude": [
+     "酸"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，{realm}？别太得意。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "attitude": [
+     "不服"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{realm}了，我会替你好好‘保管’这份得意的。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "attitude": [
+     "觊觎"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "兄弟，你到{realm}了！我这当兄弟的脸上也有光！"
+   ],
+   "when": {
+    "relation": [
+     "结拜"
+    ],
+    "attitude": [
+     "真心"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，到{realm}了，别忘了当年一起吃过的苦。"
+   ],
+   "when": {
+    "relation": [
+     "朋友",
+     "结拜"
+    ],
+    "attitude": [
+     "真心"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  }
+ ]
+}

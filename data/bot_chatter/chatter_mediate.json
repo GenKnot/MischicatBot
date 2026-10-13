@@ -1,0 +1,95 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_mediate",
+ "rules": [
+  {
+   "lines": [
+    "{player}，{victim}的事，各退一步吧。",
+    "冤冤相报何时了，{player}，{victim}，都收手吧。",
+    "江湖路长，{player}，别把事做绝了。",
+    "{victim}已经够惨了，{player}，到此为止吧。",
+    "都消消气，这事再闹下去没人讨得了好。"
+   ]
+  },
+  {
+   "lines": [
+    "都是自己人，{player}、{victim}，喝杯酒这事就算了！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}，别再打了，有话好好说。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "吵什么吵，{victim}、{player}，都散了吧，我还要炼丹。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哎哎，{player}，{victim}，都别急，听我说几句！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "诸位息怒，圣人云『和为贵』，{player}与{victim}不妨各退一步。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……够了。{player}，{victim}，到此为止。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，{victim}，和气生财，赔点灵石就完了。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}、{victim}，何必闹到这般地步？留点余地，对大家都好。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   }
+  }
+ ]
+}

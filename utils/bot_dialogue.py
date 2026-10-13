@@ -25,19 +25,48 @@ SCENES = (
     "dual_accept", "dual_refuse",       # 邀请双修
     "captive_release", "captive_rob", "captive_kill",       # 真人攻击它打输了、被擒获：放走 / 劫财 / 杀
     "bot_robbed", "bot_crippled", "bot_killed",             # 它被真人打劫 / 废修为 / 击杀时说的话
+    "recall_gift", "recall_absence", "recall_chat",         # 关系记忆：追加在上面某些台词后面的一句回忆
+    "recall_grudge", "recall_together", "recall_defeat",    # （utils/bot_memory，偶尔出现）
+    "ambush_appear", "ambush_demand", "ambush_cripple",     # 拦路（utils/bot_ambush）：放话 / 打赢后先要个交代 / 废掉修为时说的话
 )
+RECALL_VARS = {                                  # 回忆场景各自能用的变量（其余场景只有 player/bot/item）
+    "recall_gift": {"item", "count"}, "recall_absence": {"days", "city"}, "recall_chat": {"count"},
+    "recall_grudge": {"count"}, "recall_together": {"count"}, "recall_defeat": {"count"},
+}
+SCENE_VARS = {**RECALL_VARS, "ambush_appear": {"victim"}, "ambush_demand": {"victim"}, "ambush_cripple": {"victim"}}      # 校验用：每个场景额外允许的变量
 TIERS = ("仇视", "陌生", "熟识", "至交")          # 同 utils/bot_social 的好感档位，从低到高
-PLACEHOLDERS = {"player", "bot", "item"}         # 台词里允许出现的 {占位符}
+PLACEHOLDERS = {"player", "bot", "item"}         # 台词里允许出现的 {占位符}（回忆场景另有 RECALL_VARS）
 MAX_LINE_LEN = 80
 MIN_LINES_PER_CELL = 1
 
 
+def files_for(archetype: str) -> list[Path]:
+    """某个原型的所有台词文件：主文件 `<原型>.json`，加上任意个『批次文件』`<原型>.<批次名>.json`。
+    不同的 AI / 不同的时间写的台词放在各自的批次文件里，互不覆盖，查找时自动合并。"""
+    main = DIR / f"{archetype}.json"
+    return ([main] if main.exists() else []) + sorted(DIR.glob(f"{archetype}.*.json"))
+
+
+def archetype_of(path: Path) -> str:
+    """台词文件属于哪个原型：文件名第一个『.』之前的部分（`豪爽.json` / `豪爽.批次二.json` 都是『豪爽』）。"""
+    return path.name.split(".")[0]
+
+
 @lru_cache(maxsize=None)
 def _load(archetype: str) -> dict:
-    path = DIR / f"{archetype}.json"
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8")).get("lines", {})
+    """合并主文件和所有批次文件：同一个格子的台词拼在一起，去掉完全相同的句子。"""
+    merged: dict = {}
+    for path in files_for(archetype):
+        for scene, cells in json.loads(path.read_text(encoding="utf-8")).get("lines", {}).items():
+            for tier, texts in cells.items():
+                bucket = merged.setdefault(scene, {}).setdefault(tier, [])
+                bucket.extend(t for t in texts if t not in bucket)
+    return merged
+
+
+def reload() -> None:
+    """改了台词文件之后清缓存（工具脚本、测试用）。"""
+    _load.cache_clear()
 
 
 def _candidates(archetype: str, scene: str, tier: str) -> list[str]:
@@ -56,10 +85,31 @@ class _Safe(dict):
         return "{" + key + "}"
 
 
-def get_line(archetype: str | None, scene: str, tier: str, rng: random.Random | None = None, **fmt) -> str:
-    """取一句台词并代入 {player} / {bot} / {item}。找不到原型文件也不报错，用通用台词。"""
+def pick_template(archetype: str | None, scene: str, tier: str, rng: random.Random | None = None) -> str:
+    """挑一条骨架台词（还没代入占位符）。"""
     lines = _candidates(archetype or DEFAULT, scene, tier)
-    return string.Formatter().vformat(random.choice(lines) if rng is None else rng.choice(lines), (), _Safe(fmt))
+    return random.choice(lines) if rng is None else rng.choice(lines)
+
+
+def fill(template: str, **fmt) -> str:
+    return string.Formatter().vformat(template, (), _Safe(fmt))
+
+
+def get_line(archetype: str | None, scene: str, tier: str, rng: random.Random | None = None, *,
+             traits: dict | None = None, **fmt) -> str:
+    """取一句台词并代入 {player} / {bot} / {item}。找不到原型文件也不报错，用通用台词。
+    给了 `traits`（机器人的特质，见 utils/bot_traits）就先按它的口吻改写骨架台词（utils/bot_voice）。"""
+    template = pick_template(archetype, scene, tier, rng)
+    if traits:
+        from utils.bot_voice import style
+        template = style(template, traits, scene, tier, rng)
+    return fill(template, **fmt)
+
+
+def coverage(archetype: str) -> dict[str, dict[str, int]]:
+    """{场景: {档位: 句数}}，包含主文件和所有批次文件（没写的格子是 0）。"""
+    lines = _load(archetype)
+    return {s: {t: len(lines.get(s, {}).get(t, [])) for t in TIERS} for s in SCENES}
 
 
 def validate_file(path: Path, require_complete: bool = False) -> list[str]:
@@ -69,8 +119,8 @@ def validate_file(path: Path, require_complete: bool = False) -> list[str]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:                                          # JSON 不合法
         return [f"{path.name}: 不是合法 JSON（{e}）"]
-    if data.get("archetype") != path.stem:
-        errors.append(f"{path.name}: archetype 字段应为 {path.stem!r}，实际是 {data.get('archetype')!r}")
+    if data.get("archetype") != archetype_of(path):
+        errors.append(f"{path.name}: archetype 字段应为 {archetype_of(path)!r}，实际是 {data.get('archetype')!r}")
     lines = data.get("lines")
     if not isinstance(lines, dict):
         return errors + [f"{path.name}: 缺少 lines"]
@@ -106,8 +156,9 @@ def validate_file(path: Path, require_complete: bool = False) -> list[str]:
                 except ValueError:
                     errors.append(f"{path.name}: {scene}/{tier} 花括号不成对：{t}")
                     continue
-                if used - PLACEHOLDERS:
-                    errors.append(f"{path.name}: {scene}/{tier} 有不允许的占位符 {sorted(used - PLACEHOLDERS)}：{t}")
+                allowed = PLACEHOLDERS | SCENE_VARS.get(scene, set())
+                if used - allowed:
+                    errors.append(f"{path.name}: {scene}/{tier} 有不允许的占位符 {sorted(used - allowed)}：{t}")
     return errors
 
 
@@ -115,5 +166,5 @@ def validate_all() -> list[str]:
     """校验目录下所有台词文件；`_default.json` 要求格子齐全。"""
     errors = []
     for path in sorted(DIR.glob("*.json")):
-        errors += validate_file(path, require_complete=path.stem == DEFAULT)
+        errors += validate_file(path, require_complete=path.name == f"{DEFAULT}.json")
     return errors

@@ -9,7 +9,7 @@ import logging
 
 from discord.ext import commands, tasks
 
-from utils import bot_settle
+from utils import bot_grudges, bot_settle
 from utils.tasks import loop_guard
 
 log = logging.getLogger(__name__)
@@ -23,6 +23,11 @@ class BotWorldCog(commands.Cog, name="BotWorld"):
     @loop_guard(log, "机器人每日结算")
     async def _daily_settlement(self):
         await bot_settle.run_settlement()
+
+    @commands.hybrid_command(name="仇人", description="查看你的仇人：谁欠你的账、为什么（含前世的仇）")
+    async def enemies(self, ctx):
+        text = await bot_grudges.format_list(str(ctx.author.id))
+        await ctx.send(("📜 **你的仇人**\n" + text) if text else "你在江湖上还没有仇人。")
 
     @_daily_settlement.before_loop
     async def _before_settlement(self):

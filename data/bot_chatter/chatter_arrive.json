@@ -1,0 +1,560 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。每条规则：when（条件，缺省=兜底）、weight、lines。批量扩写用 scripts/dialogue_tool.py chatter-prompt / chatter-merge。",
+ "scene": "chatter_arrive",
+ "rules": [
+  {
+   "lines": [
+    "{player}，来{city}了？",
+    "{player}，好久不见。",
+    "{player}，在{city}遇见你，倒也巧。"
+   ]
+  },
+  {
+   "lines": [
+    "哼，{player}，竟敢来{city}！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}？来了{city}也不打声招呼，喝酒去！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！可算到{city}了，今晚不醉不归！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}兄！等你多时了，{city}的酒都给你留着！"
+   ],
+   "when": {
+    "archetype": [
+     "豪爽"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……{player}，你来{city}做什么。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你来{city}了，我正好在这。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你来了！{city}近来还好，你呢？"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，真高兴你来{city}，我一直想着你。"
+   ],
+   "when": {
+    "archetype": [
+     "憨直"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}？别在{city}挡着我炼丹的道。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你来{city}了，药材可别乱碰。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来得正好，我新炼了几炉丹，给你看看。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你来{city}，我这炉子都不想看了。"
+   ],
+   "when": {
+    "archetype": [
+     "痴丹"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}？你怎么来{city}了，我可没原谅你！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "哎呀{player}，你来{city}了！我跟你说，最近这里可热闹了！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！终于来{city}了，我有一肚子话要跟你说！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}！{city}这几天我天天念叨你，你可算来了！"
+   ],
+   "when": {
+    "archetype": [
+     "话痨"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，阁下来{city}，有何贵干？"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，阁下莅临{city}，幸会。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}可有雅事？在下愿作陪。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，君子重逢，当浮一大白，欢迎来{city}。"
+   ],
+   "when": {
+    "archetype": [
+     "迂腐"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……你来{city}了。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}了。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，你来{city}了，坐吧。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}……来{city}了就好。"
+   ],
+   "when": {
+    "archetype": [
+     "高冷"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}做买卖还是找茬？"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}了？有生意的话好商量。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}了！有好货我给你留着。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}怎么不早说，我给你留了最好的。"
+   ],
+   "when": {
+    "archetype": [
+     "贪财"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "呵，{player}，你还敢来{city}。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}了？有意思。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "tier": [
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}，别走远，有话跟你说。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "tier": [
+     "熟识"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}……你来{city}，我很高兴，真的。"
+   ],
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ],
+    "tier": [
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "兄弟！你可算到{city}了，我等你好些日子了。",
+    "{player}，咱们兄弟在{city}又见面了，今晚喝一杯。"
+   ],
+   "when": {
+    "relation": [
+     "结拜"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，同门一场，来{city}了就别客气。"
+   ],
+   "when": {
+    "relation": [
+     "同门"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}道友如今境界高深，可别忘了我们这些老朋友。",
+    "{player}，听说你的修为又精进了，我还差得远呢。"
+   ],
+   "when": {
+    "realm_gap": [
+     "lower"
+    ],
+    "tier": [
+     "熟识",
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}？就你这点修为，也敢来{city}闯荡？"
+   ],
+   "when": {
+    "realm_gap": [
+     "higher"
+    ],
+    "tier": [
+     "仇视",
+     "陌生"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "又是你……上回的账，我可没忘。"
+   ],
+   "when": {
+    "tags": [
+     "记仇"
+    ],
+    "tier": [
+     "仇视"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}可有雅事？不妨一起品茗论道。"
+   ],
+   "when": {
+    "origin": [
+     "书香"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}是做买卖还是访友？路上辛苦了。"
+   ],
+   "when": {
+    "origin": [
+     "商贾"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，风尘仆仆，先歇口气再说。"
+   ],
+   "when": {
+    "origin": [
+     "将门"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}，来{city}了就好，有个伴儿总比一个人强。"
+   ],
+   "when": {
+    "origin": [
+     "孤儿"
+    ],
+    "tier": [
+     "熟识",
+     "至交"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "{player}来了？{city}的夜晚长着呢，找个地方坐坐吧。"
+   ],
+   "when": {
+    "introversion": [
+     "外向"
+    ]
+   }
+  },
+  {
+   "lines": [
+    "……{player}。来了。"
+   ],
+   "when": {
+    "introversion": [
+     "内向"
+    ],
+    "tier": [
+     "陌生",
+     "熟识"
+    ]
+   }
+  }
+ ]
+}

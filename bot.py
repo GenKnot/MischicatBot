@@ -34,10 +34,13 @@ class MischicatBot(commands.Bot):
         await self.load_extension("cogs.tavern")
         await self.load_extension("cogs.public_events")
         await self.load_extension("cogs.equipment")
+        await self.load_extension("cogs.world_setup")
         await self.load_extension("cogs.alchemy")
         await self.load_extension("cogs.admin")
         await self.load_extension("cogs.botworld")
         await self.load_extension("cogs.rumors")
+        await self.load_extension("cogs.ambush")
+        await self.load_extension("cogs.chatter")
         await self.tree.sync()
 
     async def on_ready(self):

@@ -30,7 +30,7 @@ def test_档位名与好感模块一致():
 
 def test_台词文件对应真实原型():
     names = set(load_archetypes()) | {bd.DEFAULT}
-    assert {p.stem for p in bd.DIR.glob("*.json")} <= names
+    assert {bd.archetype_of(p) for p in bd.DIR.glob("*.json")} <= names           # 批次文件 <原型>.<批次>.json 也算
 
 
 def test_场景清单与_README_一致():
@@ -109,7 +109,7 @@ def test_取台词_未知原型和空原型不报错():
 @pytest.mark.parametrize("tier", bd.TIERS)
 def test_每个格子都能取到台词(scene, tier):
     for arche in list(load_archetypes()) + [None]:
-        line = bd.get_line(arche, scene, tier, player="甲", bot="乙", item="筑基丹")
+        line = bd.get_line(arche, scene, tier, player="甲", bot="乙", item="筑基丹", days=4, count=3, city="丁", victim="戊")
         assert line and "{" not in line
 
 
