@@ -20,6 +20,18 @@ from utils.views.combat import PlayerActionView
 from utils.views.party import PartyInviteButton
 
 HUMAN, BOT, CITY = "1001", "bot_00001", "灵虚城"
+
+
+
+@pytest.fixture(autouse=True)
+def no_random_offers(monkeypatch):
+    """点『搭话』之后熟人可能当场开口求事（有概率）；这个文件的断言看的是搭话本身，所以让它不开口，免得偶发多出一条消息。"""
+    import copy
+
+    from utils import bot_requests as br
+    cfg = copy.deepcopy(br.load())
+    cfg["ask"]["chance"] = 0.0
+    monkeypatch.setattr(br, "load", lambda: cfg)
 PERSONA = {"archetype": "豪爽", "tier": "正常", "kindness": 50, "greed": 30, "pride": 40, "talk": 30,
            "likes": {"categories": ["丹药"], "items": ["筑基丹"]},
            "dislikes": {"categories": ["矿石"], "items": ["黄泉铁"]}}
