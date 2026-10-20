@@ -11,6 +11,8 @@ import string
 from functools import lru_cache
 from pathlib import Path
 
+from utils import settings_hub
+
 _DATA = Path(__file__).resolve().parent.parent / "data" / "bot_legends.json"
 MAX_EPITHET_LEN = 8
 MAX_BACKSTORY_LEN = 80
@@ -20,7 +22,7 @@ ALLOWED = {"home"}
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_DATA.read_text(encoding="utf-8"))
+    return settings_hub.read(_DATA)
 
 
 def load() -> dict:

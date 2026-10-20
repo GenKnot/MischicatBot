@@ -17,6 +17,7 @@ from utils.items.breakthrough import calc_huaying_breakthrough_rate, calc_ningda
 from utils.jobs import JOBS
 from utils.realms import REALM_GROUPS, REALMS, get_realm_index
 from utils.world import SPECIAL_REGIONS
+from utils import settings_hub
 
 _CONFIG = Path(__file__).resolve().parent.parent / "data" / "bot_economy.json"
 
@@ -31,7 +32,7 @@ MAJORS = [m for m, _ in REALM_GROUPS]
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_CONFIG.read_text(encoding="utf-8"))
+    return settings_hub.read(_CONFIG)
 
 
 def load_config() -> dict:

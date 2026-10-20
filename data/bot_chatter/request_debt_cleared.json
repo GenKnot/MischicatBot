@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。玩家主动求助相关场景。",
+ "scene": "request_debt_cleared",
+ "rules": [
+  {
+   "lines": [
+    "{player}，{amount}灵石收到了，咱们两清。",
+    "谢谢你，{player}，账清了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "哈哈，{player}，爽快！{amount}灵石收到，今晚我请客！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石收到了，谢谢你记着。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石，收到。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "哎呀{player}，{amount}灵石收到啦，我就知道你不是那种人！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石已收，阁下信义，在下佩服。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……收到了。两清。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，{amount}灵石，一分不少，下回再借也行。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "呵，{player}，{amount}灵石……还算守信。"
+   ]
+  }
+ ]
+}

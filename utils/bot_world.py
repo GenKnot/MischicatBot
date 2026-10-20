@@ -24,7 +24,7 @@ from utils.bot_social import generate_personality
 from utils.bots import BOT_ID_PREFIX
 from utils.character import REALM_LIFESPAN, roll_spirit_root
 from utils.db_async import (AdventureProgress, AlchemyMastery, AsyncSessionLocal, BankAccount, BankDeposit,
-                            BotMemory, BotPersonality, BotRelation, BotRequest, BotWorldState, Equipment, Inventory, KnownRecipe, MarketListing,
+                            BotMemory, BotPersonality, BotMissing, BotRelation, BotRequest, BotWorldState, Equipment, Inventory, KnownRecipe, MarketListing,
                             Player, PublicEventParticipant, Residence, WanbaoFrozen)
 from utils.realms import REALMS, cultivation_needed, get_realm_index, major_realm
 from utils.world import CITIES
@@ -187,7 +187,7 @@ CLEANUP = {
     AdventureProgress: "discord_id", AlchemyMastery: "discord_id", BankAccount: "discord_id",
     BankDeposit: "discord_id", Equipment: "discord_id", Inventory: "discord_id", KnownRecipe: "discord_id",
     Residence: "discord_id", PublicEventParticipant: "discord_id", WanbaoFrozen: "discord_id",
-    MarketListing: "seller_id", BotRelation: "bot_id", BotMemory: "bot_id", BotRequest: "bot_id", BotPersonality: "bot_id",
+    MarketListing: "seller_id", BotRelation: "bot_id", BotMemory: "bot_id", BotRequest: "bot_id", BotMissing: "seeker_id", BotPersonality: "bot_id",
 }
 # 带玩家 ID 却不用清的表（原因写在这里，别悄悄略过）
 CLEANUP_EXEMPT = {
@@ -198,6 +198,7 @@ CLEANUP_EXEMPT = {
     "rumor_optout": "真人的『事迹不进传闻』开关",
     "bot_ties": "两个 ID 列（a_id / b_id）都可能是机器人：remove_bots 里单独处理（bot_ties.remove_for）",
     "bot_grudges": "holder_id / target_id 都可能是机器人：remove_bots 里单独处理（bot_grudges.remove_for）；victim_id 只是历史记录里的受害者",
+    "bot_missing": "seeker_id 在 CLEANUP 里；missing_id（已经死了的朋友）/ culprit_id（凶手，玩家转世时由 bot_investigation.forget_player 清）只是调查的记录",
     "chatter_state": "按真人的 ID 记今日搭话计数和屏蔽开关，不是机器人名下的东西",
     "chatter_pair": "bot_id 在 remove_bots 里单独清（bot_chatter.remove_for）",
     "chatter_queue": "speaker_id 在 remove_bots 里单独清（bot_chatter.remove_for）；player_id 是真人",
@@ -206,7 +207,7 @@ CLEANUP_EXEMPT = {
     "player_enemies": "玩家前世的仇人记录（enemy_id 可能是已经不在的机器人，记录本来就是历史）",
 }
 # 表里哪些列是玩家 ID（棘轮用）
-PLAYER_KEY_COLUMNS = ("discord_id", "seller_id", "leader_id", "bidder_id", "player_id", "bot_id", "a_id", "b_id", "holder_id", "target_id", "victim_id", "enemy_id", "rescuer_id")
+PLAYER_KEY_COLUMNS = ("discord_id", "seller_id", "leader_id", "bidder_id", "player_id", "bot_id", "a_id", "b_id", "holder_id", "target_id", "victim_id", "enemy_id", "rescuer_id", "seeker_id", "missing_id", "culprit_id")
 
 
 async def remove_bots(ids: list[str]) -> dict:

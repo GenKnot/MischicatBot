@@ -29,6 +29,7 @@ from utils.bots import is_bot_id
 from utils.character import years_to_seconds
 from utils.db_async import AsyncSessionLocal, BotPersonality, BotRequest, BotTie, Inventory, Player
 from utils.items import ITEMS
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ HOUR = 3600
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:
@@ -82,6 +83,22 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
         from utils import bot_chatter_lines as cl
         if scene not in cl.SCENES:
             errors.append(f"模板 {name} 缺少开口台词场景 {scene}（在 bot_chatter_lines.SCENES 加，并写 data/bot_chatter/{scene}.json）")
+    pa = cfg.get("player_ask", {})
+    if pa.get("min_tier") not in ("陌生", "熟识", "至交") or pa.get("cooldown_hours", -1) < 0 or pa.get("grace_years", -1) < 0:
+        errors.append("player_ask: min_tier / cooldown_hours / grace_years 不合法")
+    if not (pa.get("amounts") and all(a > 0 for a in pa["amounts"])) or not pa.get("gather_types"):
+        errors.append("player_ask.amounts 应是正数列表，gather_types 不能为空")
+    for key in ("due_years", "gather_due_years"):
+        lo, hi = pa.get(key, [1, 0])
+        if not 0 < lo <= hi:
+            errors.append(f"player_ask.{key} 应是 [最小, 最大]")
+    ac = pa.get("accept", {})
+    if set(ac.get("base_by_tier", {})) != {"仇视", "陌生", "熟识", "至交"} or not 0 <= ac.get("min", -1) <= ac.get("max", -1) <= 1:
+        errors.append("player_ask.accept: base_by_tier 要覆盖四个档位，0 ≤ min ≤ max ≤ 1")
+    if min(ac.get("kindness_div", 0), ac.get("loyalty_div", 0), ac.get("greed_div", 0)) <= 0:
+        errors.append("player_ask.accept 的 *_div 应大于 0")
+    if pa.get("dun_interval_years", -1) < 0:
+        errors.append("player_ask.dun_interval_years 不能为负")
     rp = cfg.get("repay", {})
     for key in ("default_base", "closeness"):
         if archetypes is not None and key == "default_base" and set(rp.get(key, {})) != set(archetypes):
@@ -113,6 +130,16 @@ def repay_decision(archetype: str, lawful: int, kindness: int, greed: int, tier:
     g = cfg["repay"]["gratitude"]
     p = g["chance_base"][archetype] + (kindness - 50) / 200 + cfg["repay"]["closeness"].get(tier, 0.0)
     return "plus" if rng.random() < max(0.0, min(0.9, p)) else "repay"
+
+
+def lend_chance(tier: str, relation: str, kindness: int, loyalty: int, greed: int, share: float, gather: bool = False,
+                cfg: dict | None = None) -> float:
+    """玩家向熟人求助，对方答应的概率：交情档位底子 + 关系加成 + 善意 / 义气加一点、贪婪减一点 − 数额占它身家的比例 × share_penalty（陪采集没有这一项，还有点加成）。"""
+    a = (cfg or load())["player_ask"]["accept"]
+    p = (a["base_by_tier"].get(tier, 0.0) + a["relation_bonus"].get(relation, 0.0) + (kindness - 50) / a["kindness_div"]
+         + (loyalty - 50) / a["loyalty_div"] - (greed - 50) / a["greed_div"])
+    p += a["gather_bonus"] if gather else -a["share_penalty"] * min(1.0, max(0.0, share))
+    return max(a["min"], min(a["max"], p))
 
 
 # ---- 读写小工具 -------------------------------------------------------------
@@ -317,6 +344,10 @@ async def on_meet(player_id: str, present_ids: list[str], rng=None, now: float |
             tpl = cfg["templates"].get(r["template"])
             if tpl is None:
                 continue
+            if r["params"].get("dir") == "player":               # 玩家求来的账：到期它来催，宽限之后翻脸
+                if tpl["kind"] in LOAN_KINDS and r["bot_id"] in present and now >= r["due_at"]:
+                    out["events"] += await _dun_or_default(r, rng, now, cfg)
+                continue
             if tpl["kind"] in LOAN_KINDS and r["bot_id"] in present and now >= r["due_at"]:
                 out["events"] += await _settle_loan(r, tpl, rng, now, cfg)
             elif tpl["kind"] == "errand" and r["params"].get("target") in present:
@@ -347,7 +378,10 @@ async def on_gather(player_id: str, city: str, rng=None, now: float | None = Non
                 Player.current_city == city))).scalars())          # noqa: E712
         for r in todo:
             if r["bot_id"] in here:
-                events += await _finish_gather(r, cfg["templates"][r["template"]], rng, now)
+                if r["params"].get("dir") == "player":
+                    events += await _finish_player_gather(r, rng, now, cfg)
+                else:
+                    events += await _finish_gather(r, cfg["templates"][r["template"]], rng, now)
     except Exception:
         log.warning("陪采集结算失败：%s", player_id, exc_info=True)
     return events
@@ -485,6 +519,191 @@ async def _finish_gather(r: dict, tpl: dict, rng, now: float) -> list[dict]:
     return [{"kind": "gather_done", "bot_id": bid, "bot_name": bname, "bot_realm": brealm, "line": line, "amount": paid}]
 
 
+# ---- 玩家主动求助 -----------------------------------------------------------
+
+KIND_TEMPLATE = {"loan_stones": "borrow_stones", "loan_item": "borrow_item", "companion_gather": "gather_together"}
+
+
+def _debt_label(params: dict) -> dict:
+    """催债 / 还清台词里的 {amount} {item}。"""
+    return {"amount": params.get("owed", params.get("amount", 0)), "item": params.get("item", "")}
+
+
+async def player_ask(player_id: str, bot_id: str, kind: str, params: dict, rng=None, now: float | None = None) -> dict:
+    """玩家当面向一位机器人求助：借灵石（amount）/ 借物品（item）/ 陪着采集（what）。
+    答应与否按 `lend_chance`（交情、关系、它的善意 / 义气 / 贪婪、数额占身家的比例）掷骰；答应了借的当场转给你，约定 1~5 游戏年归还。
+    返回 {"ok", "accepted", "reason", "line", "bot_name"}。每对（玩家，机器人）有冷却，婉拒也算一次。"""
+    rng, now, cfg = rng or random.Random(), now or time.time(), load()
+    pa = cfg["player_ask"]
+    if kind not in KIND_TEMPLATE:
+        return {"ok": False, "accepted": False, "reason": "不知道这种求助。", "line": "", "bot_name": ""}
+    ctx = await bc.build_context(player_id, bot_id)
+    if ctx is None:
+        return {"ok": False, "accepted": False, "reason": "对方不存在。", "line": "", "bot_name": ""}
+    async with AsyncSessionLocal() as session:
+        await _lock(session)
+        player, bot = await session.get(Player, player_id), await session.get(Player, bot_id)
+        if player is None or player.is_dead or bot is None or not bot.is_bot or bot.is_dead:
+            await session.rollback()
+            return {"ok": False, "accepted": False, "reason": "对方已不在人世。", "line": "", "bot_name": ""}
+        bname = bot.name
+        if bot.current_city != player.current_city:
+            await session.rollback()
+            return {"ok": False, "accepted": False, "reason": f"**{bname}** 已经离开此地。", "line": "", "bot_name": bname}
+        mine = [r for r in (await session.execute(select(BotRequest).where(BotRequest.player_id == player_id, BotRequest.bot_id == bot_id))).scalars()
+                if json.loads(r.params or "{}").get("dir") == "player"]
+        if any(now - r.created_at < pa["cooldown_hours"] * HOUR for r in mine):
+            await session.rollback()
+            return {"ok": False, "accepted": False, "reason": f"刚向 **{bname}** 求过助，过些日子再开口吧。", "line": "", "bot_name": bname}
+        if kind != "companion_gather" and any(r.state == "active" and r.template == KIND_TEMPLATE[kind] for r in mine):
+            await session.rollback()
+            return {"ok": False, "accepted": False, "reason": f"你上回向 **{bname}** 借的还没还。", "line": "", "bot_name": bname}
+        # 参数校验（不合规的直接拒绝，不占冷却）
+        stones, value, p = bot.spirit_stones, 0, dict(params)
+        if kind == "loan_stones":
+            if p.get("amount") not in pa["amounts"]:
+                await session.rollback()
+                return {"ok": False, "accepted": False, "reason": "借的数目不对。", "line": "", "bot_name": bname}
+            value = p["amount"]
+        elif kind == "loan_item":
+            item = p.get("item")
+            value = be.item_value(item) if item in ITEMS else 0
+            if not item or item not in ITEMS or not 0 < value <= pa["item_value_max"]:
+                await session.rollback()
+                return {"ok": False, "accepted": False, "reason": "这件东西不能借（不存在，或太贵重）。", "line": "", "bot_name": bname}
+            have = await session.scalar(select(Inventory.quantity).where(Inventory.discord_id == bot_id, Inventory.item_id == item)) or 0
+            if have < 1:
+                await session.rollback()
+                return {"ok": False, "accepted": False, "reason": f"**{bname}** 手上没有 {item}。", "line": "", "bot_name": bname}
+            p["qty"], p["value"] = 1, value
+        else:
+            from utils.world import get_region
+            if p.get("what") not in pa["gather_types"] or get_region(bot.current_city):
+                await session.rollback()
+                return {"ok": False, "accepted": False, "reason": "这里没法一起采集。", "line": "", "bot_name": bname}
+        p["dir"] = "player"
+        rid = uuid.uuid4().hex[:16]
+        known = ctx["tier"] != "仇视" and ctx["relation"] != "仇敌" and (ctx["tier"] in ("熟识", "至交") or ctx["relation"] in pa["bonded_relations"])
+        broke = kind == "loan_stones" and stones < value
+        prof = ctx["_profile"] or {}
+        chance = 0.0 if (not known or broke) else lend_chance(
+            ctx["tier"], ctx["relation"], ctx["_kindness"], prof.get("loyalty", 50), ctx["_greed"], value / max(stones, 1) if kind != "companion_gather" else 0.0,
+            kind == "companion_gather", cfg)
+        accepted = known and not broke and rng.random() < chance
+        if accepted and kind == "loan_stones":
+            accepted = await spend_stones(session, bot_id, value)
+            if accepted:
+                await grant_stones(session, player_id, value)
+        elif accepted and kind == "loan_item":
+            accepted = await consume_item(session, bot_id, p["item"], 1)
+            if accepted:
+                await grant_item(session, player_id, p["item"], 1)
+        due = now + _years(rng, pa["gather_due_years" if kind == "companion_gather" else "due_years"])
+        session.add(BotRequest(id=rid, bot_id=bot_id, player_id=player_id, template=KIND_TEMPLATE[kind], state="active" if accepted else "refused",
+                               params=json.dumps(p, ensure_ascii=False), created_at=now, due_at=due if accepted else now, updated_at=now,
+                               note="" if accepted else ("手头紧" if broke else "婉拒")))
+        await session.commit()
+    vars_ = {"amount": p.get("amount", ""), "item": p.get("item", ""), "what": p.get("what", "")}
+    line = await _line("request_lend_accept" if accepted else "request_lend_refuse", player_id, bot_id, vars_, rng)
+    reason = "" if accepted else (f"**{bname}** 手头也紧。" if broke else "")
+    return {"ok": True, "accepted": accepted, "reason": reason, "line": line, "bot_name": bname, "due_at": due if accepted else 0, "request_id": rid}
+
+
+async def repay_debt(player_id: str, bot_id: str, now: float | None = None) -> dict:
+    """玩家还这个机器人的账（借的灵石 / 物品）：灵石有多少还多少，物品优先还原物，没有就折成灵石（加价 item_markup）。"""
+    now, cfg = now or time.time(), load()
+    pa, rp = cfg["player_ask"], cfg["repay"]
+    paid_total, cleared, items = 0, [], []
+    async with AsyncSessionLocal() as session:
+        await _lock(session)
+        rows = [r for r in (await session.execute(select(BotRequest).where(
+            BotRequest.player_id == player_id, BotRequest.bot_id == bot_id, BotRequest.state == "active"))).scalars()
+            if json.loads(r.params or "{}").get("dir") == "player" and cfg["templates"].get(r.template, {}).get("kind") in LOAN_KINDS]
+        if not rows:
+            await session.rollback()
+            return {"ok": False, "reason": "你没有欠它的账。", "cleared": 0, "paid": 0, "left": 0, "line": ""}
+        left = 0
+        for r in rows:
+            params = json.loads(r.params)
+            if r.template == "borrow_item" and not params.get("as_stones"):
+                if await consume_item(session, player_id, params["item"], params["qty"]):          # 原物奉还
+                    await grant_item(session, bot_id, params["item"], params["qty"])
+                    items.append(params["item"])
+                    r.state, r.updated_at, r.note = "done", now, "原物奉还"
+                    cleared.append(params)
+                    continue
+                params["as_stones"], params["owed"] = True, int(params["value"] * params["qty"] * rp["item_markup"])
+            owed = int(params.get("owed", params.get("amount", 0)))
+            paid = await _pay(session, player_id, bot_id, owed)
+            paid_total += paid
+            if paid >= owed:
+                r.state, r.updated_at, r.note = "done", now, "已还"
+                cleared.append(params)
+            else:
+                params["owed"] = owed - paid
+                r.params, r.updated_at = json.dumps(params, ensure_ascii=False), now
+                left += owed - paid
+        await session.commit()
+    line = ""
+    if cleared:
+        from utils import bot_social
+        line = await _line("request_debt_cleared", player_id, bot_id, _debt_label(cleared[-1]))
+        await bot_social.adjust_favor(player_id, bot_id, pa["cleared_favor"])
+        await bot_memory.remember(player_id, bot_id, "repaid_by_player", "", "")
+    if not cleared and not paid_total:
+        return {"ok": False, "reason": "你的灵石不够，一分钱也还不了。", "cleared": 0, "paid": 0, "left": left, "line": ""}
+    return {"ok": True, "reason": "", "cleared": len(cleared), "paid": paid_total, "left": left, "line": line, "items": items}
+
+
+async def _dun_or_default(r: dict, rng, now: float, cfg: dict) -> list[dict]:
+    """玩家欠的账到期了、债主在场：宽限期内催一催（隔一阵才再催），宽限期过了翻脸 —— 记仇、好感大降。"""
+    from utils import bot_social
+    pa, pid, bid, params = cfg["player_ask"], r["player_id"], r["bot_id"], r["params"]
+    async with AsyncSessionLocal() as session:
+        bot = await session.get(Player, bid)
+        if bot is None or bot.is_dead:
+            return []
+        bname, brealm = bot.name, bot.realm
+    if now < r["due_at"] + years_to_seconds(pa["grace_years"]):
+        last = params.get("dunned_at", 0)
+        if last and now - last < years_to_seconds(pa["dun_interval_years"]):
+            return []
+        params["dunned_at"] = now
+        async with AsyncSessionLocal() as session:
+            await session.execute(update(BotRequest).where(BotRequest.id == r["id"], BotRequest.state == "active").values(
+                params=json.dumps(params, ensure_ascii=False), updated_at=now))
+            await session.commit()
+        await bot_social.adjust_favor(pid, bid, pa["dun_favor"])
+        return [_event("dun", bot, await _line("request_dun", pid, bid, _debt_label(params), rng), amount=_debt_label(params)["amount"], item=params.get("item", ""))]
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(update(BotRequest).where(BotRequest.id == r["id"], BotRequest.state == "active").values(
+            state="defaulted", updated_at=now, note="玩家赖账"))
+        await session.commit()
+    if res.rowcount != 1:
+        return []
+    await bot_grudges.on_offense(pid, bid, "debt")                      # 反过来：它记你的账（actor 是玩家，受害者是它）
+    await bot_memory.remember(pid, bid, "debt_by_player", "", "")
+    await bot_social.adjust_favor(pid, bid, pa["default_favor"])
+    return [_event("player_default", bot, await _line("request_player_default", pid, bid, rng=rng))]
+
+
+async def _finish_player_gather(r: dict, rng, now: float, cfg: dict) -> list[dict]:
+    """玩家求来的陪采集：它在同城就一起去了。没有酬劳，双方好感涨、记进记忆。"""
+    from utils import bot_social
+    pid, bid = r["player_id"], r["bot_id"]
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(update(BotRequest).where(BotRequest.id == r["id"], BotRequest.state == "active").values(
+            state="done", updated_at=now, note="一起采集"))
+        bot = await session.get(Player, bid)
+        await session.commit()
+    if res.rowcount != 1 or bot is None:
+        return []
+    line = await _line("request_gather_done", pid, bid, {"what": r["params"].get("what", "采集")}, rng)
+    await bot_social.adjust_favor(pid, bid, cfg["player_ask"]["gather_favor"])
+    await bot_memory.remember(pid, bid, "gather", "", "done")
+    return [_event("gather_done", bot, line, amount=0)]
+
+
 # ---- 过期 / 查询 / 清理 -----------------------------------------------------
 
 async def expire(now: float | None = None) -> int:
@@ -500,6 +719,8 @@ async def expire(now: float | None = None) -> int:
             kind = cfg["templates"].get(r.template, {}).get("kind")
             if r.state == "offered":
                 r.state, r.note = "expired", "没有答复"
+            elif kind == "companion_gather" and json.loads(r.params or "{}").get("dir") == "player":
+                r.state, r.note = "expired", "没去成"                 # 玩家求来的陪采集，过期了就算了，不扣好感
             elif kind in ("errand", "companion_gather"):
                 r.state, r.note = "failed", "没办成"
                 failed.append((r.player_id, r.bot_id))
@@ -519,6 +740,13 @@ def describe(r: dict, bot_name: str, now: float | None = None) -> str:
     now, p = now or time.time(), r["params"]
     left = f"，约定 {seconds_to_years(max(0, r['due_at'] - now)):.1f} 年后" if r["state"] == "active" else ""
     t = load()["templates"].get(r["template"], {}).get("kind")
+    if p.get("dir") == "player":
+        if t == "loan_stones":
+            return f"你欠 **{bot_name}** {p.get('owed', p['amount'])} 灵石{left}还"
+        if t == "loan_item":
+            return f"你借了 **{bot_name}** 的 {p['item']}{left}还"
+        if t == "companion_gather":
+            return f"**{bot_name}** 答应陪你{p['what']}（还剩约 {seconds_to_years(max(0, r['due_at'] - now)):.1f} 年，在同城开始采集即可）"
     if r["state"] == "offered":
         return f"【待答复】**{bot_name}** 有事相求"
     if t == "loan_stones":

@@ -9,10 +9,11 @@
 · 决策接口（给仇恨 / 拦路 / 处置用）：`effective`（这一次有没有『反常』）、`revenge_style`（直接 / 隐忍 / 等待时机）、`captive_shift`（赢了之后处置的倾向）。
 """
 
-import json
 import random
 from functools import lru_cache
 from pathlib import Path
+
+from utils import settings_hub
 
 _PATH = Path(__file__).resolve().parent.parent / "data" / "bot_profiles.json"
 AXES = ("lawful", "impulse", "loyalty", "vengeful", "capacity")
@@ -24,7 +25,7 @@ STYLES = ("直接", "隐忍", "等待时机")
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:

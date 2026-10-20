@@ -27,6 +27,7 @@ from utils.bots import is_bot_id
 from utils.character import years_to_seconds
 from utils.db_async import (AsyncSessionLocal, BotGrudge, BotPersonality, BotTie, BotWorldState, Player, PlayerEnemy)
 from utils.realms import REALMS, major_realm
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ STYLES = bot_profile.STYLES
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:
@@ -123,12 +124,59 @@ def window_years(archetype: str, rel: str, stubborn: bool, cfg: dict | None = No
 
 # ---- 记账 -------------------------------------------------------------------
 
+async def _upsert_grudge(session, holder_id: str, actor_id: str, victim_id: str, kind: str, reason: str, eff: float, rel: str,
+                         arche: str | None, prof: dict, known: float, now: float, rng, cfg: dict) -> BotGrudge:
+    """记一笔（或加重已有的一笔）仇：窗口、复仇方式、执着与否都在这里定。在调用方的事务里，不 commit。"""
+    row = await session.get(BotGrudge, (holder_id, actor_id, victim_id))
+    stubborn = bool(row.stubborn) if row else (
+        bool(prof) and prof.get("loyalty", 0) >= cfg["stubborn"]["loyalty_min"] and rng.random() < cfg["stubborn"]["share"])
+    until = known + years_to_seconds(window_years(arche, rel, stubborn, cfg)) if arche else 0.0
+    style = (row.style if row and row.style else bot_profile.revenge_style(prof or None, rng)) if arche else ""
+    sev = int(round(eff))
+    if row is None:
+        row = BotGrudge(holder_id=holder_id, target_id=actor_id, victim_id=victim_id, kind=kind, reason=reason,
+                        severity=min(100, max(1, sev)), events=1, state="active", style=style, stubborn=stubborn,
+                        created_at=now, known_at=known, window_until=until)
+        session.add(row)
+    else:
+        if stronger(kind, row.kind, cfg) == kind:
+            row.kind, row.reason = kind, reason
+        row.severity, row.events = min(100, row.severity + max(1, sev)), row.events + 1
+        row.state, row.window_until = "active", max(row.window_until, until)
+        row.known_at = min(row.known_at, known) if row.known_at else known
+    # 这个人对 actor 的其它旧账也重新激活（新仇勾起旧恨）
+    await session.execute(update(BotGrudge).where(BotGrudge.holder_id == holder_id, BotGrudge.target_id == actor_id,
+                                                  BotGrudge.state == "dormant").values(state="active", window_until=until))
+    return row
+
+
+async def add_known(holder_id: str, actor_id: str, victim_id: str, kind: str, reason: str, severity: int, rel: str,
+                    rng=None, now: float | None = None) -> bool:
+    """查清楚了：holder 现在知道是 actor 干的（调查结案用）。已死的 holder 不记。返回有没有记上。旁路。"""
+    rng, now, cfg = rng or random.Random(), now or time.time(), load()
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(update(Player).where(Player.discord_id == "").values(discord_id=""))
+            holder = await session.get(Player, holder_id)
+            if holder is None or holder.is_dead:
+                await session.rollback()
+                return False
+            persona = await session.get(BotPersonality, holder_id)
+            arche, prof = _persona(persona) if is_bot_id(holder_id) else (None, {})
+            await _upsert_grudge(session, holder_id, actor_id, victim_id, kind, reason, float(severity), rel, arche, prof, now, now, rng, cfg)
+            await session.commit()
+        return True
+    except Exception:
+        log.warning("调查结案记仇失败：%s → %s", holder_id, actor_id, exc_info=True)
+        return False
+
+
 async def on_offense(actor_id: str, victim_id: str, kind: str, *, rng=None, now: float | None = None) -> list[dict]:
     """actor 对 victim 做了 kind（rob_fail / rob / cripple / kill）：受害者本人和关系网里的人按概率记仇。
     返回新记 / 加重的仇恨 [{holder, target, victim, kind, reason, severity, known_at}]。旁路：出错只记 warning。"""
     rng, now, cfg = rng or random.Random(), now or time.time(), load()
     k = cfg["kinds"][kind]
-    out = []
+    out, pending = [], []
     try:
         async with AsyncSessionLocal() as session:
             await session.execute(update(Player).where(Player.discord_id == "").values(discord_id=""))      # 先拿写锁
@@ -166,43 +214,34 @@ async def on_offense(actor_id: str, victim_id: str, kind: str, *, rng=None, now:
                     eff *= 0.5 + strength / 100
                     if eff < cfg["min_severity"] or rng.random() >= min(0.95, eff / cfg["third_party_scale"]):
                         continue
-                delay = 0.0
+                delay, investigate = 0.0, False
                 if rel != "self" and reach != "server":
                     if reach == "city" and p.current_city != vcity:
                         delay = cfg["reach_delay_years"]["city_other"]
                     elif reach == "none":
-                        if rng.random() >= cfg["reach_delay_years"]["none_learn_chance"]:
-                            continue                              # 没名气的人出事，朋友根本没听说
-                        delay = rng.uniform(*cfg["reach_delay_years"]["none"])
+                        if is_bot_id(holder_id):
+                            investigate = True                   # 机器人朋友：自己去打听（可能向玩家问话），查到了才记仇
+                        else:
+                            if rng.random() >= cfg["reach_delay_years"]["none_learn_chance"]:
+                                continue                          # 真人朋友：没听说
+                            delay = rng.uniform(*cfg["reach_delay_years"]["none"])
                 known = now + years_to_seconds(delay)
                 reason = (k["self"] if rel == "self" else k["third"]).format(
                     actor=aname, victim=vname, rel=cfg["relation_names"].get(rel, ""))
-                row = await session.get(BotGrudge, (holder_id, actor_id, victim_id))
-                stubborn = bool(row.stubborn) if row else (
-                    bool(prof) and prof.get("loyalty", 0) >= cfg["stubborn"]["loyalty_min"] and rng.random() < cfg["stubborn"]["share"])
-                until = known + years_to_seconds(window_years(arche, rel, stubborn, cfg)) if arche else 0.0
-                style = (row.style if row and row.style else bot_profile.revenge_style(prof or None, rng)) if arche else ""
-                sev = int(round(eff))
-                if row is None:
-                    row = BotGrudge(holder_id=holder_id, target_id=actor_id, victim_id=victim_id, kind=kind, reason=reason,
-                                    severity=min(100, max(1, sev)), events=1, state="active", style=style, stubborn=stubborn,
-                                    created_at=now, known_at=known, window_until=until)
-                    session.add(row)
-                else:
-                    if stronger(kind, row.kind, cfg) == kind:
-                        row.kind, row.reason = kind, reason
-                    row.severity, row.events = min(100, row.severity + max(1, sev)), row.events + 1
-                    row.state, row.window_until = "active", max(row.window_until, until)
-                    row.known_at = min(row.known_at, known) if row.known_at else known
-                # 这个人对 actor 的其它旧账也重新激活（新仇勾起旧恨）
-                await session.execute(update(BotGrudge).where(BotGrudge.holder_id == holder_id, BotGrudge.target_id == actor_id,
-                                                              BotGrudge.state == "dormant").values(state="active", window_until=until))
+                if investigate:                                   # 无名小卒出事：机器人朋友不会立刻知道，要自己去查（utils/bot_investigation.py）
+                    pending.append({"seeker": holder_id, "missing": victim_id, "missing_name": vname, "culprit": actor_id, "culprit_name": aname,
+                                    "kind": kind, "rel": rel, "severity": int(round(eff)), "reason": reason, "city": vcity})
+                    continue
+                row = await _upsert_grudge(session, holder_id, actor_id, victim_id, kind, reason, eff, rel, arche, prof, known, now, rng, cfg)
                 out.append({"holder": holder_id, "target": actor_id, "victim": victim_id, "kind": kind, "reason": reason,
                             "severity": row.severity, "known_at": known})
             await session.commit()
     except Exception:
         log.warning("记仇失败：%s → %s %s", actor_id, victim_id, kind, exc_info=True)
         return []
+    if pending:
+        from utils import bot_investigation
+        await bot_investigation.start(pending, rng, now)
     return out
 
 

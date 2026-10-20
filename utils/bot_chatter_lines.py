@@ -42,6 +42,11 @@ SCENES = {
     "request_thanks": set(), "request_declined": set(),
     "request_repay": {"amount"}, "request_repay_plus": {"amount"}, "request_repay_item": {"item"}, "request_short": {"amount"},
     "request_default": set(), "request_errand_arrive": {"asker"}, "request_gather_done": {"what"}, "request_failed": set(),
+    # 玩家主动向机器人求助（借灵石 / 借物品 / 陪采集）
+    "request_lend_accept": {"amount", "item", "what"}, "request_lend_refuse": set(), "request_dun": {"amount", "item"},
+    "request_debt_cleared": {"amount", "item"}, "request_player_default": set(),
+    # 失踪调查（utils/bot_investigation.py）：问玩家见没见过失踪的朋友、道谢、没线索、查出凶手
+    "investigation_ask": {"missing"}, "investigation_thanks": {"missing"}, "investigation_ack": set(), "investigation_found": {"missing"},
 }
 SCENE_INFO = {                                  # 给 AI 看的场景说明（when = 什么时候说，beat = 这句话要做什么）
     "chatter_arrive": ("玩家来到了它所在的城，它迎上来打招呼", "按好感档位和关系决定热络还是冷淡；可以提{city}；别问太多问题，一句话就好"),
@@ -69,6 +74,15 @@ SCENE_INFO = {                                  # 给 AI 看的场景说明（wh
     "request_errand_arrive": ("玩家替人送的信送到了，收信人（它）说话", "点出托信的人{asker}，表示收到并道谢"),
     "request_gather_done": ("玩家陪它采集完毕", "点出{what}，高兴 / 满意，按性格"),
     "request_failed": ("玩家答应的事没办成，期限已过", "失望或淡淡地说算了，不要辱骂玩家"),
+    "request_lend_accept": ("玩家向它求助（借灵石 / 借物品 / 陪采集），它答应了", "点出借的数目{amount}或物品{item}或陪采集的{what}（用到哪个写哪个）；按性格：豪爽痛快、贪财提醒要还、阴鸷带点施压"),
+    "request_lend_refuse": ("玩家向它求助，它婉拒了", "不要羞辱玩家；原因含糊带过（手头紧 / 没空 / 不方便）；仇视的人可以冷"),
+    "request_dun": ("借给玩家的钱 / 物品到期了，它来催", "点出{amount}灵石或{item}；语气按性格从客气到施压；别威胁人身"),
+    "request_debt_cleared": ("玩家还清了欠它的账", "点出{amount}或{item}；满意 / 感慨，按性格"),
+    "request_player_default": ("玩家欠的账过了宽限期还是不还，它翻脸", "失望 / 愤怒，按性格；会记仇但不要写成死亡威胁"),
+    "investigation_ask": ("它的朋友{missing}失踪了，它在找，在城里遇到玩家就问", "问『见过{missing}吗』；担心 / 焦急 / 冷淡按性格；别暗示玩家是凶手"),
+    "investigation_thanks": ("玩家给了它一条真线索", "道谢，点出{missing}；按性格"),
+    "investigation_ack": ("玩家说没见过 / 不想说，或给的是条没用的线索", "平淡地接受，不要追问"),
+    "investigation_found": ("它查出来凶手就是眼前的玩家", "震惊 / 愤怒 / 冷静地宣战，点出{missing}；不要写成直接动手的描写"),
 }
 RELATIONS = ("结拜", "同门", "朋友", "相识", "仇敌", "无")
 REALM_GAPS = ("higher", "equal", "lower")               # 它的大境界相对玩家

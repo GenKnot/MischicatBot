@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。玩家主动求助相关场景。",
+ "scene": "request_dun",
+ "rules": [
+  {
+   "lines": [
+    "{player}，借的{amount}灵石，该还了吧？",
+    "{player}，上回借你的东西，可别忘了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，兄弟借你的{amount}灵石，到日子啦，该还了！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，你借的{amount}灵石……该还了，好吗？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，欠我的{amount}灵石，赶紧还，我要买药材。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！我跟你说那{amount}灵石到期了，你可别装糊涂啊！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，借期已过，{amount}灵石，望阁下早日奉还。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{amount}灵石，该还了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，那{amount}灵石，连本带利，今天该结了吧？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，欠我的{amount}灵石……我一直记着。"
+   ]
+  }
+ ]
+}

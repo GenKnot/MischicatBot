@@ -27,6 +27,7 @@ from utils import bot_profile
 from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, BotPersonality, BotTie, BotWorldState, Player
 from utils.realms import REALMS, major_realm
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ SOCIAL_KEY = "social_day"
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:
@@ -139,6 +140,7 @@ class TieBook:
             self.count[a] += 1
             self.count[b] += 1
         self.new, self.changed = {}, set()
+        self.events = []                                         # 当天的大事 [("quarrel", a, b) | ("sworn", [成员…])]，给传闻用
 
     def room(self, uid: str) -> bool:
         info = self.infos.get(uid)
@@ -325,6 +327,7 @@ def social_book(book: TieBook, rng, cfg: dict | None = None) -> Counter:
         if row["kind"] == "朋友":
             if rng.random() < d["quarrel_base"] * (1.5 - aff) * (a["vengeful"] + b["vengeful"]) / 100:
                 book.set(key, kind="仇敌", strength=rng.randint(*cfg["start_strength"]["仇敌"]), note="反目", bond_id="")
+                book.events.append(("quarrel", key[0], key[1]))
                 sm["quarrels"] += 1
             elif (row["strength"] >= d["sworn_strength"] and min(a["loyalty"], b["loyalty"]) >= d["sworn_loyalty"]
                   and key[0] not in in_bond and key[1] not in in_bond and rng.random() < d["sworn_chance"]):
@@ -338,6 +341,7 @@ def social_book(book: TieBook, rng, cfg: dict | None = None) -> Counter:
                     if rng.random() < d["bond_extend_chance"]:
                         members.append(m)
                 form_group(book, members, "结拜", rng, cfg, note="结拜")
+                book.events.append(("sworn", members))
                 in_bond.update(members)
                 sm["sworn"] += 1
         elif row["kind"] == "仇敌":
@@ -362,6 +366,8 @@ async def social_day(day: str, rng=None, force: bool = False) -> dict:
             sm = social_book(book, rng)
             await _persist(session, book, time.time())
             await session.commit()
+        from utils import bot_feuds                                # 延迟导入：bot_feuds 反过来用到这里的 _load_infos
+        sm["gossip"] = await bot_feuds.social_gossip(book.events, book.infos, rng)
         return {**sm, "new_ties": len(book.new)}
     except Exception:
         log.warning("机器人每日社交失败", exc_info=True)

@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。失踪调查相关场景。",
+ "scene": "investigation_found",
+ "rules": [
+  {
+   "lines": [
+    "原来是你，{player}！{missing}的事，你给我一个交代！",
+    "{player}……{missing}是不是你害的？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}！原来是你！{missing}是我兄弟，这笔账我跟你没完！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}……原来是你。{missing}……我不会原谅你。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，是你。{missing}的事，我记下了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！原来是你！我就知道有鬼！我要把{missing}的事告诉所有人！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，原来是阁下。{missing}之事，在下与你不共戴天。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……是你。{missing}的账，我会算。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，是你干的！{missing}的账，连本带利！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "呵，{player}……原来是你。{missing}的事，我一笔一笔记着。"
+   ]
+  }
+ ]
+}

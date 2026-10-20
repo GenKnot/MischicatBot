@@ -53,6 +53,10 @@ async def db():
         "forging": forging, "alchemy": alchemy, "checkin": checkin,
         "equipment_db": equipment_db, "views_alchemy": views_alchemy,
     }
+    # 每个测试自己的事件循环：连接池里的连接必须在这个循环还活着的时候关掉。
+    # 否则循环关闭时 SQLAlchemy 会留下『优雅关闭连接』的后台任务，偶尔（取决于垃圾回收的时机）卡住整个套件
+    # （症状：整套测试在某个测试收尾处不动了，0% CPU）。
+    await _db_async.engine.dispose()
 
 
 def make_player(db_async, uid: str, stones: int = 10_000):

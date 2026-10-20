@@ -450,6 +450,80 @@
     "听闻{name}在{city}一战斩了「{epithet}」{target}，从此名声大噪。",
     "「{epithet}」{target}败亡于{name}之手，天骄不再不可战胜。"
    ]
+  },
+  "bot_feud_rob": {
+   "score": 12,
+   "negative": false,
+   "desc": "散修之间结仇劫财",
+   "vars": [
+    "name",
+    "target",
+    "city",
+    "amount"
+   ],
+   "templates": [
+    "{city}有传言，{name}堵住旧怨{target}，抢去灵石{amount}。",
+    "听闻{name}与{target}在{city}撕破了脸，{target}被夺走灵石{amount}。",
+    "{city}一带，{name}劫了宿敌{target}一笔，{amount}灵石易主。"
+   ]
+  },
+  "bot_feud_cripple": {
+   "score": 20,
+   "negative": false,
+   "desc": "散修之间结仇废人修为",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "{city}外有人传言，{name}废了宿敌{target}的修为，二人的旧账又添一笔。",
+    "听闻{name}在{city}出手，将{target}一身修为尽数打散。",
+    "{target}在{city}栽在{name}手里，修为被废，江湖上又多了一桩恩怨。"
+   ]
+  },
+  "bot_feud_kill": {
+   "score": 35,
+   "negative": true,
+   "desc": "散修之间仇杀",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "{city}传来消息，{name}与{target}多年恩怨终了，{target}陨落。",
+    "听闻{name}在{city}取了仇家{target}的性命，江湖又添一桩血债。",
+    "{target}死于{city}，传言动手的正是宿敌{name}。"
+   ]
+  },
+  "bot_quarrel": {
+   "score": 8,
+   "negative": false,
+   "desc": "旧友反目",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "{city}有人说，{name}与{target}昔日称兄道弟，如今已是反目成仇。",
+    "听闻{name}和{target}在{city}闹翻了，往日交情一笔勾销。"
+   ]
+  },
+  "bot_sworn": {
+   "score": 10,
+   "negative": false,
+   "desc": "散修结拜",
+   "vars": [
+    "name",
+    "target",
+    "city"
+   ],
+   "templates": [
+    "{city}传出佳话，{name}与{target}对天结拜，从此以兄弟相称。",
+    "听闻{name}和{target}在{city}义结金兰，生死与共。"
+   ]
   }
  },
  "thresholds": {

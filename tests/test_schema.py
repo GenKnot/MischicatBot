@@ -54,7 +54,7 @@ def test_orm_模型的每个默认值都有对应的_server_default():
 
 
 # 冻结的 utils/db.py::init_db 不再新增表：新表只通过 Alembic 迁移 / ORM 建，登记在这里。
-ALEMBIC_ONLY_TABLES = {"bot_personality", "bot_relations", "bot_world_state", "bot_raids", "rumors", "rumor_optout", "bot_memories", "bot_ties", "bot_grudges", "player_enemies", "bot_encounters", "player_ambush", "chatter_state", "chatter_pair", "chatter_queue", "bot_requests"}
+ALEMBIC_ONLY_TABLES = {"bot_personality", "bot_relations", "bot_world_state", "bot_raids", "rumors", "rumor_optout", "bot_memories", "bot_ties", "bot_grudges", "player_enemies", "bot_encounters", "player_ambush", "chatter_state", "chatter_pair", "chatter_queue", "bot_requests", "bot_missing"}
 
 
 def test_两条建表路径的表集合一致(tmp_path, monkeypatch):

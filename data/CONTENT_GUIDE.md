@@ -13,6 +13,11 @@
 | **主动搭话的台词**（条件化文案库：场景 × 任意条件组合） | `data/bot_chatter/<场景>.json` 与批次文件 `<场景>.<批次名>.json` | AI | `scripts/dialogue_tool.py chatter-prompt / chatter-merge`（第 6 节） |
 | **主动搭话**的节奏配置（每天上限、冷却、各契机的概率与延迟、回应的好感变化） | `data/bot_chatter_config.json` | 人 | 直接改数字 |
 | **机器人请求 / 委托**配置（借灵石 / 借物品 / 送信 / 陪采集的模板、开口概率、还钱的性格系数） | `data/bot_requests.json` | 人 | 同一种 kind 的新模板只改数据（并写 `request_ask_<模板名>` 台词）；新 kind 要写代码 |
+| **玩家向机器人求助**的配置（答应概率、借期、宽限、催债 / 翻脸的好感变化） | `data/bot_requests.json` 的 `player_ask` | 人 | 直接改数字 |
+| **失踪调查**配置（问话概率 / 回答对进度的影响 / 每天进度 / 放弃期） | `data/bot_investigation.json` | 人 | 直接改数字 |
+| **机器人恩怨**（仇敌 / 复仇动手概率、胜负、结果权重按性格、击杀上限、传闻概率） | `data/bot_feuds.json` | 人 | 直接改数字；传闻文案在 `data/rumors.json` 的 `bot_feud_*` / `bot_quarrel` / `bot_sworn` |
+| **管理员调参**（在游戏里改上面这些 json 里的数字 / 开关，立即生效，可恢复默认） | `cat!调参` 系列命令 | 管理员 | 文件里的值是默认值；文字内容不能这样改 |
+| **AI 润色**（默认关；Qwen / DeepSeek 二选一、场景名单、日调用上限、超时） | `data/llm_polish.json` | 人 | 密钥放环境变量 `DASHSCOPE_API_KEY` / `DEEPSEEK_API_KEY`，失败自动退回模板台词 |
 | **仇恨账本**配置（各种冒犯的轻重、原因模板、蹲守年数、续期概率、化解价格） | `data/bot_grudges.json` | 人 | 直接改数字 / 模板；新增原型要补 `windows` 和 `renew` |
 | **江湖传闻**模板（22+ 个事件种类） | `data/rumors.json` | AI | `data/rumor_templates_README.md` |
 | **天骄的称号和背景** | `data/bot_legends.json` | AI | 每个原型的 `epithets` / `backstories` 追加；占位符只有 `{home}` |

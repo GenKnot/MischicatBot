@@ -28,6 +28,7 @@ from utils.bots import is_bot_id
 from utils.db_async import (AsyncSessionLocal, BotPersonality, BotRelation, BotTie, ChatterPair, ChatterQueue, ChatterState,
                             Player, PublicEventParticipant)
 from utils.realms import REALMS, major_realm
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ HOUR = 3600
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:

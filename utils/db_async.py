@@ -433,6 +433,30 @@ class BotRequest(Base):
     note: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
 
 
+class BotMissing(Base):
+    """机器人在打听失踪的朋友（U1·江湖百态）：没名气的机器人被杀，朋友不会立刻知道是谁干的，要自己去查。
+
+    progress 0~100，到 100 就查清了（seeker 记仇）。每天自己涨一点（谨慎的涨得快）；碰到玩家会问『见过某某吗』，玩家的回答让它更接近真相或走错路；
+    asked：{玩家ID: 上次问的时间}。state：active / resolved / gave_up。"""
+    __tablename__ = "bot_missing"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    seeker_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    missing_id: Mapped[str] = mapped_column(String, nullable=False)
+    missing_name: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    culprit_id: Mapped[str] = mapped_column(String, nullable=False)
+    culprit_name: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    kind: Mapped[str] = mapped_column(String, default="kill", server_default=text("'kill'"))
+    rel: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    severity: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    reason: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    city: Mapped[str] = mapped_column(String, default="", server_default=text("''"))
+    started_at: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"))
+    progress: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    state: Mapped[str] = mapped_column(String, default="active", server_default=text("'active'"))
+    asked: Mapped[str] = mapped_column(Text, default="{}", server_default=text("'{}'"))
+
+
 class BotWorldState(Base):
     """机器人世界的全局状态（key/value）：目标人数 `target`、最后补员日 `refill_day`。"""
     __tablename__ = "bot_world_state"

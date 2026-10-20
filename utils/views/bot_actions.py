@@ -4,10 +4,13 @@
 给不给、涨多少好感由 utils/bot_social.py 判定；这里只负责把结果连同台词（utils/bot_dialogue.py）展示出来。
 """
 
+import time
+
 import discord
 
 from utils import bot_social as bs
 from utils import bot_grudges, bot_memory, bot_profile, bot_ties, bot_traits
+from utils import bot_requests as br
 from utils.bots import is_bot_id
 from utils.inventory import get_inventory
 from utils.views.base import TimedView
@@ -155,9 +158,101 @@ class BotAppeaseButton(discord.ui.Button):
             f"**{self.target['name']}** 对你有旧怨。你可以赔礼、诚心道歉，或者多送些它喜欢的东西。", view=AppeaseView(self.target, interaction.user), ephemeral=True)
 
 
+class ItemAskModal(discord.ui.Modal, title="借一件东西"):
+    item = discord.ui.TextInput(label="想借的物品名", placeholder="对方背包里有的、不太贵重的东西", max_length=30)
+
+    def __init__(self, target: dict):
+        super().__init__()
+        self.target = target
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        res = await br.player_ask(str(interaction.user.id), self.target["discord_id"], "loan_item", {"item": str(self.item).strip()})
+        await interaction.followup.send(embed=_ask_result_embed(res, self.target["name"]), ephemeral=True)
+
+
+def _ask_result_embed(res: dict, name: str) -> discord.Embed:
+    if not res["ok"]:
+        return discord.Embed(title="🙏 没能开口", description=res["reason"], color=discord.Color.light_grey())
+    body = f"**{res['bot_name']}**：「{res['line']}」" if res["line"] else ""
+    if res["reason"]:
+        body = f"{res['reason']}\n{body}".strip()
+    if res["accepted"]:
+        from utils.character import seconds_to_years
+        body += f"\n*约定 {seconds_to_years(max(0, res['due_at'] - time.time())):.1f} 年内了结。*" if res.get("due_at") else ""
+    return discord.Embed(title="🙏 " + ("答应了" if res["accepted"] else "婉拒了"), description=body,
+                         color=discord.Color.green() if res["accepted"] else discord.Color.light_grey())
+
+
+class _AskButton(discord.ui.Button):
+    def __init__(self, target: dict, kind: str, params: dict, label: str, style=discord.ButtonStyle.secondary):
+        super().__init__(label=label, style=style)
+        self.target, self.kind, self.params = target, kind, params
+
+    async def callback(self, interaction: discord.Interaction):
+        if not self.view.try_claim():
+            return await interaction.response.send_message("你已经开过口了。", ephemeral=True)
+        await interaction.response.defer()
+        res = await br.player_ask(str(interaction.user.id), self.target["discord_id"], self.kind, self.params)
+        await interaction.edit_original_response(embed=_ask_result_embed(res, self.target["name"]), view=None)
+
+
+class _AskItemButton(discord.ui.Button):
+    def __init__(self, target: dict):
+        super().__init__(label="借物品…", style=discord.ButtonStyle.secondary)
+        self.target = target
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(ItemAskModal(self.target))
+
+
+class AskView(TimedView):
+    """向熟人求助：借灵石（几档）/ 借物品 / 请它陪你采集（四种）。每次只能开一次口。"""
+
+    def __init__(self, target: dict, author):
+        super().__init__(author=author)
+        self.author = author
+        pa = br.load()["player_ask"]
+        for amount in pa["amounts"]:
+            self.add_item(_AskButton(target, "loan_stones", {"amount": amount}, f"借 {amount} 灵石", discord.ButtonStyle.primary))
+        self.add_item(_AskItemButton(target))
+        for what in pa["gather_types"]:
+            self.add_item(_AskButton(target, "companion_gather", {"what": what}, f"陪我{what}"))
+
+
+class BotAskButton(discord.ui.Button):
+    def __init__(self, target: dict):
+        super().__init__(label="🙏 求助", style=discord.ButtonStyle.secondary)
+        self.target = target
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            f"向 **{self.target['name']}** 开口求助：借灵石、借东西，或请它陪你去采集。答应与否看你们的交情和它的为人；借了要按时还。",
+            view=AskView(self.target, interaction.user), ephemeral=True)
+
+
+class BotRepayButton(discord.ui.Button):
+    def __init__(self, target: dict):
+        super().__init__(label="💰 还钱", style=discord.ButtonStyle.success)
+        self.target = target
+
+    async def callback(self, interaction: discord.Interaction):
+        res = await br.repay_debt(str(interaction.user.id), self.target["discord_id"])
+        if not res["ok"]:
+            return await interaction.response.send_message(res["reason"], ephemeral=True)
+        text = (f"还了 **{res['paid']}** 灵石" if res["paid"] else "") + ("、" if res["paid"] and res.get("items") else "") + \
+               ("、".join(f"{i}（原物奉还）" for i in res.get("items", [])))
+        text += f"，还欠 **{res['left']}** 灵石。" if res["left"] else "，账清了。"
+        if res["line"]:
+            text += f"\n**{self.target['name']}**：「{res['line']}」"
+        await interaction.response.send_message(text, ephemeral=True)
+
+
 def add_bot_buttons(view: discord.ui.View, target: dict) -> None:
     if is_bot_id(target["discord_id"]):
         view.add_item(BotChatButton(target))
         view.add_item(BotGiftButton(target))
         view.add_item(BotBondButton(target))
         view.add_item(BotAppeaseButton(target))
+        view.add_item(BotAskButton(target))
+        view.add_item(BotRepayButton(target))

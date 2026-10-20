@@ -1,22 +1,188 @@
 {
- "_说明": "机器人对熟人的请求 / 委托（U1·江湖百态）。机器人在和你碰面（到城、点『搭话』）时，如果缺什么、有事相求，会开口。templates 里每个模板有一个 kind（loan_stones 借灵石 / loan_item 借物品 / errand 送信 / companion_gather 陪着采集），同一种 kind 可以写很多模板（只改数据）；新增 kind 要写代码。ask：开口的概率和限制；repay：借了钱 / 物品之后还不还、还多少，由性格决定；due_years 是游戏年（1 年 = 现实 2 小时）。所有数字都可以改。",
+ "_说明": "机器人对熟人的请求 / 委托（U1·江湖百态）。机器人在和你碰面（到城、点『搭话』）时，如果缺什么、有事相求，会开口。templates 里每个模板有一个 kind（loan_stones 借灵石 / loan_item 借物品 / errand 送信 / companion_gather 陪着采集），同一种 kind 可以写很多模板（只改数据）；新增 kind 要写代码。ask：开口的概率和限制；repay：借了钱 / 物品之后还不还、还多少，由性格决定；due_years 是游戏年（1 年 = 现实 2 小时）。所有数字都可以改。 player_ask：玩家主动向熟人求助（借灵石 / 借物品 / 陪着采集）——答应的概率 = 交情档位底子 + 关系加成 + 善意 / 义气 / 贪婪的修正 − 数额占它身家的比例 × share_penalty；借了就要还，到期后它会催，宽限 grace_years 游戏年还不还就记仇（进它的仇恨账）。",
  "ask": {
-  "chance": 0.3, "chance_by_archetype": {"豪爽": 1.0, "憨直": 0.7, "痴丹": 1.0, "话痨": 1.4, "迂腐": 0.5, "高冷": 0.4, "贪财": 1.5, "阴鸷": 0.6},
-  "min_tier": "熟识", "bonded_relations": ["结拜", "同门", "朋友"],
-  "offer_ttl_hours": 12, "max_open_per_player": 8, "per_bot_cooldown_hours": 24, "max_offers_per_meeting": 1
+  "chance": 0.3,
+  "chance_by_archetype": {
+   "豪爽": 1.0,
+   "憨直": 0.7,
+   "痴丹": 1.0,
+   "话痨": 1.4,
+   "迂腐": 0.5,
+   "高冷": 0.4,
+   "贪财": 1.5,
+   "阴鸷": 0.6
+  },
+  "min_tier": "熟识",
+  "bonded_relations": [
+   "结拜",
+   "同门",
+   "朋友"
+  ],
+  "offer_ttl_hours": 12,
+  "max_open_per_player": 8,
+  "per_bot_cooldown_hours": 24,
+  "max_offers_per_meeting": 1
  },
  "templates": {
-  "borrow_stones": {"kind": "loan_stones", "weight": 4, "bot_stones_below": 300, "amounts": [100, 300, 800], "amount_max_player_share": 0.5, "due_years": [1, 5]},
-  "borrow_item": {"kind": "loan_item", "weight": 3, "item_value_max": 400, "due_years": [1, 5]},
-  "deliver_letter": {"kind": "errand", "weight": 3, "due_years": [2, 4], "reward_stones": [80, 200], "favor": 4},
-  "gather_together": {"kind": "companion_gather", "weight": 3, "due_years": [1, 3], "reward_stones": [40, 120], "favor": 4, "types": ["采药", "采矿", "伐木", "钓鱼"]}
+  "borrow_stones": {
+   "kind": "loan_stones",
+   "weight": 4,
+   "bot_stones_below": 300,
+   "amounts": [
+    100,
+    300,
+    800
+   ],
+   "amount_max_player_share": 0.5,
+   "due_years": [
+    1,
+    5
+   ]
+  },
+  "borrow_item": {
+   "kind": "loan_item",
+   "weight": 3,
+   "item_value_max": 400,
+   "due_years": [
+    1,
+    5
+   ]
+  },
+  "deliver_letter": {
+   "kind": "errand",
+   "weight": 3,
+   "due_years": [
+    2,
+    4
+   ],
+   "reward_stones": [
+    80,
+    200
+   ],
+   "favor": 4
+  },
+  "gather_together": {
+   "kind": "companion_gather",
+   "weight": 3,
+   "due_years": [
+    1,
+    3
+   ],
+   "reward_stones": [
+    40,
+    120
+   ],
+   "favor": 4,
+   "types": [
+    "采药",
+    "采矿",
+    "伐木",
+    "钓鱼"
+   ]
+  }
  },
  "repay": {
-  "default_base": {"豪爽": 0.06, "憨直": 0.03, "痴丹": 0.10, "话痨": 0.12, "迂腐": 0.02, "高冷": 0.10, "贪财": 0.35, "阴鸷": 0.25},
-  "closeness": {"至交": 0.15, "熟识": 0.08, "陌生": 0.0, "仇视": -0.10},
-  "gratitude": {"chance_base": {"豪爽": 0.35, "憨直": 0.25, "痴丹": 0.15, "话痨": 0.2, "迂腐": 0.3, "高冷": 0.1, "贪财": 0.05, "阴鸷": 0.1}, "bonus": [0.1, 0.3]},
-  "item_markup": 1.2, "extend_years": [1, 2], "max_extends": 2
+  "default_base": {
+   "豪爽": 0.06,
+   "憨直": 0.03,
+   "痴丹": 0.1,
+   "话痨": 0.12,
+   "迂腐": 0.02,
+   "高冷": 0.1,
+   "贪财": 0.35,
+   "阴鸷": 0.25
+  },
+  "closeness": {
+   "至交": 0.15,
+   "熟识": 0.08,
+   "陌生": 0.0,
+   "仇视": -0.1
+  },
+  "gratitude": {
+   "chance_base": {
+    "豪爽": 0.35,
+    "憨直": 0.25,
+    "痴丹": 0.15,
+    "话痨": 0.2,
+    "迂腐": 0.3,
+    "高冷": 0.1,
+    "贪财": 0.05,
+    "阴鸷": 0.1
+   },
+   "bonus": [
+    0.1,
+    0.3
+   ]
+  },
+  "item_markup": 1.2,
+  "extend_years": [
+   1,
+   2
+  ],
+  "max_extends": 2
  },
- "fail": {"favor": -3},
- "default": {"favor": -10}
+ "fail": {
+  "favor": -3
+ },
+ "default": {
+  "favor": -10
+ },
+ "player_ask": {
+  "cooldown_hours": 24,
+  "bonded_relations": [
+   "结拜",
+   "同门",
+   "朋友"
+  ],
+  "min_tier": "熟识",
+  "amounts": [
+   100,
+   300,
+   800
+  ],
+  "item_value_max": 400,
+  "gather_types": [
+   "采药",
+   "采矿",
+   "伐木",
+   "钓鱼"
+  ],
+  "due_years": [
+   1,
+   5
+  ],
+  "gather_due_years": [
+   1,
+   3
+  ],
+  "grace_years": 2,
+  "dun_favor": -2,
+  "default_favor": -15,
+  "cleared_favor": 2,
+  "gather_favor": 4,
+  "accept": {
+   "base_by_tier": {
+    "仇视": 0.0,
+    "陌生": 0.05,
+    "熟识": 0.45,
+    "至交": 0.8
+   },
+   "relation_bonus": {
+    "结拜": 0.25,
+    "同门": 0.2,
+    "朋友": 0.15,
+    "相识": 0.0,
+    "仇敌": -0.5,
+    "无": 0.0
+   },
+   "kindness_div": 250,
+   "loyalty_div": 400,
+   "greed_div": 300,
+   "share_penalty": 0.5,
+   "gather_bonus": 0.1,
+   "min": 0.02,
+   "max": 0.95
+  },
+  "dun_interval_years": 0.5
+ }
 }

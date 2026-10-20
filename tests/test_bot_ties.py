@@ -602,7 +602,7 @@ def test_机器人面板上有结拜按钮():
     from utils.views import bot_actions
     view = discord.ui.View()
     bot_actions.add_bot_buttons(view, {"discord_id": "bot_00001", "name": "x"})
-    assert [c.label for c in view.children] == ["💬 搭话", "🎁 送礼", "🤝 结拜", "🕊️ 化解"]
+    assert [c.label for c in view.children] == ["💬 搭话", "🎁 送礼", "🤝 结拜", "🕊️ 化解", "🙏 求助", "💰 还钱"]
     view = discord.ui.View()
     bot_actions.add_bot_buttons(view, {"discord_id": "1001", "name": "x"})
     assert not view.children

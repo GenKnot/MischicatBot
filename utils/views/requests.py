@@ -10,7 +10,7 @@ from utils.views.base import TimedView
 log = logging.getLogger(__name__)
 
 EVENT_TITLE = {"repay": "💰 还钱", "repay_plus": "💰 多还了些", "repay_item": "📦 物归原主", "short": "💸 先还一部分", "default": "😒 赖账",
-               "errand_done": "✉️ 信已送到", "gather_done": "🌿 一起采集"}
+               "errand_done": "✉️ 信已送到", "gather_done": "🌿 一起采集", "dun": "📣 催债", "player_default": "💢 翻脸"}
 
 
 def offer_summary(offer: dict) -> str:
@@ -41,6 +41,8 @@ def events_embed(events: list[dict]) -> discord.Embed:
             note = f"（酬劳 {ev['amount']} 灵石）"
         elif ev["kind"] == "repay_item":
             note = f"（{ev.get('item')} 归还）"
+        elif ev["kind"] == "dun":
+            note = f"（欠 {ev['item'] or str(ev.get('amount')) + ' 灵石'}，用『还钱』按钮还清）"
         lines.append(f"{EVENT_TITLE.get(ev['kind'], '')} **{ev['bot_name']}**：「{ev['line']}」{note}")
     e.description = "\n".join(lines)
     return e
@@ -89,7 +91,11 @@ async def run_meet(send, user, present_ids: list[str]) -> bool:
         await send(embed=events_embed(res["events"]))
     if res["offer"]:
         await send_offer(send, user, res["offer"])
-    return bool(res["events"] or res["offer"])
+    asked = False
+    if not res["offer"]:                                               # 一次碰面最多再加一条问话，别刷屏
+        from utils.views.investigation import run_question
+        asked = await run_question(send, user, present_ids)
+    return bool(res["events"] or res["offer"] or asked)
 
 
 async def run_gather(send, user, city: str) -> bool:

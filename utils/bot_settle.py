@@ -24,7 +24,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from utils import bot_economy as be
 from utils import bot_world, rumors
-from utils import bot_grudges, bot_profile, bot_ties, bot_traits
+from utils import bot_feuds, bot_grudges, bot_investigation, bot_profile, bot_ties, bot_traits
 from utils.bot_legends import make_legend
 from utils.atomic import grant_item, increment_player, spend_stones
 from utils.breakthrough_logic import (do_single_breakthrough, handle_huaying_breakthrough,
@@ -317,7 +317,9 @@ async def run_settlement(*, force: bool = False, rng: random.Random | None = Non
         log.exception("机器人补员失败")
     out = dict(sm)
     out["social"] = await bot_ties.social_day(day, rng, force=force)
-    out["grudges"] = await bot_grudges.grudge_day(day, rng, force=force)         # 仇恨：续期 / 潜伏 / 淡去        # 一天的社交：碰面、反目、和解、结拜
+    out["grudges"] = await bot_grudges.grudge_day(day, rng, force=force)         # 仇恨：续期 / 潜伏 / 淡去
+    out["investigation"] = await bot_investigation.investigation_day(day, rng, force=force)      # 失踪调查：自己查、结案、放弃
+    out["feuds"] = await bot_feuds.feud_day(day, rng, force=force)                               # 机器人之间的恩怨：仇敌 / 复仇动手
     out["ceiling_index"] = ceiling_idx
     if sm["settled"] or sm["refilled"] or sm["errors"]:
         log.info("机器人每日结算：%s", out)

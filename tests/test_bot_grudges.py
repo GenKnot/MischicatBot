@@ -100,7 +100,7 @@ def test_更重的冒犯盖过轻的():
 
 # ---- 夹具 -------------------------------------------------------------------
 
-async def mk_bot(db, uid, arche="豪爽", city=CITY, realm="筑基期1层", profile=None, kindness=50, alive=True, fame=0, stones=1000):
+async def mk_bot(db, uid, arche="豪爽", city=CITY, realm="筑基期1层", profile=None, kindness=50, alive=True, fame=300, stones=1000):
     D = db["db_async"]
     async with D.AsyncSessionLocal() as s:
         p = make_player(D, uid, stones=stones)
@@ -115,6 +115,7 @@ async def mk_human(db, uid=H, city=CITY, **kw):
     D = db["db_async"]
     async with D.AsyncSessionLocal() as s:
         p = make_player(D, uid, stones=kw.pop("stones", 1000))
+        p.fame = kw.pop("fame", 300)                       # 默认有名气：出事全服都知道（没名气的另有测试）
         p.name, p.lifespan, p.current_city = f"人{uid}", 80, city
         for k, v in kw.items():
             setattr(p, k, v)
@@ -309,20 +310,31 @@ async def test_小有名气_同城立刻知道_外城的要过一年(db):
     assert g.window_until == pytest.approx(g.known_at + bg.window_years("豪爽", "朋友", g.stubborn) * YEAR), "窗口从得知那天算起"
 
 
-async def test_无名小卒出事_朋友要过一阵才知道_也可能根本没听说(db):
+async def test_无名小卒出事_机器人朋友不会立刻知道_开一份调查而不是直接记仇(db):
     await mk_human(db)
     await mk_bot(db, "bot_00001", fame=0)
     await mk_bot(db, "bot_00002")
     await tie(db, "bot_00001", "bot_00002")
-    got = await bg.on_offense(H, "bot_00001", "kill", rng=Z(0.0), now=NOW)
+    assert await bg.on_offense(H, "bot_00001", "kill", rng=Z(0.0), now=NOW) == [], "现在还不知道，没有仇"
+    assert await rows(db) == []
+    D = db["db_async"]
+    async with D.AsyncSessionLocal() as s:
+        (m,) = (await s.execute(select(D.BotMissing))).scalars().all()
+    assert (m.seeker_id, m.missing_id, m.culprit_id, m.state, m.progress) == ("bot_00002", "bot_00001", H, "active", 0)
+    assert m.missing_name == "机001" and m.culprit_name == f"人{H}" and m.reason == f"人{H}杀害了你的朋友机001" and m.kind == "kill"
+
+
+async def test_无名小卒出事_真人朋友还是按旧办法_过一阵知道或根本没听说(db):
+    await mk_human(db, "1002")
+    await mk_human(db)
+    await mk_bot(db, "bot_00001", fame=0)
+    await tie(db, "1002", "bot_00001")
     lo, hi = bg.load()["reach_delay_years"]["none"]
-    assert len(got) == 1 and NOW + lo * YEAR <= got[0]["known_at"] <= NOW + hi * YEAR + 1
+    got = await bg.on_offense(H, "bot_00001", "kill", rng=Z(0.0), now=NOW)
+    assert len(got) == 1 and got[0]["holder"] == "1002" and NOW + lo * YEAR <= got[0]["known_at"] <= NOW + hi * YEAR + 1
     await mk_bot(db, "bot_00003", fame=0)
-    await mk_bot(db, "bot_00004")
-    await tie(db, "bot_00003", "bot_00004")
-    # 朋友出头的那一掷过了（0.0），但『有没有听说』那一掷没过（0.99）
-    assert await bg.on_offense(H, "bot_00003", "kill", rng=Seq(0.0, 0.99), now=NOW) == [], "没听说就没有仇"
-    assert len(await bg.on_offense(H, "bot_00003", "kill", rng=Seq(0.0, 0.0), now=NOW)) == 1
+    await tie(db, "1002", "bot_00003")
+    assert await bg.on_offense(H, "bot_00003", "kill", rng=Seq(0.0, 0.99), now=NOW) == [], "真人朋友没听说就没有仇"
 
 
 # ---- 累积 / 重新激活 --------------------------------------------------------
@@ -456,10 +468,10 @@ async def test_续期有上限时用完就潜伏(db, monkeypatch):
 
 async def test_还没得知的不处理_窗口没到期的不处理(db):
     await mk_human(db)
-    await mk_bot(db, "bot_00001")
-    await mk_bot(db, "bot_00002", fame=0)
+    await mk_bot(db, "bot_00001", fame=60)
+    await mk_bot(db, "bot_00002", city="落云城")
     await tie(db, "bot_00001", "bot_00002")
-    await bg.on_offense(H, "bot_00001", "kill", rng=Z(0.0), now=NOW)
+    await bg.on_offense(H, "bot_00001", "kill", rng=Z(0.0), now=NOW)             # 小有名气：外城的朋友 1 游戏年后才知道
     (g,) = await rows(db)
     assert g.known_at > NOW
     sm = await bg.grudge_day("d1", Z(0.99), now=NOW + 1)
@@ -710,7 +722,9 @@ async def test_捕获处置杀人_走账本(db):
     assert e["enemy"] == "bot_00001" and e["life"] == 777
 
 
-async def test_击杀机器人_它的朋友记仇_清理之前读到关系网(db):
+async def test_击杀机器人_它的朋友记仇_清理之前读到关系网(db, monkeypatch):
+    real = bg.on_offense
+    monkeypatch.setattr(bg, "on_offense", lambda a, v, k, **kw: real(a, v, k, rng=R(0), **kw))      # 第三方出头有概率（上限 95%），固定骰子
     await mk_human(db, city="万妖岭")
     await mk_bot(db, "bot_00001", city="万妖岭", fame=300)
     await mk_bot(db, "bot_00002", "豪爽", profile={"loyalty": 100})

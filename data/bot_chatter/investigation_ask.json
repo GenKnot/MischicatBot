@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。失踪调查相关场景。",
+ "scene": "investigation_ask",
+ "rules": [
+  {
+   "lines": [
+    "{player}，你最近见过{missing}吗？他好些日子没消息了。",
+    "{player}，打听个人：{missing}，你有印象吗？"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}！你见过{missing}没？这小子好久没露面，我有点担心！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，你……你见过{missing}吗？我找不到他了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，你见过{missing}吗？他欠我一张丹方。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！你有没有见过{missing}？我跟你说他不见了好些天了，我到处问呢！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，敢问阁下可曾见过{missing}？此人久未联络，在下甚忧。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……{player}，见过{missing}吗。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，见过{missing}吗？他还欠我一笔账，找不到人了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "{player}，{missing}不见了……你知道些什么吗？"
+   ]
+  }
+ ]
+}

@@ -640,7 +640,7 @@ async def test_处置_保护期按管理员设置(db, monkeypatch):
 
 async def test_处置_杀_真实模式_角色坐化_记前世仇人_朋友替他出头(db, monkeypatch):
     await real_mode()
-    await mk_human(db, created_at=4321.0)
+    await mk_human(db, created_at=4321.0, fame=300)
     await hostile(db)
     await mk_bot(db, "bot_00002", "豪爽", city="落云城", profile={"loyalty": 100})       # 玩家的结拜兄弟，不在同城，来不了现场
     await tie(db, H, "bot_00002", "结拜", 100)

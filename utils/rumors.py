@@ -28,6 +28,7 @@ from utils import fame
 from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, BotPersonality, Player, Rumor, RumorOptout
 from utils.tasks import spawn
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ MIN_TEMPLATES = 2
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_CONFIG.read_text(encoding="utf-8"))
+    return settings_hub.read(_CONFIG)
 
 
 def load_config() -> dict:

@@ -24,6 +24,8 @@ class MischicatBot(commands.Bot):
         # 遗留的 41 条 ALTER，给还没升级过的老库补字段。已冻结，别往里加新的。
         from utils.db import init_db
         await asyncio.to_thread(init_db)
+        from utils import settings_hub
+        await settings_hub.refresh()          # 管理员在游戏里调过的数字（覆盖 data/*.json 里的默认值）
         await self.load_extension("cogs.music")
         await self.load_extension("cogs.character")
         await self.load_extension("cogs.travel")
@@ -41,6 +43,7 @@ class MischicatBot(commands.Bot):
         await self.load_extension("cogs.rumors")
         await self.load_extension("cogs.ambush")
         await self.load_extension("cogs.chatter")
+        await self.load_extension("cogs.tuning")
         await self.tree.sync()
 
     async def on_ready(self):

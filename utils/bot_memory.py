@@ -64,7 +64,8 @@ async def forget_player(session, player_id: str, life: int = 0) -> None:
     from utils.db_async import BotRelation
     await session.execute(delete(BotMemory).where(BotMemory.player_id == player_id))
     await session.execute(delete(BotRelation).where(BotRelation.player_id == player_id))
-    from utils import bot_ambush, bot_chatter, bot_grudges, bot_requests, bot_ties
+    from utils import bot_ambush, bot_chatter, bot_grudges, bot_investigation, bot_requests, bot_ties
+    await bot_investigation.forget_player(session, player_id)
     await bot_requests.forget_player(session, player_id)
     await bot_chatter.forget_player(session, player_id)
     await bot_ambush.forget_player(session, player_id)

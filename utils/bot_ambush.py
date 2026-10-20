@@ -31,6 +31,7 @@ from utils.character import years_to_seconds
 from utils.db_async import (AsyncSessionLocal, BotEncounter, BotGrudge, BotPersonality, Player, PlayerAmbush)
 from utils.realms import REALMS, get_realm_index, major_realm
 from utils.world import CITIES
+from utils import settings_hub
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ DAY = 86400
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    return json.loads(_PATH.read_text(encoding="utf-8"))
+    return settings_hub.read(_PATH)
 
 
 def load() -> dict:

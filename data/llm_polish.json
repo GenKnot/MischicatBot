@@ -1,0 +1,23 @@
+{
+  "_说明": "可选的 AI 润色层：把模板台词交给小模型润色一遍。默认关闭；任何失败都原样退回模板台词。密钥只放环境变量，不要写进这个文件。",
+  "enabled": false,
+  "provider": "qwen",
+  "providers": {
+    "qwen": {
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-flash",
+      "api_key_env": "DASHSCOPE_API_KEY"
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    }
+  },
+  "scenes": ["chatter_arrive", "chatter_congrats", "chatter_conflict_self", "chatter_conflict_friend"],
+  "daily_call_limit": 500,
+  "timeout_seconds": 4,
+  "temperature": 0.8,
+  "max_output_chars": 80,
+  "system_prompt": "你是修仙游戏里的一个角色，请用符合其性格的口吻，把给定的台词改写得更生动自然。只输出改写后的一句话，不超过{max_chars}个字，不要加引号、解释或表情符号，保留台词里的人名和数字。"
+}

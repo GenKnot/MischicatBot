@@ -1,0 +1,92 @@
+{
+ "_说明": "条件化文案库（utils/bot_chatter_lines.py）。玩家主动求助相关场景。",
+ "scene": "request_player_default",
+ "rules": [
+  {
+   "lines": [
+    "{player}，借的账一直不还，往后别再来找我。",
+    "{player}，这笔账我记下了。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "豪爽"
+    ]
+   },
+   "lines": [
+    "{player}，兄弟看错你了！欠的账不还，往后不必再见！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "憨直"
+    ]
+   },
+   "lines": [
+    "{player}，你欠的账一直不还……我很难过。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "痴丹"
+    ]
+   },
+   "lines": [
+    "{player}，你欠的账，我不会忘。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "话痨"
+    ]
+   },
+   "lines": [
+    "{player}！我可跟你说了，欠的账不还，我要跟所有人说！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "迂腐"
+    ]
+   },
+   "lines": [
+    "{player}，欠债不还，非君子所为，在下与阁下恩断义绝。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "高冷"
+    ]
+   },
+   "lines": [
+    "……你欠的，我会讨回来。"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "贪财"
+    ]
+   },
+   "lines": [
+    "{player}，欠我的账，连本带利，迟早要你还！"
+   ]
+  },
+  {
+   "when": {
+    "archetype": [
+     "阴鸷"
+    ]
+   },
+   "lines": [
+    "呵，{player}，欠我的，我一笔一笔都记着。"
+   ]
+  }
+ ]
+}
