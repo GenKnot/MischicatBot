@@ -23,7 +23,7 @@ async def main(n: int, settle: bool) -> None:
     t0 = time.time()
     left, made = n, 0
     while left > 0:
-        k = min(left, bot_world.MAX_PER_BATCH)
+        k = min(left, bot_world.max_per_batch())
         res = await bot_world.generate_bots(k)
         if not res["ok"]:
             print("生成失败：", res["reason"])

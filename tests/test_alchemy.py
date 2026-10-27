@@ -10,7 +10,8 @@ import pytest
 
 from tests.conftest import make_player
 from utils import alchemy as alchemy_mod
-from utils.alchemy import (DAILY_LIMIT, QUALITY_NAMES, attempt_alchemy,
+from utils import rules
+from utils.alchemy import (QUALITY_NAMES, attempt_alchemy,
                            calc_quality, calc_success_rate,
                            check_and_consume_daily, get_known_recipes,
                            get_mastery_count, increment_mastery,
@@ -34,6 +35,8 @@ RECIPE = {
         ]}
     ],
 }
+
+DAILY_LIMIT = rules.get("alchemy.daily_limit")
 
 
 @pytest.fixture

@@ -1,5 +1,5 @@
 {
- "_说明": "拦路遭遇的配置（U1·江湖百态 P4）。只在玩家在线、做『野外动作』（探险 / 前往秘地 / 采集）的当下判定一次。幸福模式不拦路；正常模式最重废修为；真实模式才可能杀人。chance：按拦路者与玩家的大境界差给基础概率，多个人一起找你时叠加（上限 multi_cap）；global_cooldown_years：同一个玩家两次被拦的间隔（用户定 3 游戏年，1 年 = 现实 2 小时）；per_pair_years：同一个蹲守者对同一个玩家至少隔多久。outcome：赢了之后的处置权重（按性格），再乘仇恨轻重、对方的行为画像、玩家的回应。 companions：同伴不设人数上限（max=null）；谁会加入——拦路者的结拜 / 同门 / 朋友（按关系和各自义气，不同城打折）、城里爱打抱不平的路人、同样记恨你的其它蹲守者；人多了战力加成和逃跑难度按幂递减（power_exponent / flee_exponent）。",
+ "_说明": "拦路遭遇的配置（U1·江湖百态 P4）。只在玩家在线、做『野外动作』（探险 / 前往秘地 / 采集）的当下判定一次。幸福模式不拦路；正常模式最重废修为；真实模式才可能杀人。chance：按拦路者与玩家的大境界差给基础概率，多个人一起找你时叠加（上限 multi_cap）；global_cooldown_years：同一个玩家两次被拦的间隔（用户定 3 游戏年，1 年 = 现实 2 小时）；per_pair_years：同一个蹲守者对同一个玩家至少隔多久。outcome：赢了之后的处置权重（按性格），再乘仇恨轻重、对方的行为画像、玩家的回应。 companions：同伴不设人数上限（max=null）；谁会加入——拦路者的结拜 / 同门 / 朋友（按关系和各自义气，不同城打折）、城里爱打抱不平的路人、同样记恨你的其它蹲守者；人多了战力加成和逃跑难度按幂递减（power_exponent / flee_exponent）。 补充：severity_weight.base / release_div —— 废修为、杀的权重乘 (base + 仇恨/100)，放走的权重乘 max(release_floor, 1 - 仇恨/release_div)；buyout.severity_div —— 买命接受概率 × (1 - 仇恨/severity_div)；fight.noise —— 打斗时双方战力各乘一个 [最小, 最大] 的随机数；stuck_seconds —— 卡在『处理中』这么久（bot 重启）的遭遇直接结案。",
  "modes": [
   "正常",
   "真实"
@@ -102,7 +102,9 @@
  "severity_weight": {
   "cripple": 1.0,
   "kill": 1.0,
-  "release_floor": 0.4
+  "release_floor": 0.4,
+  "base": 0.5,
+  "release_div": 150
  },
  "kill_grudge_bonus": 1.5,
  "responses": {
@@ -151,10 +153,18 @@
    "阴鸷": 0.35,
    "憨直": 0.3,
    "迂腐": 0.2
-  }
+  },
+  "severity_div": 200
  },
  "safe_city_after": [
   "cripple",
   "kill"
- ]
+ ],
+ "fight": {
+  "noise": [
+   0.85,
+   1.15
+  ]
+ },
+ "stuck_seconds": 600
 }

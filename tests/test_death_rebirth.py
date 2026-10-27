@@ -10,7 +10,7 @@ import pytest
 
 from tests.conftest import make_player
 from utils import death_rebirth_logic as dr
-from utils.character import REALM_LIFESPAN
+from utils import rules
 from utils.world import CITIES
 
 UID = "u"
@@ -117,7 +117,7 @@ async def test_轮回_重置成炼气期一层的新人(db):
     assert res["success"] and res["rebirth_count"] == 1 and res["name"] == "老怪"
     p = await _row(db)
     assert p.realm == "炼气期1层" and p.cultivation == 0
-    assert p.lifespan == p.lifespan_max == REALM_LIFESPAN["炼气期"]
+    assert p.lifespan == p.lifespan_max == rules.get("character.realm_lifespan.炼气期")
     assert p.is_dead is False and p.is_virgin is True
     assert p.spirit_stones == 500                        # 家底清掉，只给启动资金
     assert p.rebirth_count == 1

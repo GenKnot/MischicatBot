@@ -19,7 +19,8 @@ from cogs.character import CharacterCog
 from tests.conftest import make_player
 from tests.discord_fakes import FakeContext, FakeInteraction
 from utils import death_rebirth_logic as dr
-from utils.character import QUESTIONS, REALM_LIFESPAN
+from utils import rules
+from utils.character import QUESTIONS
 from utils.views.character_create import CharacterCreateView
 
 UID = "1001"
@@ -95,7 +96,7 @@ async def test_文字创建_新玩家(db):
     await cog._create_character_text(c)
     row = await _row(db)
     assert row.name == "青玄" and row.gender == "女"
-    assert row.lifespan == row.lifespan_max == REALM_LIFESPAN["炼气期"] and row.realm == "炼气期1层"
+    assert row.lifespan == row.lifespan_max == rules.get("character.realm_lifespan.炼气期") and row.realm == "炼气期1层"
     assert row.spirit_root and row.spirit_root_type and row.current_city
     assert "青玄" in c.last.embed.title and "天地感应" in c.last.content
 
@@ -437,7 +438,7 @@ async def test_落库_新玩家返回摘要(db):
     from utils.character_create_logic import commit_character
     r = await commit_character(UID, "道号", "女", {i: "A" for i in range(len(QUESTIONS))})
     assert r["name"] == "道号" and r["gender"] == "女" and r["rebirth_bonus"] == {}
-    assert r["lifespan"] == REALM_LIFESPAN["炼气期"] and r["starting_city"]
+    assert r["lifespan"] == rules.get("character.realm_lifespan.炼气期") and r["starting_city"]
 
 
 async def test_落库_撞上并发插入时返回None而不是抛异常(db, monkeypatch):

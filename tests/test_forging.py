@@ -8,13 +8,16 @@ import pytest
 
 from tests.conftest import make_player
 from utils import forging as forging_mod
-from utils.forging import (DAILY_LIMIT, EXAM_COST, EXAM_MATERIALS,
-                           SLOT_MAIN_ORE_QTY, attempt_forge,
+from utils import rules
+from utils.forging import (attempt_forge,
                            check_and_consume_daily, start_forging_exam)
 
 ORE = "铜矿石"
 SLOT = "饰品"                       # 用料最少：2 个主矿
-ORE_QTY = SLOT_MAIN_ORE_QTY[SLOT]
+DAILY_LIMIT = rules.get("forging.daily_limit")
+EXAM_COST = rules.get("forging.exam_cost")
+EXAM_MATERIALS = rules.get("forging.exam_materials")
+ORE_QTY = rules.get("forging.slot_ore_qty")[SLOT]
 
 
 @pytest.fixture

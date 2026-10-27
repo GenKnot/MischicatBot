@@ -10,19 +10,23 @@ from sqlalchemy import text
 from utils.player import get_player
 from utils.residence import has_residence, get_residences, add_residence
 from utils.world import get_city, SPECIAL_REGIONS
-from utils.character import (
-    RESIDENCE_PRICE_NORMAL, RESIDENCE_PRICE_CENTRAL, CAVE_PRICE,
-    REPUTATION_RESIDENCE, REPUTATION_CAVE,
-    RESIDENCE_BONUS, CAVE_BONUS,
-    RESIDENCE_EXPLORE_BONUS, CAVE_EXPLORE_BONUS,
-)
+from utils import rules
+
+
+def _residence_cfg() -> dict:
+    """置业 / 洞府的价格、声望门槛、加成（data/game_rules.json 的 character，管理员可以调），用的时候读。"""
+    return rules.section("character")["residence"]
+
+
+def _cave_cfg() -> dict:
+    return rules.section("character")["cave"]
 
 
 def _residence_price(city_name: str) -> int:
     city = get_city(city_name)
     if city and city["region"] == "中州":
-        return RESIDENCE_PRICE_CENTRAL
-    return RESIDENCE_PRICE_NORMAL
+        return _residence_cfg()["price_central"]
+    return _residence_cfg()["price_normal"]
 
 
 class PropertyCog(commands.Cog, name="Property"):
@@ -39,9 +43,9 @@ class PropertyCog(commands.Cog, name="Property"):
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
 
-        if player["reputation"] < REPUTATION_RESIDENCE:
+        if player["reputation"] < _residence_cfg()["reputation"]:
             return await ctx.send(
-                f"{ctx.author.mention} 声望不足，需要至少 **{REPUTATION_RESIDENCE}** 声望才能在城中置业。"
+                f"{ctx.author.mention} 声望不足，需要至少 **{_residence_cfg()['reputation']}** 声望才能在城中置业。"
                 f"（当前：{player['reputation']}）"
             )
 
@@ -70,8 +74,8 @@ class PropertyCog(commands.Cog, name="Property"):
             description=(
                 f"道友在 **{city}** 置下了一处居所，从此有了落脚之地。\n\n"
                 f"**居所加成**（仅在 {city} 生效）\n"
-                f"· 修炼速度 +{int(RESIDENCE_BONUS*100)}%\n"
-                f"· 探险次数上限 +{RESIDENCE_EXPLORE_BONUS}"
+                f"· 修炼速度 +{int(_residence_cfg()['bonus']*100)}%\n"
+                f"· 探险次数上限 +{_residence_cfg()['explore_bonus']}"
             ),
             color=discord.Color.teal(),
         )
@@ -88,9 +92,9 @@ class PropertyCog(commands.Cog, name="Property"):
         if player["is_dead"]:
             return await ctx.send(f"{ctx.author.mention} 道友已坐化。")
 
-        if player["reputation"] < REPUTATION_CAVE:
+        if player["reputation"] < _cave_cfg()["reputation"]:
             return await ctx.send(
-                f"{ctx.author.mention} 声望不足，需要至少 **{REPUTATION_CAVE}** 声望才能开辟洞府。"
+                f"{ctx.author.mention} 声望不足，需要至少 **{_cave_cfg()['reputation']}** 声望才能开辟洞府。"
                 f"（当前：{player['reputation']}）"
             )
 
@@ -109,9 +113,9 @@ class PropertyCog(commands.Cog, name="Property"):
         if not target:
             return await ctx.send(f"{ctx.author.mention} 未找到秘地「{region_name}」。")
 
-        if player["spirit_stones"] < CAVE_PRICE:
+        if player["spirit_stones"] < _cave_cfg()["price"]:
             return await ctx.send(
-                f"{ctx.author.mention} 灵石不足。开辟洞府需要 **{CAVE_PRICE}** 灵石。"
+                f"{ctx.author.mention} 灵石不足。开辟洞府需要 **{_cave_cfg()['price']}** 灵石。"
                 f"（当前：{player['spirit_stones']}）"
             )
 
@@ -120,12 +124,12 @@ class PropertyCog(commands.Cog, name="Property"):
             result = await session.execute(
                 text("UPDATE players SET cave = :cave, spirit_stones = spirit_stones - :price "
                      "WHERE discord_id = :uid AND spirit_stones >= :price"),
-                {"cave": region_name, "price": CAVE_PRICE, "uid": uid}
+                {"cave": region_name, "price": _cave_cfg()["price"], "uid": uid}
             )
             if result.rowcount != 1:
                 await session.rollback()
                 return await ctx.send(
-                    f"{ctx.author.mention} 灵石不足。开辟洞府需要 **{CAVE_PRICE}** 灵石。"
+                    f"{ctx.author.mention} 灵石不足。开辟洞府需要 **{_cave_cfg()['price']}** 灵石。"
                 )
             await session.commit()
 
@@ -134,12 +138,12 @@ class PropertyCog(commands.Cog, name="Property"):
             description=(
                 f"道友在 **{region_name}** 深处开辟了一处洞府，灵气汇聚，自成一方天地。\n\n"
                 f"**洞府加成**（全局生效）\n"
-                f"· 修炼速度 +{int(CAVE_BONUS*100)}%\n"
-                f"· 探险次数上限 +{CAVE_EXPLORE_BONUS}"
+                f"· 修炼速度 +{int(_cave_cfg()['bonus']*100)}%\n"
+                f"· 探险次数上限 +{_cave_cfg()['explore_bonus']}"
             ),
             color=discord.Color.gold(),
         )
-        embed.set_footer(text=f"花费 {CAVE_PRICE} 灵石")
+        embed.set_footer(text=f"花费 {_cave_cfg()['price']} 灵石")
         await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.hybrid_command(name="我的居所", aliases=["wdjs"], description="查看自己在各城市的居所与洞府加成")
@@ -171,7 +175,7 @@ class PropertyCog(commands.Cog, name="Property"):
             )
             embed.add_field(
                 name="居所加成",
-                value=f"修炼速度 +{int(RESIDENCE_BONUS*100)}%，探险次数 +{RESIDENCE_EXPLORE_BONUS}（仅当前城市生效）",
+                value=f"修炼速度 +{int(_residence_cfg()['bonus']*100)}%，探险次数 +{_residence_cfg()['explore_bonus']}（仅当前城市生效）",
                 inline=False
             )
 
@@ -179,7 +183,7 @@ class PropertyCog(commands.Cog, name="Property"):
             embed.add_field(name="野外洞府", value=f"**{cave}**", inline=False)
             embed.add_field(
                 name="洞府加成",
-                value=f"修炼速度 +{int(CAVE_BONUS*100)}%，探险次数 +{CAVE_EXPLORE_BONUS}（全局生效）",
+                value=f"修炼速度 +{int(_cave_cfg()['bonus']*100)}%，探险次数 +{_cave_cfg()['explore_bonus']}（全局生效）",
                 inline=False
             )
 

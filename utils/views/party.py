@@ -1,5 +1,6 @@
 import logging
 import discord
+from utils import rules
 from utils.party import (
     get_party, get_party_members, accept_invite,
     remove_from_party, disband_party,
@@ -19,7 +20,7 @@ def party_info_embed(members: list, leader_id: str) -> discord.Embed:
         tag = "👑 " if m["discord_id"] == leader_id else "· "
         lines.append(f"{tag}**{m['name']}**（{m['realm']}）寿元 {m['lifespan']} 年")
     embed.description = "\n".join(lines)
-    embed.set_footer(text=f"共 {len(members)} 人 · 最多4人")
+    embed.set_footer(text=f"共 {len(members)} 人 · 最多{rules.section('party')['max_size']}人")
     return embed
 
 
@@ -68,8 +69,8 @@ class PartyInviteButton(discord.ui.Button):
             return await interaction.response.send_message("对方已离开此地。", ephemeral=True)
         if inv.get("party_id"):
             members = await get_party_members(inv["party_id"])
-            if len(members) >= 4:
-                return await interaction.response.send_message("队伍已满（最多4人）。", ephemeral=True)
+            if len(members) >= rules.section("party")["max_size"]:
+                return await interaction.response.send_message(f"队伍已满（最多{rules.section('party')['max_size']}人）。", ephemeral=True)
         if tgt.get("party_id"):
             return await interaction.response.send_message(f"**{tgt['name']}** 已在其他队伍中。", ephemeral=True)
         if is_bot_id(target_uid):

@@ -110,6 +110,13 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
         errors.append("repay.gratitude.bonus 应是 [最小, 最大]")
     if rp.get("max_extends", -1) < 0 or rp.get("item_markup", 0) <= 0:
         errors.append("repay.max_extends / item_markup 不合法")
+    dd = rp.get("default_div", {})
+    if set(dd) != {"lawful", "greed", "kindness"} or any(v <= 0 for v in dd.values()):
+        errors.append("repay.default_div 需要 lawful / greed / kindness 三个正数")
+    if not 0 <= rp.get("default_cap", -1) <= 1 or not 0 <= rp.get("gratitude", {}).get("cap", -1) <= 1 or rp.get("gratitude", {}).get("kind_div", 0) <= 0:
+        errors.append("repay.default_cap / gratitude.cap 在 0~1，gratitude.kind_div > 0")
+    if cfg.get("ask", {}).get("tries_per_offer", 0) < 1:
+        errors.append("ask.tries_per_offer 应 ≥ 1")
     return errors
 
 
@@ -118,8 +125,9 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
 def default_probability(archetype: str, lawful: int, kindness: int, greed: int, tier: str, cfg: dict | None = None) -> float:
     """赖账的概率：性格底子 + 不守序 / 贪婪加一点 + 善良 / 交情深减一点。"""
     rp = (cfg or load())["repay"]
-    p = rp["default_base"][archetype] + (50 - lawful) / 250 + (greed - 50) / 250 - (kindness - 50) / 300 + rp["closeness"].get(tier, 0.0) * -1
-    return max(0.0, min(0.9, p))
+    dd = rp["default_div"]
+    p = rp["default_base"][archetype] + (50 - lawful) / dd["lawful"] + (greed - 50) / dd["greed"] - (kindness - 50) / dd["kindness"] + rp["closeness"].get(tier, 0.0) * -1
+    return max(0.0, min(rp["default_cap"], p))
 
 
 def repay_decision(archetype: str, lawful: int, kindness: int, greed: int, tier: str, rng=random, cfg: dict | None = None) -> str:
@@ -128,8 +136,8 @@ def repay_decision(archetype: str, lawful: int, kindness: int, greed: int, tier:
     if rng.random() < default_probability(archetype, lawful, kindness, greed, tier, cfg):
         return "default"
     g = cfg["repay"]["gratitude"]
-    p = g["chance_base"][archetype] + (kindness - 50) / 200 + cfg["repay"]["closeness"].get(tier, 0.0)
-    return "plus" if rng.random() < max(0.0, min(0.9, p)) else "repay"
+    p = g["chance_base"][archetype] + (kindness - 50) / g["kind_div"] + cfg["repay"]["closeness"].get(tier, 0.0)
+    return "plus" if rng.random() < max(0.0, min(g["cap"], p)) else "repay"
 
 
 def lend_chance(tier: str, relation: str, kindness: int, loyalty: int, greed: int, share: float, gather: bool = False,
@@ -355,7 +363,7 @@ async def on_meet(player_id: str, present_ids: list[str], rng=None, now: float |
         fam = await bc.familiars(player_id)
         candidates = [b for b in present_ids if b in fam]
         rng.shuffle(candidates)
-        for bot_id in candidates[:max(cfg["ask"]["max_offers_per_meeting"], 0) * 3]:       # 最多试几位，找到一位开口的就停
+        for bot_id in candidates[:max(cfg["ask"]["max_offers_per_meeting"], 0) * cfg["ask"]["tries_per_offer"]]:       # 最多试几位，找到一位开口的就停
             offer = await maybe_ask(player_id, bot_id, rng, now)
             if offer:
                 out["offer"] = offer

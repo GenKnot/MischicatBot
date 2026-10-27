@@ -1,5 +1,7 @@
 import random
 
+from utils import rules
+
 # 13 个大境，REALMS 由这里派生，免得两份列表对不上。
 REALM_GROUPS = [
     ("炼气期", [f"炼气期{i}层" for i in range(1, 11)]),
@@ -30,43 +32,25 @@ def major_realm(realm: str) -> str | None:
     """返回该小境所属的大境；境界名不在体系内时返回 None。"""
     return MAJOR_OF_REALM.get(realm)
 
-_CULTIVATION_NEEDED = {}
-for r in REALMS[:10]:
-    _CULTIVATION_NEEDED[r] = 100
-for r in REALMS[10:20]:
-    _CULTIVATION_NEEDED[r] = 200
-for i, r in enumerate(REALMS[20:]):
-    _CULTIVATION_NEEDED[r] = 400 + i * 100
+# 每个小境的突破所需修为、寿元上限、突破成功率、失败后果、功法栏位：节奏参数在 data/game_rules.json 的 realms（管理员可以调），用的时候读。
+_INDEX = {realm: i for i, realm in enumerate(REALMS)}
 
-_LIFESPAN_MAX = {}
-for i, r in enumerate(REALMS[:10]):
-    _LIFESPAN_MAX[r] = 100 + i * 5
-for i, r in enumerate(REALMS[10:20]):
-    _LIFESPAN_MAX[r] = 200 + i * 10
-_LIFESPAN_MAX.update({
-    "结丹期初期": 400, "结丹期中期": 450, "结丹期后期": 500,
-    "元婴期初期": 800, "元婴期中期": 900, "元婴期后期": 1000,
-    "化神期初期": 1500, "化神期中期": 1800, "化神期后期": 2000,
-    "炼虚期初期": 2500, "炼虚期中期": 2800, "炼虚期后期": 3000,
-    "合体期初期": 4000, "合体期中期": 4500, "合体期后期": 5000,
-    "大乘期初期": 8000, "大乘期中期": 9000, "大乘期后期": 10000,
-    "真仙初期": 20000, "真仙中期": 25000, "真仙后期": 30000,
-    "金仙初期": 50000, "金仙中期": 60000, "金仙后期": 80000,
-    "太乙初期": 100000, "太乙中期": 120000, "太乙后期": 150000,
-    "大罗初期": 200000, "大罗中期": 250000, "大罗后期": 300000,
-    "道祖": 999999,
-})
 
-_BREAKTHROUGH_RATE = {}
-for i, r in enumerate(REALMS[:10]):
-    _BREAKTHROUGH_RATE[r] = 0.90 - i * 0.01
-for i, r in enumerate(REALMS[10:20]):
-    _BREAKTHROUGH_RATE[r] = 0.80 - i * 0.02
-rates = [0.60, 0.50, 0.40, 0.35, 0.28, 0.22, 0.18, 0.14, 0.11,
-         0.09, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.015,
-         0.012, 0.010, 0.008, 0.006, 0.005, 0.004, 0.003]
-for i, r in enumerate(REALMS[20:]):
-    _BREAKTHROUGH_RATE[r] = rates[i] if i < len(rates) else 0.002
+def _cfg() -> dict:
+    return rules.section("realms")
+
+
+def _breakthrough_base(realm: str) -> float:
+    c = _cfg()["breakthrough"]
+    i = _INDEX.get(realm)
+    if i is None:
+        return c["unknown"]
+    if i < 10:
+        return c["tier1_base"] - i * c["tier1_step"]
+    if i < 20:
+        return c["tier2_base"] - (i - 10) * c["tier2_step"]
+    late = c["late_rates"]
+    return late[i - 20] if i - 20 < len(late) else c["late_default"]
 
 
 def get_realm_index(realm: str) -> int:
@@ -77,11 +61,23 @@ def get_realm_index(realm: str) -> int:
 
 
 def cultivation_needed(realm: str) -> int:
-    return _CULTIVATION_NEEDED.get(realm, 100)
+    c = _cfg()["cultivation_needed"]
+    i = _INDEX.get(realm)
+    if i is None:
+        return c["unknown"]
+    return c["tier1"] if i < 10 else c["tier2"] if i < 20 else c["late_base"] + (i - 20) * c["late_step"]
 
 
 def lifespan_max_for_realm(realm: str) -> int:
-    return _LIFESPAN_MAX.get(realm, 100)
+    c = _cfg()["lifespan_max"]
+    i = _INDEX.get(realm)
+    if i is None:
+        return c["unknown"]
+    if i < 10:
+        return c["tier1_base"] + i * c["tier1_step"]
+    if i < 20:
+        return c["tier2_base"] + (i - 10) * c["tier2_step"]
+    return c["table"][realm]
 
 
 def next_realm(realm: str) -> str | None:
@@ -92,11 +88,12 @@ def next_realm(realm: str) -> str | None:
 
 
 def breakthrough_success_rate(realm: str, physique: int, bone: int, cultivation: int) -> float:
-    base = _BREAKTHROUGH_RATE.get(realm, 0.5)
-    stat_bonus = ((physique - 5) + (bone - 5)) * 0.02
+    c = _cfg()["breakthrough"]
+    base = _breakthrough_base(realm)
+    stat_bonus = ((physique - 5) + (bone - 5)) * c["stat_bonus"]
     needed = cultivation_needed(realm)
-    overflow_bonus = max(0, (cultivation - needed) / needed) * 0.05
-    return min(0.95, max(0.01, base + stat_bonus + overflow_bonus))
+    overflow_bonus = max(0, (cultivation - needed) / needed) * c["overflow_bonus"]
+    return min(c["cap"], max(c["floor"], base + stat_bonus + overflow_bonus))
 
 
 FAIL_LIGHT = "light"
@@ -112,63 +109,41 @@ def roll_failure_outcome(realm: str) -> str:
     outcome 就是 None，而 `apply_failure` 对未知类型一律按走火入魔处理 ——
     修为高、成功率大的人反而最容易走火入魔（按钮突破曾因此踩坑，见 .gk/ISSUES.md B4）。
     """
-    idx = get_realm_index(realm)
-    if idx < 20:
-        weights = [0.70, 0.25, 0.05]
-    else:
-        weights = [0.30, 0.50, 0.20]
-
-    return random.choices([FAIL_LIGHT, FAIL_HEAVY, FAIL_DEVIATE], weights=weights)[0]
+    f = _cfg()["failure"]
+    w = f["early_weights"] if get_realm_index(realm) < f["split_index"] else f["late_weights"]
+    return random.choices([FAIL_LIGHT, FAIL_HEAVY, FAIL_DEVIATE], weights=[w["light"], w["heavy"], w["deviate"]])[0]
 
 
 def roll_breakthrough(realm: str, physique: int, bone: int, cultivation: int,
                       bonus: float = 0.0) -> tuple[bool, str | None]:
     """`bonus` 是额外的成功率（0.2 = +20 个百分点，例如破障丹），加完仍封顶 95%。"""
-    rate = min(0.95, breakthrough_success_rate(realm, physique, bone, cultivation) + bonus)
+    rate = min(_cfg()["breakthrough"]["cap"], breakthrough_success_rate(realm, physique, bone, cultivation) + bonus)
     if random.random() < rate:
         return True, None
 
     return False, roll_failure_outcome(realm)
 
 
-_TECHNIQUE_SLOTS = [
-    ("道祖", 41),
-    ("大罗初期", 38),
-    ("太乙初期", 35),
-    ("金仙初期", 32),
-    ("真仙初期", 29),
-    ("大乘期初期", 26),
-    ("合体期初期", 23),
-    ("炼虚期初期", 20),
-    ("化神期初期", 17),
-    ("元婴期初期", 12),
-    ("结丹期初期", 9),
-    ("筑基期1层", 7),
-    ("炼气期1层", 5),
-]
-
-
 def get_technique_slot_limit(realm: str) -> int:
     idx = get_realm_index(realm)
-    for threshold_realm, limit in _TECHNIQUE_SLOTS:
-        if idx >= get_realm_index(threshold_realm):
-            return limit
-    return 5
+    slots = _cfg()["technique_slots"]
+    best = max((r for r in slots if get_realm_index(r) <= idx), key=get_realm_index, default=None)
+    return slots[best] if best else slots["炼气期1层"]
 
 
 def apply_failure(cultivation: int, lifespan: int, outcome: str) -> tuple[int, int, str]:
     if outcome == FAIL_LIGHT:
-        new_cultivation = cultivation // 2
+        new_cultivation = int(cultivation * _cfg()["failure"]["cultivation_keep"])
         new_lifespan = lifespan
         msg = "差之毫厘，突破失败，修为受损。"
     elif outcome == FAIL_HEAVY:
-        new_cultivation = cultivation // 2
-        loss = max(1, lifespan // 10)
+        new_cultivation = int(cultivation * _cfg()["failure"]["cultivation_keep"])
+        loss = max(1, lifespan // _cfg()["failure"]["heavy_loss_div"])
         new_lifespan = max(0, lifespan - loss)
         msg = f"突破失败，经脉受损，损耗寿元 {loss} 年。"
     elif outcome == FAIL_DEVIATE:
         new_cultivation = 0
-        loss = max(1, lifespan // 4)
+        loss = max(1, lifespan // _cfg()["failure"]["deviate_loss_div"])
         new_lifespan = max(0, lifespan - loss)
         msg = f"走火入魔！修为尽散，寿元大损 {loss} 年，九死一生。"
     else:

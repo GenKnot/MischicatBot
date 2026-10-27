@@ -88,17 +88,14 @@ def _format_stat(stat: str, val: float) -> str:
 
 
 def _calc_single_technique_bonus(t: dict) -> dict:
-    from utils.sects import STAGE_STAT_MULTIPLIER, STAGE_PCT_MULTIPLIER, PCT_STATS
+    from utils.sects import PCT_STATS, pct_multiplier, stat_multiplier
     name = t.get("name", "")
     stage = t.get("stage", "入门")
     info = TECHNIQUES.get(name, {})
     base_bonus = info.get("stat_bonus", {})
     result = {}
     for stat, val in base_bonus.items():
-        if stat in PCT_STATS:
-            mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
-        else:
-            mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
+        mult = pct_multiplier(stage) if stat in PCT_STATS else stat_multiplier(stage)
         result[stat] = val * mult
     return result
 
@@ -295,9 +292,9 @@ class ToggleEquipView(TimedView):
             tech_info = TECHNIQUES.get(name, {})
             lifespan_bonus = tech_info.get("stat_bonus", {}).get("lifespan_bonus", 0)
             if lifespan_bonus > 0:
-                from utils.sects import STAGE_PCT_MULTIPLIER
+                from utils.sects import pct_multiplier
                 stage = target.get("stage", "入门")
-                mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
+                mult = pct_multiplier(stage)
                 actual_bonus = int(lifespan_bonus * mult)
                 from utils.character import get_effective_lifespan_max
                 current_eff_max = get_effective_lifespan_max(player)

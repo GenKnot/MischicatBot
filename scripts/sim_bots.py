@@ -320,7 +320,7 @@ def human_profile(realm: str, diligent: bool) -> dict:
 
 
 def bot_profile(realm: str, tier: str) -> dict:
-    lo, hi = bot_world.TIER_SPECS[tier]["stats"]
+    lo, hi = bot_world.tier_specs()[tier]["stats"]
     s = round((lo + hi) / 2)
     return dict(comprehension=s, physique=s, fortune=s, bone=s, soul=s, realm=realm, techniques="[]", active_buffs="{}")
 
@@ -331,7 +331,7 @@ def power_table(realms=("炼气期5层", "筑基期1层", "筑基期10层", "结
         for diligent in (False, True):
             human, gear = human_profile(realm, diligent)
             hp = asyncio.run(calc_power(human, equipped=gear))
-            for tier in bot_world.TIER_SPECS:
+            for tier in bot_world.tier_specs():
                 bp = asyncio.run(calc_power(bot_profile(realm, tier), equipped=[])) * (1 + CFG["combat"]["power_bonus"][tier])
                 wins = sum(hp * random.uniform(0.85, 1.15) > bp * random.uniform(0.85, 1.15) for _ in range(samples))
                 rows.append({"realm": realm, "human": "用心" if diligent else "普通", "tier": tier,
@@ -403,7 +403,7 @@ def report(sim: Sim, power: list[dict] | None = None) -> str:
     w(f"- 最高境界：{top.realm}（{top.tier}）")
     over = int(sim.flow["spawn_above_ceiling"])
     if over:
-        w(f"- ⚠ 出生就超过天花板（{p.human_top}）的机器人：{over} 个 —— 档位表（bot_world.TIER_SPECS）没看天花板，生成 / 补员时需要夹到天花板以内")
+        w(f"- ⚠ 出生就超过天花板（{p.human_top}）的机器人：{over} 个 —— 档位表（bot_world.tier_specs()）没看天花板，生成 / 补员时需要夹到天花板以内")
     w("\n## 死亡与更替")
     tot_dead = sum(sim.deaths.values())
     w(f"- 共 {tot_dead} 人死亡，平均每天 {tot_dead / p.days:.1f} 人（占目标 {tot_dead / p.days / p.bots:.1%}/天）")

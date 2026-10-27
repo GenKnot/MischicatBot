@@ -35,6 +35,13 @@ REGISTRY = {
     "bot_requests.json": ("utils.bot_requests", "validate"),
     "bot_investigation.json": ("utils.bot_investigation", "validate"),
     "bot_feuds.json": ("utils.bot_feuds", "validate"),
+    "bot_memory.json": ("utils.bot_memory", "validate"),
+    "bot_fame.json": ("utils.fame", "validate"),
+    "bot_favor.json": ("utils.bot_social", "validate"),
+    "game_rules.json": ("utils.rules", "validate"),
+    "checkin_config.json": ("utils.checkin", "validate"),
+    "gamble_config.json": ("utils.gamble", "validate"),
+    "adventure_chains_config.json": ("utils.adventure_chain", "validate"),
     "rumors.json": ("utils.rumors", "validate_config"),
     "llm_polish.json": ("utils.llm_polish", "validate"),
 }
@@ -130,7 +137,9 @@ def parse(raw: str, default):
 
 def reload_module(name: str) -> None:
     module = importlib.import_module(REGISTRY[name][0])
-    module._load.cache_clear()
+    load = getattr(module, "_load", None)
+    if load is not None:
+        load.cache_clear()
     reload = getattr(module, "reload", None)
     if reload:
         reload()
@@ -241,6 +250,11 @@ def overview() -> list[dict]:
         out.append({"file": name, "count": sum(1 for _ in leaves(cfg)), "changed": len(_overrides.get(name, {})),
                     "note": str(cfg.get("_说明", ""))[:120]})
     return out
+
+
+def note(name: str) -> str:
+    """配置文件开头的『_说明』：每个字段是什么意思。"""
+    return str(defaults(name).get("_说明", ""))
 
 
 def entries(name: str, query: str = "") -> list[dict]:

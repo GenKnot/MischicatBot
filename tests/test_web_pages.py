@@ -379,3 +379,43 @@ def test_页面请求不再留下ResourceWarning(client, recwarn):
     gc.collect()
     leaked = [w for w in recwarn if issubclass(w.category, ResourceWarning) and "unclosed database" in str(w.message)]
     assert not leaked, [str(w.message) for w in leaked]
+
+
+# --- SQL 不拼接（CodeQL py/sql-injection）---------------------------------------
+
+def test_sort_rows_和SQLite的排序规则一致():
+    rows = [{"v": 2}, {"v": None}, {"v": 5}, {"v": 1}]
+    assert [r["v"] for r in web_main.sort_rows(rows, "v")] == [5, 2, 1, None], "降序：空值最后"
+    assert [r["v"] for r in web_main.sort_rows(rows, "v", descending=False)] == [None, 1, 2, 5], "升序：空值最前"
+    assert [r["v"] for r in web_main.sort_rows([{"v": "乙"}, {"v": "甲"}], "v")] == ["甲", "乙"], "文字按码点比，和 SQLite 的二进制排序一致"
+
+
+def test_静态棘轮_web里的SQL不用f字符串拼接():
+    import re
+    from pathlib import Path
+    src = Path(web_main.__file__).read_text(encoding="utf-8")
+    assert not re.search(r'execute\(\s*f["\']', src) and not re.search(r'\bf["\']\s*(SELECT|INSERT|UPDATE|DELETE)\b', src), \
+        "SQL 一律写成常量、值走参数绑定；动态的排序在 Python 里做（见 sort_rows）"
+
+
+async def test_玩家列表_按所选列降序_默认含不含机器人(db, client):
+    await _add(db, "1", name="甲", spirit_stones=10)
+    await _add(db, "2", name="乙", spirit_stones=900)
+    await _add(db, "bot_00003", name="机丙", spirit_stones=500, is_bot=1)
+    html = client.get("/players", params={"sort": "spirit_stones"}).text
+    assert html.index("乙") < html.index("甲") and "机丙" not in html
+    html = client.get("/players", params={"sort": "spirit_stones", "bots": 1}).text
+    assert html.index("乙") < html.index("机丙") < html.index("甲")
+
+
+async def test_玩家列表_城市下拉与结果一致(db, client):
+    await _add(db, "1", name="甲", current_city="天京城")
+    await _add(db, "bot_00002", name="机乙", current_city="万妖岭", is_bot=1)
+    assert "万妖岭" not in client.get("/players").text
+    assert "万妖岭" in client.get("/players", params={"bots": 1}).text
+
+
+async def test_统计页_含机器人开关(db, client):
+    await _add(db, "1", name="甲")
+    await _add(db, "bot_00002", name="机乙", is_bot=1)
+    assert "机乙" not in client.get("/stats").text and "机乙" in client.get("/stats", params={"bots": 1}).text

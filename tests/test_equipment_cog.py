@@ -19,7 +19,8 @@ import pytest
 from cogs.equipment import BackpackPageView, EquipmentCog, _build_backpack_pages
 from tests.conftest import make_player
 from tests.discord_fakes import FakeContext, FakeInteraction
-from utils.alchemy import QUALITY_MULTIPLIERS, QUALITY_NAMES
+from utils import rules
+from utils.alchemy import QUALITY_NAMES
 from utils.items import ITEMS
 
 U = "1001"
@@ -246,7 +247,7 @@ async def test_使用_修为增益按品质倍率(db, cog):
     await use(cog, c, "培元丹")
     assert (await row(db)).cultivation == 100 and c.said("修为 **+100**")
     await use(cog, c, "三纹培元丹")
-    mult = QUALITY_MULTIPLIERS[QUALITY_NAMES.index("三纹")]
+    mult = rules.get("alchemy.quality_multipliers")[QUALITY_NAMES.index("三纹")]
     assert (await row(db)).cultivation == 100 + int(100 * mult)
     assert await qty(db, "三纹培元丹") == 0
 

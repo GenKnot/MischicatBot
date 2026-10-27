@@ -1,4 +1,6 @@
 import random
+
+from utils import rules
 from utils.realms import get_realm_index
 
 JOBS = [
@@ -230,9 +232,7 @@ JOBS = [
     },
 ]
 
-COOLDOWN_SECONDS = 1800
-
-JOB_DAILY_LIMIT = 3
+# 冷却和每日次数在 data/game_rules.json 的 jobs（管理员可以调），用的时候读：rules.section("jobs")
 
 
 def get_available_jobs(player: dict) -> list[dict]:
@@ -316,7 +316,7 @@ async def do_job(player: dict, job: dict) -> dict:
         # 坐化与否以数据库为准，不信调用方传来的 player 字典（可能是旧快照）
         if (refused := await refuse_if_dead(session, uid)):
             return refused
-        if not await claim_cooldown(session, uid, Player.job_cooldown_until, COOLDOWN_SECONDS, now=now):
+        if not await claim_cooldown(session, uid, Player.job_cooldown_until, rules.section("jobs")["cooldown_seconds"], now=now):
             remaining = int((await session.scalar(
                 select(Player.job_cooldown_until).where(Player.discord_id == uid)
             ) or 0) - now)
@@ -324,11 +324,11 @@ async def do_job(player: dict, job: dict) -> dict:
             return {"ok": False, "reason": f"打工冷却中，还需 **{remaining // 60} 分 {remaining % 60} 秒**。"}
 
         daily_used = await claim_daily_quota(
-            session, uid, Player.job_daily_count, Player.job_daily_reset, JOB_DAILY_LIMIT, now=now
+            session, uid, Player.job_daily_count, Player.job_daily_reset, rules.section("jobs")["daily_limit"], now=now
         )
         if daily_used is None:
             await session.rollback()          # 连带退回刚打上的冷却
-            return {"ok": False, "reason": f"今日打工次数已达上限（{JOB_DAILY_LIMIT}次），明日再来。"}
+            return {"ok": False, "reason": f"今日打工次数已达上限（{rules.section('jobs')['daily_limit']}次），明日再来。"}
         await session.commit()
 
     stones_min, stones_max = job["reward"]["spirit_stones"]

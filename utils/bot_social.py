@@ -12,9 +12,10 @@
 import json
 import random
 import time
+from functools import lru_cache
 from pathlib import Path
 
-from utils import bot_grudges, bot_memory, bot_ties
+from utils import bot_grudges, bot_memory, bot_ties, settings_hub
 from utils.atomic import consume_item, grant_item, refuse_if_dead
 from utils.bot_dialogue import get_line
 from utils.bots import bot_refusal, is_bot_id
@@ -22,6 +23,7 @@ from utils.db_async import AsyncSessionLocal, BotPersonality, BotRelation, Playe
 from utils.items import ITEMS
 
 _DATA = Path(__file__).resolve().parent.parent / "data" / "bot_archetypes.json"
+_FAVOR = Path(__file__).resolve().parent.parent / "data" / "bot_favor.json"
 
 # items 表的 type -> 玩家看到的类别名
 CATEGORY_OF_TYPE = {"pill": "丹药", "herb": "药材", "ore": "矿石", "wood": "灵木", "fish": "灵鱼"}
@@ -29,17 +31,44 @@ CATEGORIES = tuple(CATEGORY_OF_TYPE.values())
 
 FAVOR_MIN, FAVOR_MAX = -100, 100
 TIER_HOSTILE, TIER_STRANGER, TIER_ACQUAINT, TIER_CLOSE = "仇视", "陌生", "熟识", "至交"
-HOSTILE_BELOW = -30
-# 各互动要的基础好感（再按善意 ±10）
-BASE_REQUIRED = {"party": 20, "dual": 50}
 CAPABILITY_TEXT = {"party": "组队", "dual": "双修"}
+GIFT_REACTIONS = ("love", "like", "neutral", "dislike", "hate")
 
-MAX_GIFTS_PER_DAY = 3            # 同一个机器人每天最多收你几份礼
-GIFT_GAIN_DAILY_CAP = 12         # 每天靠送礼最多涨多少好感（跌不设限）
-RARITY_BONUS = {"普通": 0, "稀有": 1, "珍贵": 2, "绝世": 3}
-# 反应 -> 基础好感变化
-GIFT_DELTA = {"love": 8, "like": 4, "neutral": 1, "dislike": -3, "hate": -8}
-CHAT_DELTA, CHAT_DELTA_TALKATIVE, TALKATIVE_AT = 1, 2, 60
+
+@lru_cache(maxsize=1)
+def _load_favor() -> dict:
+    return settings_hub.read(_FAVOR)
+
+
+def favor_cfg() -> dict:
+    """好感配置（data/bot_favor.json，只读）。"""
+    return _load_favor()
+
+
+def reload() -> None:
+    _load_favor.cache_clear()
+
+
+def validate(cfg: dict) -> list[str]:
+    errors = []
+    req = cfg.get("required", {})
+    if set(req) != set(CAPABILITY_TEXT) or not (0 <= req.get("party", -1) <= req.get("dual", -2) <= 100):
+        errors.append("required 需要 party / dual，且 0 ≤ party ≤ dual ≤ 100")
+    if not FAVOR_MIN <= cfg.get("hostile_below", 1) < 0 or cfg.get("kindness_div", 0) < 1:
+        errors.append("hostile_below 应在 -100~0 之间，kindness_div ≥ 1")
+    if cfg.get("max_gifts_per_day", 0) < 1 or cfg.get("gift_gain_daily_cap", -1) < 0:
+        errors.append("max_gifts_per_day ≥ 1，gift_gain_daily_cap ≥ 0")
+    gd = cfg.get("gift_delta", {})
+    if set(gd) != set(GIFT_REACTIONS) or any(abs(v) > 100 for v in gd.values()):
+        errors.append(f"gift_delta 需要 {GIFT_REACTIONS}，幅度不超过 100")
+    if any(v < 0 for v in cfg.get("rarity_bonus", {}).values()) or not cfg.get("rarity_bonus"):
+        errors.append("rarity_bonus 不能为空，加成不能为负")
+    rf = cfg.get("remark_tier_factor", {})
+    if set(rf) != {TIER_HOSTILE, TIER_STRANGER, TIER_ACQUAINT, TIER_CLOSE} or any(v < 0 for v in rf.values()):
+        errors.append("remark_tier_factor 需要四个好感档位，系数非负")
+    if cfg.get("chat_delta", -1) < 0 or cfg.get("chat_delta_talkative", -1) < 0 or not 0 <= cfg.get("talkative_at", -1) <= 100:
+        errors.append("chat_delta / chat_delta_talkative 不能为负，talkative_at 在 0~100")
+    return errors
 
 
 def category_of(item_name: str) -> str | None:
@@ -102,18 +131,20 @@ async def get_personality(bot_id: str) -> dict | None:
 # ---- 好感度 -----------------------------------------------------------------
 
 def favor_tier(favor: int) -> str:
-    if favor <= HOSTILE_BELOW:
+    cfg = favor_cfg()
+    if favor <= cfg["hostile_below"]:
         return TIER_HOSTILE
-    if favor >= BASE_REQUIRED["dual"]:
+    if favor >= cfg["required"]["dual"]:
         return TIER_CLOSE
-    if favor >= BASE_REQUIRED["party"]:
+    if favor >= cfg["required"]["party"]:
         return TIER_ACQUAINT
     return TIER_STRANGER
 
 
 def required_favor(capability: str, kindness: int = 50) -> int:
     """善意 0 → 门槛 +10，善意 100 → 门槛 -10。"""
-    return BASE_REQUIRED[capability] + (50 - kindness) // 5
+    cfg = favor_cfg()
+    return cfg["required"][capability] + (50 - kindness) // cfg["kindness_div"]
 
 
 async def get_favor(player_id: str, bot_id: str) -> int:
@@ -163,16 +194,17 @@ def gift_reaction(personality: dict | None, item_name: str) -> tuple[str, int]:
     likes = (personality or {}).get("likes", {})
     dislikes = (personality or {}).get("dislikes", {})
     cat = category_of(item_name)
+    delta, rarity = favor_cfg()["gift_delta"], favor_cfg()["rarity_bonus"]
     if item_name in dislikes.get("items", []):
-        return "hate", GIFT_DELTA["hate"]
-    bonus = RARITY_BONUS.get(ITEMS[item_name].get("rarity"), 0)
+        return "hate", delta["hate"]
+    bonus = rarity.get(ITEMS[item_name].get("rarity"), 0)
     if item_name in likes.get("items", []):
-        return "love", GIFT_DELTA["love"] + bonus
+        return "love", delta["love"] + bonus
     if cat in dislikes.get("categories", []):
-        return "dislike", GIFT_DELTA["dislike"]
+        return "dislike", delta["dislike"]
     if cat in likes.get("categories", []):
-        return "like", GIFT_DELTA["like"] + bonus
-    return "neutral", GIFT_DELTA["neutral"] + bonus
+        return "like", delta["like"] + bonus
+    return "neutral", delta["neutral"] + bonus
 
 
 async def _interaction_refusal(session, player: Player | None, bot: Player | None) -> str | None:
@@ -198,15 +230,15 @@ async def give_gift(player_id: str, bot_id: str, item_name: str) -> dict:
         player, bot = await session.get(Player, player_id), await session.get(Player, bot_id)
         if (reason := await _interaction_refusal(session, player, bot)):
             return {"ok": False, "reason": reason}
-        today = _today()
+        today, fcfg = _today(), favor_cfg()
         rel = await _relation(session, player_id, bot_id, today)
-        if rel.gifts_today >= MAX_GIFTS_PER_DAY:
+        if rel.gifts_today >= fcfg["max_gifts_per_day"]:
             return {"ok": False, "code": "limit",
-                    "reason": f"今天已经送过 {MAX_GIFTS_PER_DAY} 份礼了，**{bot.name}** 笑着摆了摆手。"}
+                    "reason": f"今天已经送过 {fcfg['max_gifts_per_day']} 份礼了，**{bot.name}** 笑着摆了摆手。"}
         row = await session.get(BotPersonality, bot_id)
         reaction, delta = gift_reaction(_personality_dict(row) if row else None, item_name)
         if delta > 0:
-            delta = min(delta, GIFT_GAIN_DAILY_CAP - rel.gift_gain_today)
+            delta = min(delta, fcfg["gift_gain_daily_cap"] - rel.gift_gain_today)
         if not await consume_item(session, player_id, item_name, 1):
             return {"ok": False, "reason": f"背包里没有 **{item_name}**。"}
         await grant_item(session, bot_id, item_name, 1)
@@ -217,7 +249,7 @@ async def give_gift(player_id: str, bot_id: str, item_name: str) -> dict:
         await session.commit()
         result = {"ok": True, "reaction": reaction, "delta": delta, "favor": rel.favor,
                   "tier": favor_tier(rel.favor), "bot_name": bot.name,
-                  "gifts_left": MAX_GIFTS_PER_DAY - rel.gifts_today}
+                  "gifts_left": fcfg["max_gifts_per_day"] - rel.gifts_today}
     await bot_memory.remember(player_id, bot_id, "gift", item_name, reaction)       # 记住这份礼（提交之后；旁路）
     await bot_ties.sync_player_tie(player_id, bot_id, result["favor"])
     await bot_grudges.on_gift(player_id, bot_id, result["delta"])           # 好礼能让对方消点气
@@ -237,7 +269,8 @@ async def chat(player_id: str, bot_id: str) -> dict:
         city = bot.current_city
         if not rel.chatted_today:
             row = await session.get(BotPersonality, bot_id)
-            delta = CHAT_DELTA_TALKATIVE if row and row.talk >= TALKATIVE_AT else CHAT_DELTA
+            fcfg = favor_cfg()
+            delta = fcfg["chat_delta_talkative"] if row and row.talk >= fcfg["talkative_at"] else fcfg["chat_delta"]
             rel.chatted_today = 1
             rel.favor = _clamp(rel.favor + delta)
         rel.last_interact = time.time()

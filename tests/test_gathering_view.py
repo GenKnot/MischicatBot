@@ -27,11 +27,13 @@ from utils.items.herbs import HERBS
 from utils.items.materials import MATERIALS
 from utils.items.wood import WOOD
 from utils.views import gathering as gv
-from utils.views.gathering import (GATHER_OPTIONS, RARITY_WEIGHTS_BASE, GatherView, _ore_pool,
+from utils.views.gathering import (GatherView, _ore_pool,
                                    _pick_rarity, _rarity_weights, roll_gathering_rewards)
 
 U = "1001"
 YEAR = 7200
+GATHER_OPTIONS = gv.gather_options()
+RARITY_WEIGHTS_BASE = gv.rarity_weights_base()
 
 
 # --- 掉落：纯函数 -------------------------------------------------------------

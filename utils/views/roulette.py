@@ -1,5 +1,5 @@
 import discord
-from utils.roulette import BET, DAILY_LIMIT, SLOTS, WHEEL, do_roulette
+from utils.roulette import bet, daily_limit, do_roulette, slots, wheel
 from utils.views.base import TimedView
 
 
@@ -13,22 +13,23 @@ def _wheel_overview_embed(player: dict) -> discord.Embed:
     if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
         daily_count = 0
 
-    remaining = DAILY_LIMIT - daily_count
-    wheel_str = " ".join(s["emoji"] for s in WHEEL)
+    remaining = daily_limit() - daily_count
+    cells = wheel()
+    wheel_str = " ".join(s["emoji"] for s in cells)
 
-    total_cells = len(WHEEL)
+    total_cells = len(cells)
     slot_lines = "\n".join(
         f"{s['emoji']} **{s['label']}** — {s['count']} 格（{round(s['count'] / total_cells * 100)}%）"
-        for s in SLOTS if s["count"] > 0
+        for s in slots() if s["count"] > 0
     )
 
     embed = discord.Embed(
         title="🎡 轮转赌坊",
         description=(
             f"{wheel_str}\n\n"
-            f"转盘共 {total_cells} 格，固定押注 **{BET} 灵石**，转到哪格算哪格。\n\n"
+            f"转盘共 {total_cells} 格，固定押注 **{bet()} 灵石**，转到哪格算哪格。\n\n"
             f"{slot_lines}\n\n"
-            f"今日剩余：**{remaining} / {DAILY_LIMIT}**　　灵石：**{player.get('spirit_stones', 0):,}**"
+            f"今日剩余：**{remaining} / {daily_limit()}**　　灵石：**{player.get('spirit_stones', 0):,}**"
         ),
         color=discord.Color.dark_gold(),
     )
@@ -51,10 +52,11 @@ class RouletteView(TimedView):
         if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
             daily_count = 0
 
-        exhausted = daily_count >= DAILY_LIMIT
-        no_stones = player.get("spirit_stones", 0) < BET
+        exhausted = daily_count >= daily_limit()
+        no_stones = player.get("spirit_stones", 0) < bet()
 
         self.spin_btn.disabled = exhausted or no_stones
+        self.spin_btn.label = f"🎡 转动转盘（{bet()} 灵石）"
 
     @discord.ui.button(label="🎡 转动转盘（500 灵石）", style=discord.ButtonStyle.danger)
     async def spin_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -75,7 +77,7 @@ class RouletteView(TimedView):
         net = result["net"]
 
         if net > 0:
-            color = discord.Color.gold() if result["payout"] >= BET * 5 else discord.Color.green()
+            color = discord.Color.gold() if result["payout"] >= bet() * 5 else discord.Color.green()
         elif net == 0:
             color = discord.Color.greyple()
         else:
@@ -83,7 +85,7 @@ class RouletteView(TimedView):
 
         wheel_parts = []
         seen = False
-        for s in WHEEL:
+        for s in wheel():
             if not seen and s["label"] == slot["label"] and s["emoji"] == slot["emoji"]:
                 wheel_parts.append(f"**[{s['emoji']}]**")
                 seen = True
@@ -106,7 +108,7 @@ class RouletteView(TimedView):
             title=f"🎡 {title}",
             description=(
                 f"{wheel_str}\n\n"
-                f"押注：**{BET:,}** 灵石　结算：**{sign}{net:,}** 灵石\n"
+                f"押注：**{result['bet']:,}** 灵石　结算：**{sign}{net:,}** 灵石\n"
                 f"今日剩余：**{result['daily_limit'] - result['daily_count']} / {result['daily_limit']}**"
             ),
             color=color,

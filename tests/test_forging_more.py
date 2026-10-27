@@ -16,7 +16,8 @@ from tests.conftest import make_player
 from tests.discord_fakes import FakeInteraction
 from utils import forging as fm
 from utils.equipment import QUALITY_ORDER
-from utils.forging import (DAILY_LIMIT, FORGING_EXP_PER_CRAFT, FORGING_EXP_THRESHOLDS, ORE_TIERS, SLOT_MAIN_ORE_QTY,
+from utils import rules
+from utils.forging import (ORE_TIERS,
                            add_forging_exp, attempt_forge, attempt_reforge, calc_forge_success_rate,
                            get_available_qualities, get_forging_level_label, get_forging_mastery,
                            get_max_quality_for_level, increment_forging_mastery, pass_forging_exam, roll_forge_failure)
@@ -24,6 +25,10 @@ from utils.views import forging as fv
 
 U = "1001"
 ORE, SLOT = "铜矿石", "饰品"
+DAILY_LIMIT = rules.get("forging.daily_limit")
+FORGING_EXP_PER_CRAFT = rules.get("forging.exp_per_craft")
+FORGING_EXP_THRESHOLDS = rules.get("forging.exp_thresholds")
+SLOT_MAIN_ORE_QTY = rules.get("forging.slot_ore_qty")
 QTY = SLOT_MAIN_ORE_QTY[SLOT]
 
 
@@ -155,7 +160,7 @@ async def test_B42_并发走火扣寿元不丢更新(db, monkeypatch):
         await s.execute(update(D.Player).values(forging_level=1))
         await s.commit()
     # 绕开每日 5 次：直接并发调内部失败结算路径需要真实锻造，这里把上限抬高
-    monkeypatch.setattr(fm, "DAILY_LIMIT", 50)
+    monkeypatch.setattr(fm, "daily_limit", lambda: 50)
     await asyncio.gather(*[attempt_forge(U, SLOT, ORE, "普通", None, None, inventory, 10, 1) for _ in range(8)])
     assert (await row(db)).lifespan == 100 - 2 * 8
 
@@ -439,7 +444,7 @@ async def test_考核按钮_各分支(db):
     v = fv.ForgingMainView(inter().user, await pdict(), None)
     i = inter()
     await v.exam_btn.callback(i)
-    assert "炼器入门考核" in i.last.embed.title and (await row(db)).spirit_stones == 100_000 - fm.EXAM_COST
+    assert "炼器入门考核" in i.last.embed.title and (await row(db)).spirit_stones == 100_000 - fm.exam_cost()
     i = inter()
     await v.exam_btn.callback(i)
     assert "已缴过考核费" in i.last and i.last.ephemeral

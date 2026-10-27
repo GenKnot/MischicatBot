@@ -16,6 +16,8 @@
 | **玩家向机器人求助**的配置（答应概率、借期、宽限、催债 / 翻脸的好感变化） | `data/bot_requests.json` 的 `player_ask` | 人 | 直接改数字 |
 | **失踪调查**配置（问话概率 / 回答对进度的影响 / 每天进度 / 放弃期） | `data/bot_investigation.json` | 人 | 直接改数字 |
 | **机器人恩怨**（仇敌 / 复仇动手概率、胜负、结果权重按性格、击杀上限、传闻概率） | `data/bot_feuds.json` | 人 | 直接改数字；传闻文案在 `data/rumors.json` 的 `bot_feud_*` / `bot_quarrel` / `bot_sworn` |
+| **游戏规则数字**（钱庄 / 坊市 / 炼丹炼器 / 境界节奏 / 战斗 / 灵雨 / 万宝楼…） | `data/game_rules.json` | 人 | 开头 `_说明` 逐项解释；管理员也可 `cat!调参` 在游戏里改 |
+| **机器人记忆 / 名望 / 好感** | `data/bot_memory.json` / `bot_fame.json` / `bot_favor.json` | 人 | 直接改数字 |
 | **管理员调参**（在游戏里改上面这些 json 里的数字 / 开关，立即生效，可恢复默认） | `cat!调参` 系列命令 | 管理员 | 文件里的值是默认值；文字内容不能这样改 |
 | **AI 润色**（默认关；Qwen / DeepSeek 二选一、场景名单、日调用上限、超时） | `data/llm_polish.json` | 人 | 密钥放环境变量 `DASHSCOPE_API_KEY` / `DEEPSEEK_API_KEY`，失败自动退回模板台词 |
 | **仇恨账本**配置（各种冒犯的轻重、原因模板、蹲守年数、续期概率、化解价格） | `data/bot_grudges.json` | 人 | 直接改数字 / 模板；新增原型要补 `windows` 和 `renew` |

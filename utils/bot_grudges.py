@@ -87,8 +87,11 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
     if cfg.get("third_party_scale", 0) <= 0:
         errors.append("third_party_scale 应大于 0")
     ap = cfg.get("appease", {})
-    if ap.get("stones_per_point", 0) <= 0 or not 0 <= ap.get("apology", {}).get("base", -1) <= 1:
-        errors.append("appease 配置不合法")
+    if ap.get("stones_per_point", 0) <= 0 or not 0 <= ap.get("apology", {}).get("base", -1) <= 1 or not 0 <= ap.get("apology", {}).get("chance_cap", -1) <= 1:
+        errors.append("appease 配置不合法（apology.base / chance_cap 在 0~1，stones_per_point > 0）")
+    f = cfg.get("formula", {})
+    if f.get("stat_base", -1) < 0 or f.get("strength_base", -1) < 0 or not 0 <= f.get("third_cap", -1) <= 1 or not 0 <= f.get("renew_cap", -1) <= 1:
+        errors.append("formula: stat_base / strength_base ≥ 0，third_cap / renew_cap 在 0~1")
     return errors
 
 
@@ -209,10 +212,10 @@ async def on_offense(actor_id: str, victim_id: str, kind: str, *, rng=None, now:
                 arche, prof = _persona(personas.get(holder_id)) if is_bot_id(holder_id) else (None, {})
                 eff = k["severity"] * cfg["relation"][rel]
                 if prof:
-                    eff *= 0.5 + (prof.get("vengeful", 50) if rel == "self" else prof.get("loyalty", 50)) / 100
+                    eff *= cfg["formula"]["stat_base"] + (prof.get("vengeful", 50) if rel == "self" else prof.get("loyalty", 50)) / 100
                 if rel != "self":
-                    eff *= 0.5 + strength / 100
-                    if eff < cfg["min_severity"] or rng.random() >= min(0.95, eff / cfg["third_party_scale"]):
+                    eff *= cfg["formula"]["strength_base"] + strength / 100
+                    if eff < cfg["min_severity"] or rng.random() >= min(cfg["formula"]["third_cap"], eff / cfg["third_party_scale"]):
                         continue
                 delay, investigate = 0.0, False
                 if rel != "self" and reach != "server":
@@ -270,7 +273,7 @@ async def grudge_day(day: str, rng=None, force: bool = False, now: float | None 
             for g in due:
                 arche, _prof = _persona(personas.get(g.holder_id))
                 mx = cfg["renew"]["max_renewals"]
-                p = min(0.95, cfg["renew"][arche] + g.severity / 100 * cfg["renew"]["severity_bonus_per_100"])
+                p = min(cfg["formula"]["renew_cap"], cfg["renew"][arche] + g.severity / 100 * cfg["renew"]["severity_bonus_per_100"])
                 if (mx is None or g.renewals < mx) and rng.random() < p:
                     g.window_until = now + years_to_seconds(window_years(arche, "self", g.stubborn, cfg))
                     g.renewals += 1
@@ -414,7 +417,7 @@ async def appease(player_id: str, holder_id: str, method: str, amount: int = 0, 
                 return {"ok": False, "reason": f"**{name}** 刚听过你的道歉，过些时候再说吧。", "left": total}
             persona = await session.get(BotPersonality, holder_id)
             prof = json.loads(persona.profile) if persona and persona.profile else {}
-            chance = min(0.9, ap["base"] + persona.kindness / 100 * ap["kind_weight"] + (100 - prof.get("vengeful", 50)) / 100 * ap["vengeful_weight"]) if persona else ap["base"]
+            chance = min(ap["chance_cap"], ap["base"] + persona.kindness / 100 * ap["kind_weight"] + (100 - prof.get("vengeful", 50)) / 100 * ap["vengeful_weight"]) if persona else ap["base"]
             for g in grudges:
                 g.last_apology = now
             if rng.random() < chance:

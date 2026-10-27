@@ -23,10 +23,10 @@ from utils.items import ITEMS
 from utils.sects import (
     PCT_STATS,
     SECTS,
-    STAGE_PCT_MULTIPLIER,
-    STAGE_STAT_MULTIPLIER,
     TECHNIQUE_STAGES,
     TECHNIQUES,
+    pct_multiplier,
+    stat_multiplier,
 )
 from utils.equipment import (
     QUALITY_ORDER,
@@ -179,6 +179,12 @@ STATS_SORT_COLUMNS = {
 STATS_SORT_COLUMNS["stat_total"] = "stat_total"   # SELECT 里的计算列
 
 
+def sort_rows(rows: list[dict], column: str, descending: bool = True) -> list[dict]:
+    """按列排序（在 Python 里排，SQL 保持写死的常量，永远不拼进用户给的东西）。
+    和 SQLite 的 ORDER BY 一致：空值最小，降序时排在最后，升序时排在最前。"""
+    return sorted(rows, key=lambda r: (r[column] is not None, r[column]), reverse=descending)
+
+
 def ts(val):
     if not val:
         return "—"
@@ -286,34 +292,23 @@ def players(
     bots: int = 0,
 ):
     # `bots=1`（页面上的「含机器人」）才列出机器人，默认只看真人。
-    # 用参数查表拿列名，进 SQL 的永远是这里的常量，不是用户传来的字符串。
-    # 原先是校验完直接把 sort 拼进去，校验和拼接隔着十几行，改动时容易漏。
+    # SQL 是写死的常量，筛选值全部走参数绑定；排序列先过白名单、再在 Python 里排。
     sort_column = PLAYER_SORT_COLUMNS.get(sort)
     if sort_column is None:
         sort, sort_column = "cultivation", PLAYER_SORT_COLUMNS["cultivation"]
     with get_conn() as conn:
-        where = ["is_dead = 0"]
-        if not bots:
-            where.append("is_bot = 0")
-        params = []
-        if q:
-            where.append("(name LIKE ? OR discord_id LIKE ?)")
-            params += [f"%{q}%", f"%{q}%"]
-        if city:
-            where.append("current_city = ?")
-            params.append(city)
-        if realm:
-            where.append("realm LIKE ?")
-            params.append(f"%{realm}%")
-        sql = f"SELECT * FROM players WHERE {' AND '.join(where)} ORDER BY {sort_column} DESC"
-        rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
-        city_filter = "" if bots else " AND is_bot=0"      # 下拉选项与结果一致
-        cities = [
-            r[0]
-            for r in conn.execute(
-                f"SELECT DISTINCT current_city FROM players WHERE is_dead=0{city_filter} ORDER BY current_city"
-            ).fetchall()
-        ]
+        rows = sort_rows([dict(r) for r in conn.execute(
+            "SELECT * FROM players WHERE is_dead = 0 AND (? OR is_bot = 0) "
+            "AND (? = '' OR name LIKE ? OR discord_id LIKE ?) "
+            "AND (? = '' OR current_city = ?) "
+            "AND (? = '' OR realm LIKE ?)",
+            (1 if bots else 0, q, f"%{q}%", f"%{q}%", city, city, realm, f"%{realm}%"),
+        ).fetchall()], sort_column)
+        if bots:
+            cities = [r[0] for r in conn.execute("SELECT DISTINCT current_city FROM players WHERE is_dead=0 ORDER BY current_city").fetchall()]
+        else:        # 下拉选项与结果一致
+            cities = [r[0] for r in conn.execute(
+                "SELECT DISTINCT current_city FROM players WHERE is_dead=0 AND is_bot=0 ORDER BY current_city").fetchall()]
     return templates.TemplateResponse(
         request=request,
         name="players.html",
@@ -489,17 +484,16 @@ def stats(request: Request, sort: str = "cultivation", order: str = "desc", bots
     sort_column = STATS_SORT_COLUMNS.get(sort)
     if sort_column is None:
         sort, sort_column = "cultivation", STATS_SORT_COLUMNS["cultivation"]
-    direction = "DESC" if order != "asc" else "ASC"
     with get_conn() as conn:
-        rows = conn.execute(
+        rows = sort_rows([dict(r) for r in conn.execute(
             "SELECT *, (comprehension+physique+fortune+bone+soul) as stat_total "
-            f"FROM players WHERE is_dead=0{'' if bots else ' AND is_bot=0'} ORDER BY {sort_column} {direction}"
-        ).fetchall()
+            "FROM players WHERE is_dead=0 AND (? OR is_bot=0)", (1 if bots else 0,)
+        ).fetchall()], sort_column, descending=order != "asc")
     return templates.TemplateResponse(
         request=request,
         name="stats.html",
         context={
-            "players": [dict(r) for r in rows],
+            "players": rows,
             "sort": sort,
             "order": order,
             "bots": 1 if bots else 0,
@@ -555,14 +549,14 @@ def techniques_page(
             bonuses = {}
             for stat, val in info.get("stat_bonus", {}).items():
                 if stat in PCT_STATS:
-                    mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
+                    mult = pct_multiplier(stage)
                     bonuses[STAT_NAMES.get(stat, stat)] = (
                         f"+{val * mult:.0%}"
                         if stat == "cultivation_speed"
                         else f"+{val * mult:.1f}"
                     )
                 else:
-                    mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
+                    mult = stat_multiplier(stage)
                     bonuses[STAT_NAMES.get(stat, stat)] = f"+{val * mult:.0f}"
             stages.append({"stage": stage, "bonuses": bonuses})
 

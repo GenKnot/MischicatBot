@@ -18,14 +18,17 @@ import pytest
 
 from cogs import explore as ex
 from cogs.explore import (
-    EXPLORE_LIMIT, EXPLORE_RESET_YEARS, ExploreCog, ExploreNextView, ExploreResultView, ExploreView,
+    ExploreCog, ExploreNextView, ExploreResultView, ExploreView,
 )
 from tests.conftest import make_player
 from tests.discord_fakes import FakeContext, FakeInteraction, FakeUser
-from utils.character import CAVE_EXPLORE_BONUS
+from utils import rules
 from utils.player import get_player
 
 UID = "1"
+
+EXPLORE_LIMIT = rules.get("explore.limit")
+EXPLORE_RESET_YEARS = rules.get("explore.reset_years")
 
 
 def _now_years():
@@ -170,7 +173,7 @@ async def test_并发再多也不会超过上限(db):
 
 async def test_上限_基础值加洞府加成(db):
     await _add_player(db, cave="x")
-    assert await ex._get_explore_limit(await _pd()) == EXPLORE_LIMIT + CAVE_EXPLORE_BONUS
+    assert await ex._get_explore_limit(await _pd()) == EXPLORE_LIMIT + rules.get("character.cave.explore_bonus")
     await _add_player(db, "2")
     assert await ex._get_explore_limit(await _pd("2")) == EXPLORE_LIMIT
 

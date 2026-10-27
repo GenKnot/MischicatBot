@@ -1,40 +1,21 @@
+from utils import rules
 from utils.realms import get_realm_index
 from utils.techniques import WORLD_TECHNIQUES
 
 TECHNIQUE_STAGES = ["入门", "熟练", "精通", "小成", "大成", "圆满", "破限"]
 
-STAGE_COST_BASE = {
-    "入门":  500,
-    "熟练":  1000,
-    "精通":  2000,
-    "小成":  4000,
-    "大成":  8000,
-    "圆满":  16000,
-}
+# 各阶段的灵石 / 年数、品阶倍数、属性加成倍数在 data/game_rules.json 的 techniques（管理员可以调），用的时候读
 
-STAGE_TIME_BASE = {
-    "入门":  1,
-    "熟练":  2,
-    "精通":  4,
-    "小成":  8,
-    "大成":  16,
-    "圆满":  32,
-}
 
-GRADE_COST_MULTIPLIER = {
-    "黄级下品": 0.5, "黄级中品": 0.8, "黄级上品": 1.0,
-    "玄级下品": 2.0, "玄级中品": 3.0, "玄级上品": 4.0,
-    "地级下品": 8.0, "地级中品": 12.0, "地级上品": 16.0,
-    "天级下品": 30.0, "天级中品": 50.0, "天级上品": 80.0,
-}
+def stat_multiplier(stage: str) -> float:
+    """某阶段对属性加成（悟性、体魄……）的倍数。"""
+    return rules.section("techniques")["stat_mult"].get(stage, 1)
 
-STAGE_STAT_MULTIPLIER = {
-    "入门": 1, "熟练": 1.5, "精通": 2, "小成": 3, "大成": 4, "圆满": 5, "破限": 7,
-}
 
-STAGE_PCT_MULTIPLIER = {
-    "入门": 1, "熟练": 1.2, "精通": 1.4, "小成": 1.6, "大成": 1.8, "圆满": 2.0, "破限": 2.5,
-}
+def pct_multiplier(stage: str) -> float:
+    """某阶段对百分比类加成（修炼速度、逃跑率、寿元）的倍数。"""
+    return rules.section("techniques")["pct_mult"].get(stage, 1)
+
 
 PCT_STATS = {"escape_rate", "cultivation_speed", "lifespan_bonus"}
 
@@ -107,9 +88,10 @@ TECHNIQUES = {**TECHNIQUES, **WORLD_TECHNIQUES}
 def get_technique_cost(name: str, current_stage: str) -> tuple[int, int]:
     info = TECHNIQUES.get(name, {})
     grade = info.get("grade", "黄级上品")
-    mult = GRADE_COST_MULTIPLIER.get(grade, 1.0)
-    stones = int(STAGE_COST_BASE.get(current_stage, 500) * mult)
-    years = STAGE_TIME_BASE.get(current_stage, 1)
+    t = rules.section("techniques")
+    mult = t["grade_cost"].get(grade, 1.0)
+    stones = int(t["stage_cost"].get(current_stage, 500) * mult)
+    years = t["stage_years"].get(current_stage, 1)
     return stones, years
 
 
@@ -132,10 +114,7 @@ def calc_technique_stat_bonus(techniques_json: list) -> dict:
         info = TECHNIQUES.get(name, {})
         base_bonus = info.get("stat_bonus", {})
         for stat, val in base_bonus.items():
-            if stat in PCT_STATS:
-                mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
-            else:
-                mult = STAGE_STAT_MULTIPLIER.get(stage, 1)
+            mult = pct_multiplier(stage) if stat in PCT_STATS else stat_multiplier(stage)
             total[stat] = total.get(stat, 0) + val * mult
     return total
 

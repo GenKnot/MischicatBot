@@ -19,9 +19,10 @@ import pytest
 from cogs.cultivation import CultivationCog
 from tests.conftest import make_player
 from utils import cultivation_logic as cl
+from utils import rules
 from utils import dual_cultivation_logic as dual
 from utils.character import (
-    CAVE_BONUS, calc_cultivation_gain, years_to_seconds,
+    calc_cultivation_gain, years_to_seconds,
 )
 from utils.realms import cultivation_needed
 
@@ -227,7 +228,7 @@ async def test_双修_洞府加成只算在有洞府的那一方(db):
 
     res = await dual.start_dual_cultivation(A, B)
 
-    assert res["inviter_gain"] == _gain(bonus=CAVE_BONUS)
+    assert res["inviter_gain"] == _gain(bonus=rules.get("character.cave.bonus"))
     assert res["target_gain"] == _gain()
     assert res["inviter_gain"] > res["target_gain"]
 
@@ -436,7 +437,7 @@ async def test_单人闭关结束_洞府加成与丹药速度buff都算(db, noti
 
     await run()
 
-    exp = int(calc_cultivation_gain(4, 5, "单灵根") * (1 + CAVE_BONUS + 0.5))
+    exp = int(calc_cultivation_gain(4, 5, "单灵根") * (1 + rules.get("character.cave.bonus") + 0.5))
     assert (await _row(db, A)).cultivation == exp
 
 

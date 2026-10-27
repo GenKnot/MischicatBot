@@ -1,5 +1,5 @@
 {
- "_说明": "机器人对熟人的请求 / 委托（U1·江湖百态）。机器人在和你碰面（到城、点『搭话』）时，如果缺什么、有事相求，会开口。templates 里每个模板有一个 kind（loan_stones 借灵石 / loan_item 借物品 / errand 送信 / companion_gather 陪着采集），同一种 kind 可以写很多模板（只改数据）；新增 kind 要写代码。ask：开口的概率和限制；repay：借了钱 / 物品之后还不还、还多少，由性格决定；due_years 是游戏年（1 年 = 现实 2 小时）。所有数字都可以改。 player_ask：玩家主动向熟人求助（借灵石 / 借物品 / 陪着采集）——答应的概率 = 交情档位底子 + 关系加成 + 善意 / 义气 / 贪婪的修正 − 数额占它身家的比例 × share_penalty；借了就要还，到期后它会催，宽限 grace_years 游戏年还不还就记仇（进它的仇恨账）。",
+ "_说明": "机器人对熟人的请求 / 委托（U1·江湖百态）。机器人在和你碰面（到城、点『搭话』）时，如果缺什么、有事相求，会开口。templates 里每个模板有一个 kind（loan_stones 借灵石 / loan_item 借物品 / errand 送信 / companion_gather 陪着采集），同一种 kind 可以写很多模板（只改数据）；新增 kind 要写代码。ask：开口的概率和限制；repay：借了钱 / 物品之后还不还、还多少，由性格决定；due_years 是游戏年（1 年 = 现实 2 小时）。所有数字都可以改。 player_ask：玩家主动向熟人求助（借灵石 / 借物品 / 陪着采集）——答应的概率 = 交情档位底子 + 关系加成 + 善意 / 义气 / 贪婪的修正 − 数额占它身家的比例 × share_penalty；借了就要还，到期后它会催，宽限 grace_years 游戏年还不还就记仇（进它的仇恨账）。 补充：repay.default_div —— 赖账概率里 守序 / 贪婪 / 善意 偏离 50 的程度各除以这个数（越小影响越大），repay.default_cap 赖账概率上限；repay.gratitude.kind_div / cap —— 感念旧情多还的概率里善意的除数和上限；ask.tries_per_offer —— 每次碰面最多试几位熟人（= max_offers_per_meeting × 这个数），找到一位开口的就停。",
  "ask": {
   "chance": 0.3,
   "chance_by_archetype": {
@@ -21,7 +21,8 @@
   "offer_ttl_hours": 12,
   "max_open_per_player": 8,
   "per_bot_cooldown_hours": 24,
-  "max_offers_per_meeting": 1
+  "max_offers_per_meeting": 1,
+  "tries_per_offer": 3
  },
  "templates": {
   "borrow_stones": {
@@ -112,14 +113,22 @@
    "bonus": [
     0.1,
     0.3
-   ]
+   ],
+   "kind_div": 200,
+   "cap": 0.9
   },
   "item_markup": 1.2,
   "extend_years": [
    1,
    2
   ],
-  "max_extends": 2
+  "max_extends": 2,
+  "default_div": {
+   "lawful": 250,
+   "greed": 250,
+   "kindness": 300
+  },
+  "default_cap": 0.9
  },
  "fail": {
   "favor": -3

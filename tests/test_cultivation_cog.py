@@ -21,7 +21,8 @@ from tests.conftest import make_player
 from tests.discord_fakes import FakeContext, FakeInteraction
 from tests.test_dual_cultivation import _FakeUser, _Member
 from utils import breakthrough_logic as bt
-from utils.character import CAVE_BONUS, calc_cultivation_gain, years_to_seconds
+from utils import rules
+from utils.character import calc_cultivation_gain, years_to_seconds
 from utils.realms import cultivation_needed
 
 UID, PARTNER = "1", "2002"
@@ -289,7 +290,7 @@ async def test_选择时长_给出面板(db, cog):
     assert isinstance(m.view, CultivateView)
     assert "当前寿元：**100 年**" in m.embed.description
     assert "极快（×2.0）" in m.embed.description
-    assert f"+{int(CAVE_BONUS * 100)}%" in m.embed.description
+    assert f"+{int(rules.get("character.cave.bonus") * 100)}%" in m.embed.description
 
 
 @pytest.mark.parametrize("fields,phrase", [
@@ -376,7 +377,7 @@ async def test_修炼命令_洞府与丹药加成计入预估(db, cog):
     await _add_player(db, cave="洞府", active_buffs=json.dumps({"cultivation_speed_bonus": {"value": 50}}))
     c = ctx()
     await cog.cultivate.callback(cog, c, 2)
-    exp = int(calc_cultivation_gain(2, 5, "单灵根") * (1 + CAVE_BONUS + 0.5))
+    exp = int(calc_cultivation_gain(2, 5, "单灵根") * (1 + rules.get("character.cave.bonus") + 0.5))
     assert c.said(f"+{exp}") and c.said("修炼速度加成 +50%")
 
 

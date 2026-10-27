@@ -4,6 +4,7 @@ import time
 import discord
 
 from sqlalchemy import text
+from utils import rules
 from utils.db_async import AsyncSessionLocal
 from utils.player import get_player, apply_updates, settle_time
 from utils.views.base import TimedView
@@ -40,27 +41,31 @@ def _today_trigger_ts() -> float:
     return now.replace(hour=21, minute=0, second=0, microsecond=0).timestamp()
 
 
-SPIRIT_RAIN_DESC = (
-    "天地异象，灵气暴涨，灵雨降临指定城市。\n\n"
-    "**活动机制**\n"
-    "· 在场修士修炼加成 **+150%**，持续 1 小时（现实）\n"
-    "· 灵雨活动每次最多参与 **2 次**，每次间隔 **10 分钟**冷却\n"
-    "· 可选择以下活动参与：\n"
-    "　💎 **灵雨结晶** — 收集落地灵晶，获得材料与灵石\n"
-    "　🧘 **灵雨感悟** — 打坐感悟，有概率获得属性点\n"
-    "　💪 **灵雨淬体** — 以体魄承受灵雨（需体魄 ≥ 7）\n\n"
-    "**守城（独立系统）**\n"
-    "· ⚔️ **参与守城** — 自愿加入守城队伍，贡献战力\n"
-    "· 参与守城后将**锁定在城内**直到事件结束，无法离开\n"
-    "· 守城与灵雨活动互不影响，可同时参与\n\n"
-    "**万兽齐鸣（30% 概率）**\n"
-    "· 第 1 名：2件稀有装备 + 大量灵石 + 声望 +50\n"
-    "· 第 2-3 名：1件稀有装备 + 灵石 + 声望 +30\n"
-    "· 其余守城者：灵石 + 声望 +10\n"
-    "· 临阵脱逃者（领取奖励后离城）：结算时公开点名\n"
-    "· 在城内未守城的修士有 30% 概率被妖兽袭击，损失寿元\n\n"
-    "**触发时间**：每日 21:00（北美东部时间），19:00 起每半小时预告"
-)
+def spirit_rain_desc() -> str:
+    """灵雨说明（面板里给玩家看）：次数、冷却、体魄门槛、兽潮概率和奖励都取自 data/game_rules.json 的 spirit_rain，调参后跟着变。"""
+    c = rules.section("spirit_rain")
+    d = c["defense"]
+    return (
+        "天地异象，灵气暴涨，灵雨降临指定城市。\n\n"
+        "**活动机制**\n"
+        "· 在场修士修炼加成 **+150%**，持续 1 小时（现实）\n"
+        f"· 灵雨活动每次最多参与 **{c['max_activities']} 次**，每次间隔 **{c['activity_cooldown_seconds'] / 60:g} 分钟**冷却\n"
+        "· 可选择以下活动参与：\n"
+        "　💎 **灵雨结晶** — 收集落地灵晶，获得材料与灵石\n"
+        "　🧘 **灵雨感悟** — 打坐感悟，有概率获得属性点\n"
+        f"　💪 **灵雨淬体** — 以体魄承受灵雨（需体魄 ≥ {c['temper_min_physique']}）\n\n"
+        "**守城（独立系统）**\n"
+        "· ⚔️ **参与守城** — 自愿加入守城队伍，贡献战力\n"
+        "· 参与守城后将**锁定在城内**直到事件结束，无法离开\n"
+        "· 守城与灵雨活动互不影响，可同时参与\n\n"
+        f"**万兽齐鸣（{c['beast_tide_chance'] * 100:g}% 概率）**\n"
+        f"· 第 1 名：{d['rank1']['equipment']}件稀有装备 + 大量灵石 + 声望 +{d['rank1']['rep']}\n"
+        f"· 第 2-3 名：{d['rank23']['equipment']}件稀有装备 + 灵石 + 声望 +{d['rank23']['rep']}\n"
+        f"· 其余守城者：灵石 + 声望 +{d['rest']['rep']}\n"
+        "· 临阵脱逃者（领取奖励后离城）：结算时公开点名\n"
+        f"· 在城内未守城的修士有 {c['slacker']['chance'] * 100:g}% 概率被妖兽袭击，损失寿元\n\n"
+        "**触发时间**：每日 21:00（北美东部时间），19:00 起每半小时预告"
+    )
 
 
 async def _build_main_menu(interaction: discord.Interaction, cog):
@@ -262,7 +267,7 @@ class _EventDetailButton(discord.ui.Button):
         event = self.event
 
         if not event:
-            embed = discord.Embed(title="✦ 天降灵雨 ✦", description=SPIRIT_RAIN_DESC, color=discord.Color.blue())
+            embed = discord.Embed(title="✦ 天降灵雨 ✦", description=spirit_rain_desc(), color=discord.Color.blue())
             embed.set_footer(text="当前无进行中的事件，敬请期待。")
             return await interaction.response.send_message(
                 embed=embed, view=_BackToOverviewView(interaction.user, self.pe_cog), ephemeral=True
@@ -279,7 +284,7 @@ class _EventDetailButton(discord.ui.Button):
                     {"eid": event["event_id"]},
                 )
                 count = result.scalar()
-            embed = discord.Embed(title="✦ 天降灵雨 · 进行中 ✦", description=SPIRIT_RAIN_DESC, color=discord.Color.blue())
+            embed = discord.Embed(title="✦ 天降灵雨 · 进行中 ✦", description=spirit_rain_desc(), color=discord.Color.blue())
             embed.add_field(name="当前城市", value=city, inline=True)
             embed.add_field(name="剩余时间", value=f"{remaining/60:.0f} 分钟", inline=True)
             embed.add_field(name="参与人数", value=str(count), inline=True)
@@ -289,7 +294,7 @@ class _EventDetailButton(discord.ui.Button):
             )
         else:
             remaining = max(0, _today_trigger_ts() - time.time())
-            embed = discord.Embed(title="✦ 天降灵雨 · 即将开始 ✦", description=SPIRIT_RAIN_DESC, color=discord.Color.blue())
+            embed = discord.Embed(title="✦ 天降灵雨 · 即将开始 ✦", description=spirit_rain_desc(), color=discord.Color.blue())
             embed.add_field(name="降临城市", value=city, inline=True)
             embed.add_field(name="距开始", value=f"{remaining/60:.0f} 分钟", inline=True)
             await interaction.response.send_message(

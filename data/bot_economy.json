@@ -1,181 +1,237 @@
 {
-  "_说明": "机器人经济参数。每日结算（utils/bot_settle.py）和离线模拟（scripts/sim_bots.py）共用这一份。数值来源与校准见 .gk/ISSUES.md「经济参数」「模拟结果」。",
-  "day_years": 12,
-  "income": {
-    "炮灰": 80,
-    "正常": 200,
-    "天骄": 500
+ "_说明": "机器人经济参数。每日结算（utils/bot_settle.py）和离线模拟（scripts/sim_bots.py）共用这一份。数值来源与校准见 .gk/ISSUES.md「经济参数」「模拟结果」。 world：max_bots 机器人总数上限、default_count 生成命令的默认个数、max_per_batch 一次最多生成几个、tier_weights 三个档位的出生比例（相对权重）、tiers 每档出生时的境界范围（含，写层名，不能调）/ 五项属性范围 / 随身灵石范围、raid_keep_days 打劫 / 击杀次数记录保留几天；public_events.meet_pairs_per_event 公共事件里最多抽几对机器人互相认识。",
+ "day_years": 12,
+ "income": {
+  "炮灰": 80,
+  "正常": 200,
+  "天骄": 500
+ },
+ "income_noise": [
+  0.7,
+  1.3
+ ],
+ "daily_cap_per_bot": 170,
+ "speed": {
+  "炮灰": 0.2,
+  "正常": 0.4,
+  "天骄": 0.8
+ },
+ "money": {
+  "豪爽": {
+   "carry": 0.7,
+   "spend": 0.15
   },
-  "income_noise": [
-    0.7,
-    1.3
-  ],
-  "daily_cap_per_bot": 170,
-  "speed": {
-    "炮灰": 0.2,
-    "正常": 0.4,
-    "天骄": 0.8
+  "贪财": {
+   "carry": 0.7,
+   "spend": 0.15
   },
-  "money": {
-    "豪爽": {
-      "carry": 0.7,
-      "spend": 0.15
-    },
-    "贪财": {
-      "carry": 0.7,
-      "spend": 0.15
-    },
-    "话痨": {
-      "carry": 0.5,
-      "spend": 0.1
-    },
-    "憨直": {
-      "carry": 0.5,
-      "spend": 0.1
-    },
-    "痴丹": {
-      "carry": 0.4,
-      "spend": 0.1
-    },
-    "阴鸷": {
-      "carry": 0.3,
-      "spend": 0.1
-    },
-    "迂腐": {
-      "carry": 0.3,
-      "spend": 0.07
-    },
-    "高冷": {
-      "carry": 0.2,
-      "spend": 0.07
-    }
+  "话痨": {
+   "carry": 0.5,
+   "spend": 0.1
   },
-  "pill_price": {
-    "筑基丹": 1000,
-    "凝丹丹": 3000,
-    "化婴丹": 8000
+  "憨直": {
+   "carry": 0.5,
+   "spend": 0.1
   },
-  "refill_rate": 0.02,
-  "refill_min_per_day": 5,
-  "materials": {
-    "discount": 0.25,
-    "jobs_per_day": 3,
-    "daily_cap_value_per_bot": 2.6,
-    "keep_per_item": 20,
-    "keep_equipment": 6
+  "痴丹": {
+   "carry": 0.4,
+   "spend": 0.1
   },
-  "ceiling": {
-    "override": null,
-    "floor": "炼气期"
+  "阴鸷": {
+   "carry": 0.3,
+   "spend": 0.1
   },
-  "wild": {
-    "trip_chance": 0.15
+  "迂腐": {
+   "carry": 0.3,
+   "spend": 0.07
   },
-  "combat": {
-    "power_bonus": {
-      "炮灰": 0.0,
-      "正常": 0.2,
-      "天骄": 0.5
-    },
-    "rob": {
-      "share": 0.15,
-      "cap": 150,
-      "per_human_per_day": 3
-    },
-    "kill": {
-      "share": 0.3,
-      "cap": 300,
-      "per_human_per_day": 5,
-      "global_per_day": 4
-    },
-    "cost": {
-      "rob": {
-        "reputation": 1,
-        "favor": -40
-      },
-      "cripple": {
-        "reputation": 2,
-        "favor": -60
-      },
-      "kill": {
-        "reputation": 5,
-        "reputation_tianjiao": 10
-      }
-    },
-    "reaction": {
-      "豪爽": {
-        "release": 90,
-        "rob": 10
-      },
-      "憨直": {
-        "release": 100
-      },
-      "痴丹": {
-        "release": 100
-      },
-      "话痨": {
-        "release": 90,
-        "rob": 10
-      },
-      "迂腐": {
-        "release": 100
-      },
-      "高冷": {
-        "release": 85,
-        "rob": 15
-      },
-      "贪财": {
-        "release": 20,
-        "rob": 70,
-        "kill": 10
-      },
-      "阴鸷": {
-        "release": 20,
-        "rob": 50,
-        "kill": 30
-      }
-    },
-    "captive_rob": {
-      "share": 0.15,
-      "cap": 150
-    },
-    "can_kill_humans": true,
-    "kill_protect_below": "筑基期1层"
-  },
-  "public_events": {
-    "migrate_share": 0.25,
-    "join_chance": 0.7,
-    "defense_chance": 0.6,
-    "activity_reward_budget_per_event": 40000,
-    "auction": {
-      "bidders_per_lot": 3,
-      "max_bids_per_lot": 3,
-      "max_multiple": 3.0,
-      "carry_share": 0.8,
-      "min_carry": 100,
-      "increment_pct": 0.08,
-      "bid_window": [
-        0.1,
-        0.85
-      ],
-      "interest": {
-        "equipment": [
-          "贪财",
-          "阴鸷",
-          "豪爽"
-        ],
-        "technique": [
-          "迂腐",
-          "高冷",
-          "痴丹"
-        ]
-      }
-    },
-    "stat_cap_over_tier": 3,
-    "bots_compete_for_defense_rewards": true
-  },
-  "tianjiao": {
-    "ascend_after_days": 14,
-    "ascend_chance": 0.3
+  "高冷": {
+   "carry": 0.2,
+   "spend": 0.07
   }
+ },
+ "pill_price": {
+  "筑基丹": 1000,
+  "凝丹丹": 3000,
+  "化婴丹": 8000
+ },
+ "refill_rate": 0.02,
+ "refill_min_per_day": 5,
+ "materials": {
+  "discount": 0.25,
+  "jobs_per_day": 3,
+  "daily_cap_value_per_bot": 2.6,
+  "keep_per_item": 20,
+  "keep_equipment": 6
+ },
+ "ceiling": {
+  "override": null,
+  "floor": "炼气期"
+ },
+ "wild": {
+  "trip_chance": 0.15
+ },
+ "combat": {
+  "power_bonus": {
+   "炮灰": 0.0,
+   "正常": 0.2,
+   "天骄": 0.5
+  },
+  "rob": {
+   "share": 0.15,
+   "cap": 150,
+   "per_human_per_day": 3
+  },
+  "kill": {
+   "share": 0.3,
+   "cap": 300,
+   "per_human_per_day": 5,
+   "global_per_day": 4
+  },
+  "cost": {
+   "rob": {
+    "reputation": 1,
+    "favor": -40
+   },
+   "cripple": {
+    "reputation": 2,
+    "favor": -60
+   },
+   "kill": {
+    "reputation": 5,
+    "reputation_tianjiao": 10
+   }
+  },
+  "reaction": {
+   "豪爽": {
+    "release": 90,
+    "rob": 10
+   },
+   "憨直": {
+    "release": 100
+   },
+   "痴丹": {
+    "release": 100
+   },
+   "话痨": {
+    "release": 90,
+    "rob": 10
+   },
+   "迂腐": {
+    "release": 100
+   },
+   "高冷": {
+    "release": 85,
+    "rob": 15
+   },
+   "贪财": {
+    "release": 20,
+    "rob": 70,
+    "kill": 10
+   },
+   "阴鸷": {
+    "release": 20,
+    "rob": 50,
+    "kill": 30
+   }
+  },
+  "captive_rob": {
+   "share": 0.15,
+   "cap": 150
+  },
+  "can_kill_humans": true,
+  "kill_protect_below": "筑基期1层"
+ },
+ "public_events": {
+  "migrate_share": 0.25,
+  "join_chance": 0.7,
+  "defense_chance": 0.6,
+  "activity_reward_budget_per_event": 40000,
+  "auction": {
+   "bidders_per_lot": 3,
+   "max_bids_per_lot": 3,
+   "max_multiple": 3.0,
+   "carry_share": 0.8,
+   "min_carry": 100,
+   "increment_pct": 0.08,
+   "bid_window": [
+    0.1,
+    0.85
+   ],
+   "interest": {
+    "equipment": [
+     "贪财",
+     "阴鸷",
+     "豪爽"
+    ],
+    "technique": [
+     "迂腐",
+     "高冷",
+     "痴丹"
+    ]
+   }
+  },
+  "stat_cap_over_tier": 3,
+  "bots_compete_for_defense_rewards": true,
+  "meet_pairs_per_event": 40
+ },
+ "tianjiao": {
+  "ascend_after_days": 14,
+  "ascend_chance": 0.3
+ },
+ "world": {
+  "max_bots": 20000,
+  "default_count": 2000,
+  "max_per_batch": 2000,
+  "tier_weights": {
+   "炮灰": 60,
+   "正常": 35,
+   "天骄": 5
+  },
+  "tiers": {
+   "炮灰": {
+    "realms": [
+     "炼气期1层",
+     "炼气期5层"
+    ],
+    "stats": [
+     3,
+     6
+    ],
+    "stones": [
+     0,
+     100
+    ]
+   },
+   "正常": {
+    "realms": [
+     "炼气期4层",
+     "筑基期3层"
+    ],
+    "stats": [
+     4,
+     8
+    ],
+    "stones": [
+     50,
+     400
+    ]
+   },
+   "天骄": {
+    "realms": [
+     "筑基期3层",
+     "结丹期初期"
+    ],
+    "stats": [
+     7,
+     11
+    ],
+    "stones": [
+     300,
+     1500
+    ]
+   }
+  },
+  "raid_keep_days": 3
+ }
 }

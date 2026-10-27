@@ -3,32 +3,39 @@ import time
 import discord
 
 from sqlalchemy import text
+from utils import rules
 from utils.db_async import AsyncSessionLocal
 from utils.views.base import TimedView
 
-WANBAO_DESC = (
-    "每日北美东部时间 **20:00**，万宝楼将举办大型拍卖会。\n\n"
-    "**官方拍品**\n"
-    "· 每次官方出 **8 件**：2件功法、2件丹药、2件灵材、2件装备\n"
-    "· 按稀有度权重随机生成，偶有珍稀之物\n\n"
-    "**玩家上架**\n"
-    "· 每位道友最多上架 **2 件**，全场上限 **20 件**\n"
-    "· 上架需支付 **300 灵石** 手续费\n"
-    "· 流拍需额外支付 **300 灵石** 取回费\n"
-    "· 拍卖开始后无法继续上架，请提前到场\n\n"
-    "**竞拍规则**\n"
-    "· 每件拍品竞拍时间 **2 分钟**，按顺序逐件进行\n"
-    "· 出价按钮：+10 / +100 / +200 / +500 / +1000\n"
-    "· 出价时灵石自动冻结，被超越后立即解冻\n"
-    "· 成交后万宝楼收取 **8%** 手续费，卖家实收 92%\n"
-    "· 功法得标后进入背包，可学习或留作交易\n"
-    "· 装备得标后直接入库\n\n"
-    "**注意事项**\n"
-    "· 拍卖期间在万宝楼内无法闭关、采集、探险\n"
-    "· 茶馆暂停营业\n"
-    "· 18:00 起公告频道发布预告，附前往按钮\n\n"
-    "**触发时间**：每日 20:00（北美东部时间），18:00 起预告"
-)
+def wanbao_desc() -> str:
+    """万宝楼说明（面板里给玩家看）：件数、手续费、竞拍时长都取自 data/game_rules.json 的 wanbao，调参后跟着变。"""
+    c = rules.section("wanbao")
+    o = c["official"]
+    total = sum(o.values())
+    return (
+        "每日北美东部时间 **20:00**，万宝楼将举办大型拍卖会。\n\n"
+        "**官方拍品**\n"
+        f"· 每次官方出 **{total} 件**：{o['techniques']}件功法、{o['pills']}件丹药、{o['materials']}件灵材、{o['equipment']}件装备\n"
+        "· 按稀有度权重随机生成，偶有珍稀之物\n\n"
+        "**玩家上架**\n"
+        f"· 每位道友最多上架 **{c['max_player_lots']} 件**，全场上限 **{c['max_lots']} 件**\n"
+        f"· 上架需支付 **{c['listing_fee']} 灵石** 手续费\n"
+        f"· 流拍需额外支付 **{c['listing_fee']} 灵石** 取回费\n"
+        "· 拍卖开始后无法继续上架，请提前到场\n\n"
+        "**竞拍规则**\n"
+        f"· 每件拍品竞拍时间 **{c['lot_seconds'] // 60} 分钟**，按顺序逐件进行\n"
+        "· 出价按钮：+10 / +100 / +200 / +500 / +1000\n"
+        "· 出价时灵石自动冻结，被超越后立即解冻\n"
+        f"· 成交后万宝楼收取 **{round(c['commission'] * 100)}%** 手续费，卖家实收 {round((1 - c['commission']) * 100)}%\n"
+        "· 功法得标后进入背包，可学习或留作交易\n"
+        "· 装备得标后直接入库\n\n"
+        "**注意事项**\n"
+        "· 拍卖期间在万宝楼内无法闭关、采集、探险\n"
+        "· 茶馆暂停营业\n"
+        "· 18:00 起公告频道发布预告，附前往按钮\n\n"
+        "**触发时间**：每日 20:00（北美东部时间），18:00 起预告"
+    )
+
 
 WANBAO_TRIGGER_HOUR = 20
 
@@ -42,7 +49,7 @@ class _WanbaoEventButton(discord.ui.Button):
         from utils.events.public.wanbao import get_active_auction, get_lots
         auction = await get_active_auction()
 
-        embed = discord.Embed(title="✦ 万宝楼大型拍卖会 ✦", description=WANBAO_DESC, color=discord.Color.gold())
+        embed = discord.Embed(title="✦ 万宝楼大型拍卖会 ✦", description=wanbao_desc(), color=discord.Color.gold())
 
         if auction:
             lots = await get_lots(auction["auction_id"])
@@ -118,7 +125,7 @@ class _WanbaoDetailView(TimedView):
         await interaction.response.defer(ephemeral=True)
         from utils.events.public.wanbao import get_active_auction, get_lots, get_last_ended_auction, get_or_create_auction
         from utils.views.wanbao import WanbaoMainView, build_lots_list_embed, _item_display
-        from utils.views.wanbao_public import WANBAO_DESC, WANBAO_TRIGGER_HOUR
+        from utils.views.wanbao_public import WANBAO_TRIGGER_HOUR, wanbao_desc
         auction = await get_active_auction()
         if not auction:
             from datetime import datetime
@@ -126,7 +133,7 @@ class _WanbaoDetailView(TimedView):
             today_str = datetime.now(ZoneInfo("America/Montreal")).strftime("%Y-%m-%d")
             auction = await get_or_create_auction(today_str)
         if not auction or auction["status"] == "ended":
-            embed = discord.Embed(title="✦ 万宝楼大型拍卖会 ✦", description=WANBAO_DESC, color=discord.Color.gold())
+            embed = discord.Embed(title="✦ 万宝楼大型拍卖会 ✦", description=wanbao_desc(), color=discord.Color.gold())
             embed.add_field(name="今日状态", value=f"🟡 等待开始　北美东部时间 **{WANBAO_TRIGGER_HOUR}:00** 开始", inline=False)
             last = await get_last_ended_auction()
             if last:
@@ -153,7 +160,7 @@ class _WanbaoDetailView(TimedView):
         embed = discord.Embed(title="✦ 万宝楼拍卖会 ✦", description=f"状态：**{status_text}**　拍品：**{len(lots)}** 件", color=discord.Color.gold())
         if auction["status"] == "pending":
             embed.add_field(name="开始时间", value=f"北美东部时间 **{WANBAO_TRIGGER_HOUR}:00**", inline=True)
-            embed.add_field(name="提示", value="拍卖开始前可上架物品（每人最多2件），开始后无法继续上架。", inline=False)
+            embed.add_field(name="提示", value=f"拍卖开始前可上架物品（每人最多{rules.section('wanbao')['max_player_lots']}件），开始后无法继续上架。", inline=False)
         view = WanbaoMainView(interaction.user, self.pe_cog)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 

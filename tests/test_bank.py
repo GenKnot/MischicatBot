@@ -11,11 +11,15 @@ import pytest
 
 from tests.conftest import make_player
 from utils import bank
-from utils.bank import (BANK_CITIES, MIN_DEPOSIT, TRANSFER_MAX, deposit_demand, deposit_term, get_bank_account,
+from utils import rules
+from utils.bank import (BANK_CITIES, deposit_demand, deposit_term, get_bank_account,
                         get_term_deposits, transfer, withdraw_demand, withdraw_term)
 
 U = "1001"
 YEAR = 7200                      # 一游戏年 = 2 小时 = 7200 秒
+
+MIN_DEPOSIT = rules.get("bank.min_deposit")
+TRANSFER_MAX = rules.get("bank.transfer_max")
 
 
 async def _add(db, uid=U, stones=100_000, city="灵虚城", **kw):

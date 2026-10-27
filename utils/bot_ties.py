@@ -77,6 +77,10 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
             errors.append(f"daily.{key} 应在 0~1")
     if not 2 <= cfg.get("daily", {}).get("bond_max", 0) <= 8:
         errors.append("daily.bond_max 应在 2~8")
+    if cfg.get("daily", {}).get("quarrel_aff_base", -1) < 1 or cfg.get("daily", {}).get("party_meet_pairs", -1) < 0:
+        errors.append("daily.quarrel_aff_base 应 ≥ 1（亲和度最高 1），party_meet_pairs 应 ≥ 0")
+    if cfg.get("player", {}).get("enemy_recover_margin", -1) < 0:
+        errors.append("player.enemy_recover_margin 不能为负")
     for key in ("same", "other"):
         if not 0 < cfg.get("city", {}).get(key, 0) <= 1:
             errors.append(f"city.{key} 应在 (0, 1]")
@@ -325,7 +329,7 @@ def social_book(book: TieBook, rng, cfg: dict | None = None) -> Counter:
             continue
         aff = affinity(a["arche"], b["arche"], cfg)
         if row["kind"] == "朋友":
-            if rng.random() < d["quarrel_base"] * (1.5 - aff) * (a["vengeful"] + b["vengeful"]) / 100:
+            if rng.random() < d["quarrel_base"] * (d["quarrel_aff_base"] - aff) * (a["vengeful"] + b["vengeful"]) / 100:
                 book.set(key, kind="仇敌", strength=rng.randint(*cfg["start_strength"]["仇敌"]), note="反目", bond_id="")
                 book.events.append(("quarrel", key[0], key[1]))
                 sm["quarrels"] += 1
@@ -376,7 +380,7 @@ async def social_day(day: str, rng=None, force: bool = False) -> dict:
 
 # ---- 共同经历 ---------------------------------------------------------------
 
-async def meet_group(ids: list[str], context: str, rng=None, max_pairs: int = 8) -> int:
+async def meet_group(ids: list[str], context: str, rng=None, max_pairs: int | None = None) -> int:
     """一群机器人共同经历了一件事（组队 / 公共事件）：随机抽几对，按概率认识 / 加深。返回新认识的对数。出错只记 warning。"""
     rng = rng or random.Random()
     bots = [i for i in dict.fromkeys(ids) if is_bot_id(i)]
@@ -384,6 +388,7 @@ async def meet_group(ids: list[str], context: str, rng=None, max_pairs: int = 8)
         return 0
     try:
         cfg = load()
+        max_pairs = cfg["daily"]["party_meet_pairs"] if max_pairs is None else max_pairs
         async with AsyncSessionLocal() as session:
             await session.execute(update(Player).where(Player.discord_id == "").values(discord_id=""))
             book = TieBook(await _load_infos(session, bots), await _load_ties(session, bots))
@@ -480,7 +485,7 @@ async def sync_player_tie(player_id: str, bot_id: str, favor: int) -> None:
             elif favor >= cfg["friend_favor"]:
                 want = "朋友" if kind in (None, "相识", "仇敌") else None
             else:
-                want = "相识" if kind is None else ("相识" if kind == "仇敌" and favor > cfg["enemy_favor"] + 20 else None)
+                want = "相识" if kind is None else ("相识" if kind == "仇敌" and favor > cfg["enemy_favor"] + cfg["enemy_recover_margin"] else None)
             if want is None:
                 return
             if row is None:

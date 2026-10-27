@@ -1,0 +1,817 @@
+{
+ "_说明": "游戏规则的数值（utils/rules.py）。这里是默认值，管理员可以用 cat!调参 在游戏里改。bank：钱庄（demand_rate 活期年利率；terms 定期档位，年限 + 年利率；min_deposit 定期每笔最低；transfer_fee_rate / transfer_max 转账手续费率 / 单次上限）。market：坊市（max_listings 同时上架数；fee_rate 成交手续费率；listing_ttl_hours 上架多少小时自动下架）。roulette：轮转赌坊（bet 每次下注；daily_limit 每日次数；slots 每格的倍率和占几格，期望倍率必须 ≤ 1）。jobs：打工（cooldown_seconds 两次打工间隔；daily_limit 每日次数）。explore：探险（limit 每个窗口的次数；reset_years 窗口多少游戏年重置，1 游戏年 = 现实 2 小时）。party：组队（max_size 队伍人数上限）。tavern：茶馆任务耗时（游戏年，按任务品阶）。 alchemy：炼丹（daily_limit 每日次数；no_yanhuo_cap 没有炎火时品质最高到第几档；exp_per_craft 每次成功炼丹得多少炼丹经验；quality_multipliers 十二档品质对应的效果倍率；exp_thresholds 每个炼丹师品级需要的累计经验；mastery_stages 熟练度阶段（炼制次数起点 / 称号 / 品质加成，最后一档是『炉火纯青』，成功率另加 success.master_bonus）；quality 品质 = 随机 0~roll_max + 神识 × soul_factor + 各种加成；success 成功率修正；failure 失败后果：plain_p 普通失败、ruin_p 炉毁（扣寿元 ruin_loss），其余是丹毒反噬（扣寿元 poison_loss））。 forging：炼器（daily_limit 每日锻造次数；exp_per_craft 每次成功得多少炼器经验；exp_thresholds 炼器师品级所需累计经验；slot_ore_qty 各部位要几块主矿石；mastery_stages 熟练度阶段（次数起点 / 称号 / 成功率加成）；success 成功率 = base − 品质档 × per_quality + (炼器品级−1) × per_level + min(根骨 ÷ bone_div, bone_cap) + 熟练度加成，夹在 min~max 之间；failure 失败后果：plain_p 普通失败，其余走火（扣寿元 fire_loss）；reforge 淬炼：灵石 = base_cost × 品质倍数，要 ore_qty 块同品级矿石；exam_cost / exam_materials 入门考核的费用和送的材料）。alchemy.exam_cost / exam_refill_cost：丹阁炼丹入门考核的费用和补材料的费用。 gathering：采集（options 可选的采集时长，单位游戏年，按钮文字由它自动生成；rarity_base 各稀有度的基础权重；rarity_time / rarity_realm 采集越久 / 境界越高，稀有项权重加成（每年 / 每层境界 + 上限）；rarity_scale 珍贵、绝世吃这些加成的比例；rolls 抽取次数 = 年数 × per_year + 境界 ÷ realm_div + 随机；element_bias_p 地域属性偏向的概率；max_cooldown_reduction 冷却缩减上限；min_actual_years 缩减后最短采集时长）。 character：角色与修炼（base_stats 创建角色的基础属性和灵石；spirit_root_speed 各灵根的修炼速度倍数；spirit_root_odds 创建 / 机器人生成时抽到各灵根的相对权重（默认加起来是 100，所以也是百分比；改任何一项，别的自动按比例变）；realm_lifespan 各大境界的寿元上限；cultivation：每游戏年基础修为 base_per_year × (1 + (悟性 − comprehension_base) × comprehension_step) × 灵根倍数，离线超过 auto_threshold_years 游戏年自动修炼结算）；residence 城中置业（修炼加成 / 探险次数加成 / 中州以外价格 / 中州价格 / 所需声望）；cave 洞府（同上，全局生效）。 realms：境界体系的节奏（cultivation_needed 每个小境突破所需修为：前 10 层 tier1、再 10 层 tier2、其后 late_base + 序号 × late_step；lifespan_max 每个小境的寿元上限：前 20 层按『起点 + 序号 × 步长』，其后查 table；breakthrough 突破成功率：前 20 层按『起点 − 序号 × 步长』，其后查 late_rates，再往后 late_default；stat_bonus 体魄 / 根骨每高 1 点加的成功率；overflow_bonus 修为溢出的加成；cap / floor 成功率上下限；failure 突破失败后果：序号 < split_index 的用 early_weights，否则 late_weights，三种失败各自的权重，减半修为、重伤扣寿元 1/heavy_loss_div、走火扣 1/deviate_loss_div；technique_slots 各境界起的功法栏位数）。 combat：战斗（realm_step 战力 = 属性总和 × (1 + 境界序号 × realm_step)；noise 每次比拼双方战力各乘一个 [最小, 最大] 的随机数；escape 逃跑成功率 = base + 神识 × per_soul + 境界序号 × per_realm + 加成，夹在 min~max）。quests：茶馆战斗任务（noise 战力随机范围；normal_drop_chance 普通任务掉装备的概率；drops 各品阶任务的装备品质权重；escape_loss 打输但逃掉时按品阶扣的寿元；death 没逃掉时的死亡概率 = min(cap, base + 战力差 ÷ (敌人战力 × gap_div))；fail_loss 没死也没逃掉时扣的寿元 [最小, 最大]）。rebirth：转世（mult_step 每转一世加成倍数多 mult_step；stat_keep 保留上一世超出 5 点的属性的比例；start_stones 转世后的初始灵石；yinyang_chance 触发『阴阳』奇遇的概率）。 gates：三道大关（筑基 / 凝丹 / 化婴）的突破率（百分数）：root_base 各灵根的基础值（default_root_base 查不到时用）；筑基 = 基础 + 悟性 × comprehension + 机缘 × fortune；凝丹 = 基础 × base_factor + 悟性 × comprehension + 根骨 × bone；化婴 = 基础 × base_factor + 悟性 × comprehension + 神识 × soul；用了破境丹再加 pill；总和不超过 cap；悟性 + 机缘 ≥ skip_pill_min 的人可以免丹冲击筑基。 equipment：装备生成（quality_mult 各品质的基础属性倍数；affix_count 各品质的词缀数量 [最少, 最多]（词缀 1 个是前缀，2 个是前缀 + 后缀 / 第二个前缀，3 个再多一个）；random_quality_weights 没指定品质时随机品质的权重；基础值 = 1 + 境界档 ÷ tier_div；词缀强度 = max(1, 基础值 × affix_scale)；noise 每条属性各乘一个随机数；second_prefix_p 第二个词缀是前缀（而不是后缀）的概率）。 techniques：功法修炼（stage_cost 从某一阶段升到下一阶段要的灵石基数；stage_years 要的游戏年数；grade_cost 功法品阶对灵石的倍数（实际灵石 = 基数 × 倍数）；stat_mult 各阶段对属性加成（悟性、体魄等）的倍数；pct_mult 各阶段对百分比类加成（修炼速度、逃跑率、寿元）的倍数）。 spirit_rain：天降灵雨（beast_tide_chance 同时有兽潮的概率；max_activities 每人每场最多几次非守城活动（真人和机器人一样）；activity_cooldown_seconds 两次活动间隔；temper_min_physique 淬体要的体魄；defense 守城结算：base 每个守城者的基础奖励，rank1 / rank23 / rest 贡献榜第 1 名 / 第 2~3 名 / 其余的灵石范围 + 声望 + 稀有装备件数，list_max 榜单最多列几名，power_noise 战力贡献的随机范围；slacker 兽潮时袖手旁观者被扣寿元的概率和范围；crystal / enlighten / temper 三种活动的奖励）。wanbao：万宝楼拍卖（commission 成交手续费率；listing_fee 玩家上架费（流拍取回费同）；max_lots 全场拍品上限；max_player_lots 每人上架上限；lot_seconds 每件拍品竞拍秒数；preview_before_seconds 预告提前多少秒；official 每次官方出的各类拍品件数；grade_weights / rarity_weights 抽官方拍品时各品阶 / 稀有度的权重；start_price 起拍价；equipment_quality_weights 官方装备的品质权重；equipment_tier 官方装备的境界档范围）。",
+ "bank": {
+  "demand_rate": 0.001,
+  "min_deposit": 20000,
+  "transfer_fee_rate": 0.02,
+  "transfer_max": 50000,
+  "terms": [
+   {
+    "years": 10,
+    "rate": 0.01
+   },
+   {
+    "years": 15,
+    "rate": 0.0125
+   },
+   {
+    "years": 20,
+    "rate": 0.015
+   },
+   {
+    "years": 50,
+    "rate": 0.0175
+   },
+   {
+    "years": 100,
+    "rate": 0.04
+   },
+   {
+    "years": 500,
+    "rate": 0.05
+   }
+  ]
+ },
+ "market": {
+  "max_listings": 5,
+  "fee_rate": 0.08,
+  "listing_ttl_hours": 72
+ },
+ "roulette": {
+  "bet": 500,
+  "daily_limit": 5,
+  "slots": [
+   {
+    "multiplier": 0.0,
+    "emoji": "💀",
+    "count": 6
+   },
+   {
+    "multiplier": 0.5,
+    "emoji": "🌑",
+    "count": 3
+   },
+   {
+    "multiplier": 1.0,
+    "emoji": "⚪",
+    "count": 1
+   },
+   {
+    "multiplier": 2.0,
+    "emoji": "🟡",
+    "count": 1
+   },
+   {
+    "multiplier": 5.0,
+    "emoji": "🔥",
+    "count": 1
+   },
+   {
+    "multiplier": 10.0,
+    "emoji": "💎",
+    "count": 0
+   }
+  ]
+ },
+ "jobs": {
+  "cooldown_seconds": 1800,
+  "daily_limit": 3
+ },
+ "explore": {
+  "limit": 8,
+  "reset_years": 5
+ },
+ "party": {
+  "max_size": 4
+ },
+ "tavern": {
+  "quest_years": {
+   "普通": 1,
+   "精英": 1,
+   "传说": 1
+  },
+  "gather_years": {
+   "普通": 2,
+   "精英": 2,
+   "传说": 2
+  }
+ },
+ "alchemy": {
+  "daily_limit": 6,
+  "no_yanhuo_cap": 8,
+  "exp_per_craft": 10,
+  "quality_multipliers": [
+   1.0,
+   1.1,
+   1.2,
+   1.35,
+   1.5,
+   2.0,
+   2.5,
+   3.2,
+   4.2,
+   5.5,
+   7.5,
+   12.0
+  ],
+  "exp_thresholds": [
+   0,
+   0,
+   50,
+   150,
+   300,
+   500,
+   800,
+   1200,
+   1800,
+   2500
+  ],
+  "mastery_stages": [
+   {
+    "crafts": 0,
+    "label": "生疏",
+    "bonus": 0
+   },
+   {
+    "crafts": 10,
+    "label": "熟悉",
+    "bonus": 1
+   },
+   {
+    "crafts": 30,
+    "label": "精通",
+    "bonus": 2
+   },
+   {
+    "crafts": 100,
+    "label": "炉火纯青",
+    "bonus": 3
+   }
+  ],
+  "quality": {
+   "roll_max": 6,
+   "soul_factor": 0.5
+  },
+  "success": {
+   "master_bonus": 15,
+   "free_mix_factor": 0.7,
+   "min": 5,
+   "max": 95
+  },
+  "failure": {
+   "plain_p": 0.7,
+   "ruin_p": 0.2,
+   "ruin_loss": [
+    1,
+    5
+   ],
+   "poison_loss": [
+    5,
+    15
+   ]
+  },
+  "exam_cost": 500,
+  "exam_refill_cost": 300
+ },
+ "forging": {
+  "daily_limit": 5,
+  "exp_per_craft": 12,
+  "exp_thresholds": [
+   0,
+   0,
+   80,
+   200,
+   400,
+   700,
+   1100,
+   1600,
+   2300,
+   3200
+  ],
+  "slot_ore_qty": {
+   "武器": 3,
+   "防具": 3,
+   "饰品": 2
+  },
+  "mastery_stages": [
+   {
+    "crafts": 0,
+    "label": "生疏",
+    "bonus": 0
+   },
+   {
+    "crafts": 10,
+    "label": "熟悉",
+    "bonus": 5
+   },
+   {
+    "crafts": 30,
+    "label": "精通",
+    "bonus": 12
+   },
+   {
+    "crafts": 100,
+    "label": "炉火纯青",
+    "bonus": 20
+   }
+  ],
+  "success": {
+   "base": 85,
+   "per_quality": 15,
+   "per_level": 5,
+   "bone_div": 3,
+   "bone_cap": 10,
+   "min": 5,
+   "max": 95
+  },
+  "failure": {
+   "plain_p": 0.8,
+   "fire_loss": [
+    1,
+    5
+   ]
+  },
+  "reforge": {
+   "base_cost": 200,
+   "ore_qty": 2,
+   "cost_multiplier": {
+    "普通": 1,
+    "精良": 2,
+    "稀有": 4,
+    "史诗": 8,
+    "传说": 15
+   }
+  },
+  "exam_cost": 500,
+  "exam_materials": {
+   "铜矿石": 6,
+   "铁矿石": 3
+  }
+ },
+ "gathering": {
+  "options": [
+   0.25,
+   0.5,
+   1,
+   2,
+   3,
+   5
+  ],
+  "rarity_base": {
+   "普通": 70,
+   "稀有": 20,
+   "珍贵": 5,
+   "绝世": 0.3
+  },
+  "rarity_time": {
+   "per_year": 1.5,
+   "cap": 8
+  },
+  "rarity_realm": {
+   "per_realm": 0.3,
+   "cap": 10
+  },
+  "rarity_scale": {
+   "珍贵_time": 0.3,
+   "珍贵_realm": 0.3,
+   "绝世_time": 0.05,
+   "绝世_realm": 0.08
+  },
+  "rolls": {
+   "per_year": 2,
+   "realm_div": 5
+  },
+  "element_bias_p": 0.4,
+  "max_cooldown_reduction": 0.9,
+  "min_actual_years": 0.25
+ },
+ "character": {
+  "base_stats": {
+   "comprehension": 5,
+   "physique": 5,
+   "fortune": 5,
+   "bone": 5,
+   "soul": 5,
+   "spirit_stones": 50
+  },
+  "spirit_root_speed": {
+   "单灵根": 2.0,
+   "双灵根": 1.5,
+   "三灵根": 1.2,
+   "四灵根": 0.9,
+   "五灵根": 0.7,
+   "变异灵根": 1.8
+  },
+  "spirit_root_odds": {
+   "单灵根": 1,
+   "双灵根": 9,
+   "三灵根": 20,
+   "四灵根": 35,
+   "五灵根": 30,
+   "变异灵根": 5
+  },
+  "realm_lifespan": {
+   "炼气期": 100,
+   "筑基期": 200,
+   "结丹期": 450,
+   "元婴期": 1000,
+   "化神期": 2000,
+   "炼虚期": 3000,
+   "合体期": 5000,
+   "大乘期": 10000
+  },
+  "cultivation": {
+   "base_per_year": 10,
+   "comprehension_base": 5,
+   "comprehension_step": 0.05,
+   "auto_threshold_years": 2
+  },
+  "residence": {
+   "bonus": 0.1,
+   "explore_bonus": 2,
+   "price_normal": 5000,
+   "price_central": 10000,
+   "reputation": 300
+  },
+  "cave": {
+   "bonus": 0.25,
+   "explore_bonus": 3,
+   "price": 20000,
+   "reputation": 600
+  }
+ },
+ "realms": {
+  "cultivation_needed": {
+   "tier1": 100,
+   "tier2": 200,
+   "late_base": 400,
+   "late_step": 100,
+   "unknown": 100
+  },
+  "lifespan_max": {
+   "tier1_base": 100,
+   "tier1_step": 5,
+   "tier2_base": 200,
+   "tier2_step": 10,
+   "unknown": 100,
+   "table": {
+    "结丹期初期": 400,
+    "结丹期中期": 450,
+    "结丹期后期": 500,
+    "元婴期初期": 800,
+    "元婴期中期": 900,
+    "元婴期后期": 1000,
+    "化神期初期": 1500,
+    "化神期中期": 1800,
+    "化神期后期": 2000,
+    "炼虚期初期": 2500,
+    "炼虚期中期": 2800,
+    "炼虚期后期": 3000,
+    "合体期初期": 4000,
+    "合体期中期": 4500,
+    "合体期后期": 5000,
+    "大乘期初期": 8000,
+    "大乘期中期": 9000,
+    "大乘期后期": 10000,
+    "真仙初期": 20000,
+    "真仙中期": 25000,
+    "真仙后期": 30000,
+    "金仙初期": 50000,
+    "金仙中期": 60000,
+    "金仙后期": 80000,
+    "太乙初期": 100000,
+    "太乙中期": 120000,
+    "太乙后期": 150000,
+    "大罗初期": 200000,
+    "大罗中期": 250000,
+    "大罗后期": 300000,
+    "道祖": 999999
+   }
+  },
+  "breakthrough": {
+   "tier1_base": 0.9,
+   "tier1_step": 0.01,
+   "tier2_base": 0.8,
+   "tier2_step": 0.02,
+   "late_rates": [
+    0.6,
+    0.5,
+    0.4,
+    0.35,
+    0.28,
+    0.22,
+    0.18,
+    0.14,
+    0.11,
+    0.09,
+    0.07,
+    0.06,
+    0.05,
+    0.04,
+    0.03,
+    0.025,
+    0.02,
+    0.015,
+    0.012,
+    0.01,
+    0.008,
+    0.006,
+    0.005,
+    0.004,
+    0.003
+   ],
+   "late_default": 0.002,
+   "unknown": 0.5,
+   "stat_bonus": 0.02,
+   "overflow_bonus": 0.05,
+   "cap": 0.95,
+   "floor": 0.01
+  },
+  "failure": {
+   "split_index": 20,
+   "early_weights": {
+    "light": 0.7,
+    "heavy": 0.25,
+    "deviate": 0.05
+   },
+   "late_weights": {
+    "light": 0.3,
+    "heavy": 0.5,
+    "deviate": 0.2
+   },
+   "cultivation_keep": 0.5,
+   "heavy_loss_div": 10,
+   "deviate_loss_div": 4
+  },
+  "technique_slots": {
+   "炼气期1层": 5,
+   "筑基期1层": 7,
+   "结丹期初期": 9,
+   "元婴期初期": 12,
+   "化神期初期": 17,
+   "炼虚期初期": 20,
+   "合体期初期": 23,
+   "大乘期初期": 26,
+   "真仙初期": 29,
+   "金仙初期": 32,
+   "太乙初期": 35,
+   "大罗初期": 38,
+   "道祖": 41
+  }
+ },
+ "combat": {
+  "realm_step": 0.15,
+  "noise": [
+   0.85,
+   1.15
+  ],
+  "escape": {
+   "base": 0.3,
+   "per_soul": 0.01,
+   "per_realm": 0.005,
+   "min": 0.05,
+   "max": 0.9
+  }
+ },
+ "quests": {
+  "noise": [
+   0.85,
+   1.15
+  ],
+  "normal_drop_chance": 0.3,
+  "drops": {
+   "普通": {
+    "普通": 70,
+    "精良": 30
+   },
+   "精英": {
+    "精良": 60,
+    "稀有": 40
+   },
+   "传说": {
+    "稀有": 50,
+    "史诗": 35,
+    "传说": 15
+   }
+  },
+  "escape_loss": {
+   "普通": 2,
+   "精英": 5,
+   "传说": 10
+  },
+  "death": {
+   "base": 0.1,
+   "cap": 0.6,
+   "gap_div": 2
+  },
+  "fail_loss": [
+   10,
+   30
+  ]
+ },
+ "rebirth": {
+  "mult_step": 0.5,
+  "stat_keep": 0.3,
+  "start_stones": 500,
+  "yinyang_chance": 0.0003
+ },
+ "gates": {
+  "root_base": {
+   "单灵根": 90,
+   "双灵根": 75,
+   "三灵根": 60,
+   "变异灵根": 70,
+   "四灵根": 45,
+   "五灵根": 30
+  },
+  "default_root_base": 30,
+  "cap": 95,
+  "skip_pill_min": 20,
+  "zhuji": {
+   "comprehension": 3,
+   "fortune": 2,
+   "pill": 40
+  },
+  "ningdan": {
+   "base_factor": 0.8,
+   "comprehension": 2,
+   "bone": 2,
+   "pill": 35
+  },
+  "huaying": {
+   "base_factor": 0.6,
+   "comprehension": 2,
+   "soul": 2,
+   "pill": 30
+  }
+ },
+ "equipment": {
+  "quality_mult": {
+   "普通": 1.0,
+   "精良": 1.5,
+   "稀有": 2.2,
+   "史诗": 3.5,
+   "传说": 6.0
+  },
+  "affix_count": {
+   "普通": [
+    0,
+    0
+   ],
+   "精良": [
+    1,
+    1
+   ],
+   "稀有": [
+    1,
+    2
+   ],
+   "史诗": [
+    2,
+    2
+   ],
+   "传说": [
+    2,
+    3
+   ]
+  },
+  "random_quality_weights": {
+   "普通": 50,
+   "精良": 30,
+   "稀有": 15,
+   "史诗": 4,
+   "传说": 1
+  },
+  "tier_div": 2,
+  "affix_scale": 0.6,
+  "noise": [
+   0.8,
+   1.2
+  ],
+  "second_prefix_p": 0.5
+ },
+ "techniques": {
+  "stage_cost": {
+   "入门": 500,
+   "熟练": 1000,
+   "精通": 2000,
+   "小成": 4000,
+   "大成": 8000,
+   "圆满": 16000
+  },
+  "stage_years": {
+   "入门": 1,
+   "熟练": 2,
+   "精通": 4,
+   "小成": 8,
+   "大成": 16,
+   "圆满": 32
+  },
+  "grade_cost": {
+   "黄级下品": 0.5,
+   "黄级中品": 0.8,
+   "黄级上品": 1.0,
+   "玄级下品": 2.0,
+   "玄级中品": 3.0,
+   "玄级上品": 4.0,
+   "地级下品": 8.0,
+   "地级中品": 12.0,
+   "地级上品": 16.0,
+   "天级下品": 30.0,
+   "天级中品": 50.0,
+   "天级上品": 80.0
+  },
+  "stat_mult": {
+   "入门": 1,
+   "熟练": 1.5,
+   "精通": 2,
+   "小成": 3,
+   "大成": 4,
+   "圆满": 5,
+   "破限": 7
+  },
+  "pct_mult": {
+   "入门": 1,
+   "熟练": 1.2,
+   "精通": 1.4,
+   "小成": 1.6,
+   "大成": 1.8,
+   "圆满": 2.0,
+   "破限": 2.5
+  }
+ },
+ "spirit_rain": {
+  "beast_tide_chance": 0.3,
+  "max_activities": 2,
+  "activity_cooldown_seconds": 600,
+  "temper_min_physique": 7,
+  "defense": {
+   "base": {
+    "stones": [
+     100,
+     300
+    ],
+    "rep": 5
+   },
+   "rank1": {
+    "stones": [
+     3000,
+     5000
+    ],
+    "rep": 50,
+    "equipment": 2
+   },
+   "rank23": {
+    "stones": [
+     1500,
+     2500
+    ],
+    "rep": 30,
+    "equipment": 1
+   },
+   "rest": {
+    "stones": [
+     300,
+     800
+    ],
+    "rep": 10
+   },
+   "list_max": 8,
+   "power_noise": [
+    0.9,
+    1.1
+   ]
+  },
+  "slacker": {
+   "chance": 0.3,
+   "loss": [
+    5,
+    15
+   ]
+  },
+  "crystal": {
+   "stones": [
+    150,
+    400
+   ],
+   "herb_chance": 0.65,
+   "herb_weights": {
+    "普通": 70,
+    "稀有": 25,
+    "珍贵": 4,
+    "绝世": 1
+   },
+   "herb_count": [
+    1,
+    2
+   ],
+   "qty": [
+    1,
+    2
+   ]
+  },
+  "enlighten": {
+   "stat_chance": 0.15,
+   "cultivation": [
+    80,
+    200
+   ]
+  },
+  "temper": {
+   "physique_chance": 0.12,
+   "bone_chance": 0.08,
+   "cultivation": [
+    100,
+    250
+   ]
+  }
+ },
+ "wanbao": {
+  "commission": 0.08,
+  "listing_fee": 300,
+  "max_lots": 20,
+  "max_player_lots": 2,
+  "lot_seconds": 120,
+  "preview_before_seconds": 7200,
+  "official": {
+   "techniques": 2,
+   "pills": 2,
+   "materials": 2,
+   "equipment": 2
+  },
+  "grade_weights": {
+   "黄级下品": 40,
+   "黄级中品": 30,
+   "黄级上品": 20,
+   "玄级下品": 6,
+   "玄级中品": 3,
+   "玄级上品": 1,
+   "地级下品": 0.4,
+   "地级中品": 0.2,
+   "地级上品": 0.1,
+   "天级下品": 0.05,
+   "天级中品": 0.02,
+   "天级上品": 0.01
+  },
+  "rarity_weights": {
+   "普通": 50,
+   "稀有": 30,
+   "珍贵": 15,
+   "绝世": 5
+  },
+  "start_price": {
+   "technique": {
+    "黄级下品": 500,
+    "黄级中品": 1000,
+    "黄级上品": 2000,
+    "玄级下品": 5000,
+    "玄级中品": 10000,
+    "玄级上品": 20000,
+    "地级下品": 50000,
+    "地级中品": 100000,
+    "地级上品": 200000,
+    "天级下品": 500000,
+    "天级中品": 1000000,
+    "天级上品": 2000000
+   },
+   "pill": {
+    "普通": 100,
+    "稀有": 500,
+    "珍贵": 2000,
+    "绝世": 8000
+   },
+   "material": {
+    "普通": 50,
+    "稀有": 300,
+    "珍贵": 1200,
+    "绝世": 5000
+   },
+   "equipment": {
+    "普通": 800,
+    "精良": 2000,
+    "稀有": 6000,
+    "史诗": 20000,
+    "传说": 80000
+   }
+  },
+  "pill_qty": [
+   1,
+   3
+  ],
+  "material_qty": [
+   1,
+   5
+  ],
+  "equipment_quality_weights": {
+   "普通": 40,
+   "精良": 30,
+   "稀有": 20,
+   "史诗": 8,
+   "传说": 2
+  },
+  "equipment_tier": [
+   1,
+   4
+  ]
+ }
+}

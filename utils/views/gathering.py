@@ -1,5 +1,6 @@
 import random
 import discord
+from utils import rules
 from utils.items.materials import MATERIALS
 from utils.items.wood import WOOD
 from utils.items.fish import FISH
@@ -7,16 +8,23 @@ from utils.items.herbs import HERBS
 from utils.views.base import TimedView
 
 
-GATHER_OPTIONS = [
-    (0.25, "3个月", "现实 30 分钟"),
-    (0.5,  "6个月", "现实 1 小时"),
-    (1,    "1年",   "现实 2 小时"),
-    (2,    "2年",   "现实 4 小时"),
-    (3,    "3年",   "现实 6 小时"),
-    (5,    "5年",   "现实 10 小时"),
-]
+# 可选时长、稀有度权重和加成、抽取次数等数值在 data/game_rules.json 的 gathering（管理员可以调），用的时候读
 
-RARITY_WEIGHTS_BASE = {"普通": 70, "稀有": 20, "珍贵": 5, "绝世": 0.3}
+
+def gather_options() -> list[tuple[float, str, str]]:
+    """[(游戏年数, 按钮文字, 现实时长提示)]，文字由年数生成（1 游戏年 = 现实 2 小时）。"""
+    from utils.character import HOURS_PER_YEAR
+    out = []
+    for years in rules.section("gathering")["options"]:
+        label = f"{years * 12:g}个月" if years < 1 else f"{years:g}年"
+        hours = years * HOURS_PER_YEAR
+        out.append((years, label, f"现实 {hours * 60:g} 分钟" if hours < 1 else f"现实 {hours:g} 小时"))
+    return out
+
+
+def rarity_weights_base() -> dict:
+    return rules.section("gathering")["rarity_base"]
+
 
 REGION_ELEMENT_BIAS = {
     "寒玉窟": "水",
@@ -27,12 +35,14 @@ TYPE_EMOJI = {"采矿": "⛏️", "采药": "🌿", "伐木": "🪓", "钓鱼": 
 
 
 def _rarity_weights(years: float, realm_idx: int) -> dict:
-    w = dict(RARITY_WEIGHTS_BASE)
-    time_bonus = min(years * 1.5, 8)
-    realm_bonus = min(realm_idx * 0.3, 10)
+    g = rules.section("gathering")
+    w = dict(g["rarity_base"])
+    time_bonus = min(years * g["rarity_time"]["per_year"], g["rarity_time"]["cap"])
+    realm_bonus = min(realm_idx * g["rarity_realm"]["per_realm"], g["rarity_realm"]["cap"])
+    sc = g["rarity_scale"]
     w["稀有"] += time_bonus + realm_bonus
-    w["珍贵"] += time_bonus * 0.3 + realm_bonus * 0.3
-    w["绝世"] += time_bonus * 0.05 + realm_bonus * 0.08
+    w["珍贵"] += time_bonus * sc["珍贵_time"] + realm_bonus * sc["珍贵_realm"]
+    w["绝世"] += time_bonus * sc["绝世_time"] + realm_bonus * sc["绝世_realm"]
     return w
 
 
@@ -64,8 +74,9 @@ def _ore_pool(region_name: str | None, gather_type: str = "采矿") -> list[dict
 
 
 def roll_gathering_rewards(years: float, realm_idx: int, region_name: str, gather_type: str = "采矿", gather_bonus: float = 0.0) -> list[tuple[str, int]]:
-    base_count = max(1, int(years * 2))
-    realm_extra = realm_idx // 5
+    rolls = rules.section("gathering")["rolls"]
+    base_count = max(1, int(years * rolls["per_year"]))
+    realm_extra = realm_idx // rolls["realm_div"]
     total_rolls = base_count + realm_extra + random.randint(0, max(1, int(years)))
 
     if gather_bonus > 0:
@@ -84,7 +95,7 @@ def roll_gathering_rewards(years: float, realm_idx: int, region_name: str, gathe
         candidates = [m for m in pool if m["rarity"] == rarity]
         if element_bias:
             biased = [m for m in candidates if m.get("element") == element_bias]
-            if biased and random.random() < 0.4:
+            if biased and random.random() < rules.section("gathering")["element_bias_p"]:
                 candidates = biased
         if not candidates:
             candidates = [m for m in pool if m["rarity"] == "普通"]
@@ -105,7 +116,7 @@ class GatherView(TimedView):
         self.gather_type = gather_type
         self.region_name = region_name
         emoji = TYPE_EMOJI.get(gather_type, "⛏️")
-        for years, label, hint in GATHER_OPTIONS:
+        for years, label, hint in gather_options():
             disabled = player["lifespan"] < years
             self.add_item(GatherButton(years, f"{emoji} {label}（{hint}）", disabled))
 
@@ -174,10 +185,10 @@ class GatherButton(discord.ui.Button):
         # 速灵丹：限时 buff，24 小时内每次采集都生效，不消耗；百草增益丹：一次性，用一次就消耗（B56）。两者叠加。
         timed_reduction = get_buff_value(player, "gather_cooldown_reduction", 0) / 100.0
         once_reduction = get_buff_value(player, "gather_cooldown_reduction_once", 0) / 100.0
-        cooldown_reduction = min(0.9, timed_reduction + once_reduction)
+        cooldown_reduction = min(rules.section("gathering")["max_cooldown_reduction"], timed_reduction + once_reduction)
 
         actual_years = self.years * (1 - cooldown_reduction)
-        actual_years = max(0.25, actual_years)
+        actual_years = max(rules.section("gathering")["min_actual_years"], actual_years)
 
         gathering_until = now + years_to_seconds(actual_years)
         lifespan_cost = math.ceil(actual_years) if actual_years > 0 else 0

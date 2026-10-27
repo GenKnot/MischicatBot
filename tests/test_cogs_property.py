@@ -11,7 +11,11 @@ from tests.discord_fakes import FakeContext
 from cogs.property import PropertyCog
 from utils.residence import get_residences, has_residence
 from utils.world import CITIES, SPECIAL_REGIONS
-from utils.character import CAVE_PRICE, REPUTATION_CAVE, REPUTATION_RESIDENCE
+from utils import rules
+
+CAVE_PRICE = rules.get("character.cave.price")
+REPUTATION_CAVE = rules.get("character.cave.reputation")
+REPUTATION_RESIDENCE = rules.get("character.residence.reputation")
 
 
 @pytest.fixture

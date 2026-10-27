@@ -16,8 +16,9 @@ import pytest
 
 from tests.conftest import make_player
 from utils import cultivation_logic as cl
+from utils import rules
 from utils.character import (
-    CAVE_BONUS, calc_cultivation_gain, years_to_seconds,
+    calc_cultivation_gain, years_to_seconds,
 )
 from utils.realms import cultivation_needed
 
@@ -105,7 +106,7 @@ async def test_开始闭关_预估收益按悟性与灵根算(db):
 async def test_洞府加成计入预估收益(db):
     await _add_player(db, cave="青云洞府")
     res = await cl.start_cultivation(UID, 10)
-    assert res["gain"] == _gain(10, bonus=CAVE_BONUS)
+    assert res["gain"] == _gain(10, bonus=rules.get("character.cave.bonus"))
 
 
 async def test_丹药修炼速度buff计入预估收益(db):

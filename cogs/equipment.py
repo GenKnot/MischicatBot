@@ -129,26 +129,26 @@ class EquipmentCog(commands.Cog, name="Equipment"):
 
             if "cultivation_gain" in effect:
                 gain = effect["cultivation_gain"]
-                from utils.alchemy import QUALITY_MULTIPLIERS
+                from utils.alchemy import quality_multipliers
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
                         quality_idx = QUALITY_NAMES.index(q)
                         break
-                multiplier = QUALITY_MULTIPLIERS[quality_idx]
+                multiplier = quality_multipliers()[quality_idx]
                 gain = int(gain * multiplier)
                 player.cultivation += gain
                 msg_parts.append(f"修为 **+{gain}**")
 
             if "lifespan" in effect:
                 gain = effect["lifespan"]
-                from utils.alchemy import QUALITY_MULTIPLIERS
+                from utils.alchemy import quality_multipliers
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
                         quality_idx = QUALITY_NAMES.index(q)
                         break
-                gain = int(gain * QUALITY_MULTIPLIERS[quality_idx])
+                gain = int(gain * quality_multipliers()[quality_idx])
                 from utils.character import get_effective_lifespan_max
                 p_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}
                 eff_max = get_effective_lifespan_max(p_dict)
@@ -160,13 +160,13 @@ class EquipmentCog(commands.Cog, name="Equipment"):
 
             if "lifespan_extend" in effect:
                 gain = effect["lifespan_extend"]
-                from utils.alchemy import QUALITY_MULTIPLIERS
+                from utils.alchemy import quality_multipliers
                 quality_idx = 0
                 for q in QUALITY_NAMES[1:]:
                     if item_name_clean.startswith(q):
                         quality_idx = QUALITY_NAMES.index(q)
                         break
-                gain = int(gain * QUALITY_MULTIPLIERS[quality_idx])
+                gain = int(gain * quality_multipliers()[quality_idx])
                 player.lifespan += gain
                 from utils.character import get_effective_lifespan_max
                 p_dict = {c.key: getattr(player, c.key) for c in player.__table__.columns}

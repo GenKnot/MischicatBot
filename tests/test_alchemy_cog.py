@@ -18,12 +18,16 @@ from cogs.alchemy import AlchemyCog
 from tests.conftest import make_player
 from tests.discord_fakes import FakeContext
 from utils import alchemy as al
-from utils.alchemy import ALCHEMY_EXP_THRESHOLDS, DAILY_LIMIT, RECIPES, add_alchemy_exp
+from utils import rules
+from utils.alchemy import RECIPES, add_alchemy_exp
 from utils.views.alchemy import AlchemyMainView
 
 U = "1001"
 MASTER = "304758476448595970"
 ROOT = Path(__file__).resolve().parent.parent
+
+DAILY_LIMIT = rules.get("alchemy.daily_limit")
+ALCHEMY_EXP_THRESHOLDS = rules.get("alchemy.exp_thresholds")
 
 
 @pytest.fixture

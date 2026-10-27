@@ -10,12 +10,16 @@ import pytest
 
 from tests.conftest import make_player
 from utils import jobs as jobs_mod
-from utils.jobs import COOLDOWN_SECONDS, JOB_DAILY_LIMIT, JOBS, do_job
+from utils import rules
+from utils.jobs import JOBS, do_job
 
 SWEEP = next(j for j in JOBS if j["id"] == "sweep")          # 无 req、无 risk、无 items
 WITH_ITEMS = next(j for j in JOBS if "items" in j["reward"])
 WITH_RISK = next(j for j in JOBS if "risk" in j)
 WITH_ALCHEMY = next(j for j in JOBS if "alchemy_exp" in j["reward"])
+
+COOLDOWN_SECONDS = rules.get("jobs.cooldown_seconds")
+JOB_DAILY_LIMIT = rules.get("jobs.daily_limit")
 
 
 @pytest.fixture

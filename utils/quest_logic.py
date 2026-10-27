@@ -8,7 +8,7 @@ from utils.db_async import AsyncSessionLocal, Player, Inventory, Equipment
 from utils.combat import calc_power
 from utils.equipment import generate_equipment
 from utils.character import years_to_seconds, seconds_to_years
-from utils import rumors
+from utils import rules, rumors
 from utils.realms import get_realm_index
 
 log = logging.getLogger(__name__)
@@ -207,12 +207,13 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
             )
             party_members = list(party_rows.scalars())
             powers = [await calc_power({c.key: getattr(m, c.key) for c in m.__table__.columns}) for m in party_members]
-            total_power = sum(powers) * random.uniform(0.85, 1.15)
+            total_power = sum(powers) * random.uniform(*rules.section("quests")["noise"])
     else:
-        total_power = (await calc_power(player_dict)) * random.uniform(0.85, 1.15)
+        total_power = (await calc_power(player_dict)) * random.uniform(*rules.section("quests")["noise"])
     
     enemy = quest_data.get("enemy", {})
-    enemy_power = enemy.get("power", 100) * random.uniform(0.85, 1.15)
+    qcfg = rules.section("quests")
+    enemy_power = enemy.get("power", 100) * random.uniform(*qcfg["noise"])
     
     won = total_power > enemy_power
     
@@ -222,27 +223,11 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
         equipment_drop = None
         tier = quest_data.get("tier", "普通")
         
-        if tier == "普通":
-            if random.random() < 0.3:
-                from utils.equipment import get_player_tier
-                realm_idx = get_player_tier(player.realm)
-                quality_pool = ["普通", "精良"]
-                quality_weights = [70, 30]
-                quality = random.choices(quality_pool, weights=quality_weights, k=1)[0]
-                equipment_drop = generate_equipment(tier=realm_idx, quality=quality)
-        elif tier == "精英":
+        if tier in qcfg["drops"] and (tier != "普通" or random.random() < qcfg["normal_drop_chance"]):
             from utils.equipment import get_player_tier
             realm_idx = get_player_tier(player.realm)
-            quality_pool = ["精良", "稀有"]
-            quality_weights = [60, 40]
-            quality = random.choices(quality_pool, weights=quality_weights, k=1)[0]
-            equipment_drop = generate_equipment(tier=realm_idx, quality=quality)
-        elif tier == "传说":
-            from utils.equipment import get_player_tier
-            realm_idx = get_player_tier(player.realm)
-            quality_pool = ["稀有", "史诗", "传说"]
-            quality_weights = [50, 35, 15]
-            quality = random.choices(quality_pool, weights=quality_weights, k=1)[0]
+            weights = qcfg["drops"][tier]
+            quality = random.choices(list(weights), weights=list(weights.values()), k=1)[0]
             equipment_drop = generate_equipment(tier=realm_idx, quality=quality)
         
         await _apply_quest_rewards(discord_id, rewards, player_dict, equipment_drop, party_id)
@@ -261,7 +246,7 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
         
         if escaped:
             tier = quest_data.get("tier", "普通")
-            lifespan_loss = {"普通": 2, "精英": 5, "传说": 10}.get(tier, 2)
+            lifespan_loss = qcfg["escape_loss"].get(tier, qcfg["escape_loss"]["普通"])
             
             died = False
             async with AsyncSessionLocal() as session:
@@ -286,7 +271,8 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
             }
         else:
             power_gap = max(0, enemy_power - total_power)
-            death_chance = min(0.6, 0.1 + power_gap / (enemy.get("power", 100) * 2))
+            dc = qcfg["death"]
+            death_chance = min(dc["cap"], dc["base"] + power_gap / (enemy.get("power", 100) * dc["gap_div"]))
             
             if random.random() < death_chance:
                 async with AsyncSessionLocal() as session:
@@ -307,7 +293,7 @@ async def _resolve_combat_quest(discord_id: str, player: Player, quest_data: dic
                     "quest_name": quest_data.get("title", "任务")
                 }
             else:
-                lifespan_loss = random.randint(10, 30)
+                lifespan_loss = random.randint(*qcfg["fail_loss"])
                 async with AsyncSessionLocal() as session:
                     p = await session.get(Player, discord_id)
                     if p:

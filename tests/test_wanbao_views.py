@@ -251,7 +251,7 @@ async def test_主面板_上架_已达个人上限被拒_否则弹出表单(db):
     await main_view().list_item_btn.callback(i)
     assert isinstance(i.modal, ListItemModal) and i.modal.auction_id == aid
 
-    for n in range(wb.MAX_PLAYER_LOTS):
+    for n in range(wb.max_player_lots()):
         await _sql(db, "INSERT INTO wanbao_lots (lot_id, auction_id, lot_index, seller_id, item_name, quantity, item_type, start_price) "
                        "VALUES (:l, :a, :i, '1', 'x', 1, 'item', 1)", l=f"s{n}", a=aid, i=100 + n)
     i = it()
@@ -283,7 +283,7 @@ def bid_button(view, label):
 
 async def test_公开竞价_是公共面板_超时等于一件拍品的时长(db):
     view = PublicBidView("a", 0, 8)
-    assert view.public is True and view.timeout == wb.LOT_DURATION
+    assert view.public is True and view.timeout == wb.lot_duration()
     assert [b.label for b in view.children] == ["+10", "+100", "+200", "+500", "+1000"]
 
 
@@ -464,7 +464,7 @@ async def test_私人竞价_灵石不足被拒(db):
 async def test_私人竞价_五个增量按钮(db):
     aid, lot, view = await _private(db)
     assert [b.label for b in view.children] == ["+10", "+100", "+200", "+500", "+1000"]
-    assert view.timeout == wb.LOT_DURATION
+    assert view.timeout == wb.lot_duration()
 
 
 # =============================================================================
@@ -501,8 +501,8 @@ async def test_上架表单_成功_扣手续费扣物品_并提示取回费(db):
 
     await modal(aid, name=" 灵芝草 ", qty="2", price="500").on_submit(i)          # 名称两侧的空格会被去掉
 
-    assert i.said("已上架「灵芝草」×2") and i.said(f"{wb.LISTING_FEE}")
-    assert await _stones(db, "1") == 1000 - wb.LISTING_FEE
+    assert i.said("已上架「灵芝草」×2") and i.said(f"{wb.listing_fee()}")
+    assert await _stones(db, "1") == 1000 - wb.listing_fee()
     assert (await db["inventory"].get_inventory("1")).get("灵芝草") == 3
 
 
@@ -657,8 +657,8 @@ async def test_详情面板_返回公共事件总览(db):
 def test_万宝楼说明里公布的规则_与实现一致():
     """说明文字是玩家看到的规则；其中两条曾经与代码不符（B19 出价不冻结、B20 流拍不退物品）。
     这里钉住关键数字，免得改了规则忘了改说明，或反过来。"""
-    d = wp.WANBAO_DESC
+    d = wp.wanbao_desc()
     assert "出价时灵石自动冻结，被超越后立即解冻" in d
-    assert f"**{wb.LISTING_FEE} 灵石** 手续费" in d and f"**{wb.LISTING_FEE} 灵石** 取回费" in d
-    assert f"**{int(wb.AUCTION_COMMISSION * 100)}%**" in d and f"最多上架 **{wb.MAX_PLAYER_LOTS} 件**" in d
-    assert f"全场上限 **{wb.MAX_LOTS} 件**" in d and f"**{wb.LOT_DURATION // 60} 分钟**" in d
+    assert f"**{wb.listing_fee()} 灵石** 手续费" in d and f"**{wb.listing_fee()} 灵石** 取回费" in d
+    assert f"**{int(wb.commission_rate() * 100)}%**" in d and f"最多上架 **{wb.max_player_lots()} 件**" in d
+    assert f"全场上限 **{wb.max_lots()} 件**" in d and f"**{wb.lot_duration() // 60} 分钟**" in d

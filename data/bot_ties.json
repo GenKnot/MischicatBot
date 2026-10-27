@@ -1,5 +1,5 @@
 {
- "_说明": "机器人关系网的配置（U1·江湖百态 P2）。关系种类：相识 / 朋友 / 结拜 / 同门 / 仇敌。所有『结识』都是概率：性格相合（affinity）只提高概率，不保证；合不来的人也可能因共同经历成为朋友。关系容量（认识的人上限）在 data/bot_profiles.json 的 capacity。pairs 里的亲和度是对称的，缺的组合用 default；整体不低于 min。 knowing：结识概率 = base × 亲和度 × 同城 × 境界相近 × 事由，封顶 cap；刚认识时一见如故(friend_first_sight)/一见有梁子(enemy_first_sight)的系数。player.accept_*：真人提结拜时，对方答应的概率 = accept_base + 义气 × accept_per_loyalty。",
+ "_说明": "机器人关系网的配置（U1·江湖百态 P2）。关系种类：相识 / 朋友 / 结拜 / 同门 / 仇敌。所有『结识』都是概率：性格相合（affinity）只提高概率，不保证；合不来的人也可能因共同经历成为朋友。关系容量（认识的人上限）在 data/bot_profiles.json 的 capacity。pairs 里的亲和度是对称的，缺的组合用 default；整体不低于 min。 knowing：结识概率 = base × 亲和度 × 同城 × 境界相近 × 事由，封顶 cap；刚认识时一见如故(friend_first_sight)/一见有梁子(enemy_first_sight)的系数。player.accept_*：真人提结拜时，对方答应的概率 = accept_base + 义气 × accept_per_loyalty。 补充：daily.quarrel_aff_base —— 反目概率 = quarrel_base × (这个数 − 亲和度) × 两人记仇度之和/100（亲和度越低越容易反目）；daily.party_meet_pairs —— 一起组队时最多抽几对机器人互相认识；player.enemy_recover_margin —— 仇敌的好感回到『仇敌线』之上多少才降回『相识』。",
  "affinity": {
   "default": 0.5,
   "min": 0.1,
@@ -254,7 +254,9 @@
   "sworn_loyalty": 55,
   "sworn_chance": 0.01,
   "bond_extend_chance": 0.35,
-  "bond_max": 5
+  "bond_max": 5,
+  "quarrel_aff_base": 1.5,
+  "party_meet_pairs": 8
  },
  "player": {
   "friend_favor": 50,
@@ -263,7 +265,8 @@
   "betray_favor": -10,
   "refuse_cooldown_hours": 24,
   "accept_base": 0.4,
-  "accept_per_loyalty": 0.005
+  "accept_per_loyalty": 0.005,
+  "enemy_recover_margin": 20
  },
  "knowing": {
   "base": 0.7,

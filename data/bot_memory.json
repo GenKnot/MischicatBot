@@ -1,0 +1,13 @@
+{
+ "_说明": "机器人对真人的记忆（utils/bot_memory.py）。max_gifts：礼物只记最近几件；absence_days：上次见面隔几天算『好久不见』；familiar_chats：聊过几次算『聊得熟了』；shared_min：一起组队 / 双修几次后才会提『以前也一起过』（记录发生在说话之前，所以 2 才是真的『以前』）；recall_p：普通回忆概率 = base × 内外向系数（level_factor），不超过 cap；boost_p：关键时刻（结仇后见面、久别重逢）的概率。纯文案，不影响数值。",
+ "max_gifts": 8,
+ "absence_days": 3,
+ "familiar_chats": 5,
+ "shared_min": 2,
+ "recall": {
+  "base": 0.25,
+  "cap": 0.8,
+  "boost_p": 0.6,
+  "level_factor": {"内向": 0.5, "偏内向": 0.8, "中性": 1.0, "偏外向": 1.3, "外向": 1.6}
+ }
+}

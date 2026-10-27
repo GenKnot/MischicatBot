@@ -59,6 +59,16 @@ def validate(cfg: dict, archetypes: list[str] | None = None, origins: list[str] 
     t = cfg.get("thresholds", {})
     if not (0 <= t.get("low", -1) < t.get("high", -1) <= 100):
         errors.append("thresholds 应满足 0 ≤ low < high ≤ 100")
+    if not 0 <= cfg.get("righteous", {}).get("min_kindness", -1) <= 100:
+        errors.append("righteous.min_kindness 应在 0~100")
+    rs = cfg.get("revenge_style", {})
+    if not (0 <= rs.get("cautious_below", -1) <= rs.get("direct_above", -2) <= 100 and 0 <= rs.get("main_p", -1) <= 1 and 0 <= rs.get("mid_factor", -1) <= 1):
+        errors.append("revenge_style: 0 ≤ cautious_below ≤ direct_above ≤ 100，main_p / mid_factor 在 0~1")
+    cp = cfg.get("captive", {})
+    if set(cp.get("kind_high", {})) - {"release", "rob", "kill"} or set(cp.get("kind_low", {})) - {"release", "rob", "kill"}:
+        errors.append("captive.kind_high / kind_low 只能有 release / rob / kill")
+    if any(v < 0 for part in (cp.get("kind_high", {}), cp.get("kind_low", {})) for v in part.values()) or cp.get("lawful_low_kill", -1) < 0 or cp.get("lawful_high_kill", -1) < 0:
+        errors.append("captive 的倍数不能为负")
     return errors
 
 
@@ -108,7 +118,7 @@ def is_righteous(kindness: int, profile: dict | None) -> bool:
     """爱打抱不平：心地不坏（善意不低）、而且义气重或性子急。路过看见不平事会插一手（拦路组团、劝架都用它）。"""
     if not profile:
         return False
-    return kindness >= 55 and (level(profile["loyalty"]) == "high" or level(profile["impulse"]) == "high")
+    return kindness >= _load()["righteous"]["min_kindness"] and (level(profile["loyalty"]) == "high" or level(profile["impulse"]) == "high")
 
 
 def effective(kindness: int, profile: dict | None, rng=random) -> tuple[int, int, int, bool]:
@@ -123,13 +133,14 @@ def effective(kindness: int, profile: dict | None, rng=random) -> tuple[int, int
 def revenge_style(profile: dict | None, rng=random) -> str:
     """要报仇时怎么报：直接（冲动，打不过也上）/ 隐忍（谨慎，先打听、修炼）/ 等待时机（折中）。"""
     _k, _o, impulse, _flipped = effective(50, profile, rng)
+    c = _load()["revenge_style"]
     p_direct = impulse / 100
     r = rng.random()
-    if impulse >= 65:
-        return "直接" if r < 0.8 else "等待时机"
-    if impulse <= 35:
-        return "隐忍" if r < 0.8 else "等待时机"
-    return "直接" if r < p_direct * 0.5 else "隐忍" if r > 1 - (1 - p_direct) * 0.5 else "等待时机"
+    if impulse >= c["direct_above"]:
+        return "直接" if r < c["main_p"] else "等待时机"
+    if impulse <= c["cautious_below"]:
+        return "隐忍" if r < c["main_p"] else "等待时机"
+    return "直接" if r < p_direct * c["mid_factor"] else "隐忍" if r > 1 - (1 - p_direct) * c["mid_factor"] else "等待时机"
 
 
 def captive_shift(kindness: int, profile: dict | None, rng=random) -> dict[str, float]:
@@ -137,13 +148,14 @@ def captive_shift(kindness: int, profile: dict | None, rng=random) -> dict[str, 
     if not profile:
         return {}
     k, lawful, _impulse, _ = effective(kindness, profile, rng)
+    c = _load()["captive"]
     shift = {"release": 1.0, "rob": 1.0, "kill": 1.0}
     if level(k) == "high":
-        shift.update(release=1.5, kill=0.3)
+        shift.update(c["kind_high"])
     elif level(k) == "low":
-        shift.update(release=0.6, rob=1.2, kill=1.8)
+        shift.update(c["kind_low"])
     if level(lawful) == "low":
-        shift["kill"] *= 1.2
+        shift["kill"] *= c["lawful_low_kill"]
     elif level(lawful) == "high":
-        shift["kill"] *= 0.8
+        shift["kill"] *= c["lawful_high_kill"]
     return shift

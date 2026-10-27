@@ -1,7 +1,7 @@
 import uuid
 import time
 from sqlalchemy import exists, func, select, update
-from utils import bot_memory, bot_ties
+from utils import bot_memory, bot_ties, rules
 from utils.bot_social import bot_gate
 from utils.bots import is_bot_id
 from utils.db_async import AsyncSessionLocal, Party, Player
@@ -37,7 +37,7 @@ async def create_party(leader_id: str, city: str) -> str:
     return party_id
 
 
-MAX_PARTY_SIZE = 4
+# 队伍人数上限在 data/game_rules.json 的 party.max_size（管理员可以调）
 
 
 async def _teammates_meet(party_id: str) -> None:
@@ -48,7 +48,7 @@ async def _teammates_meet(party_id: str) -> None:
 
 
 async def add_to_party(party_id: str, uid: str) -> bool:
-    """把玩家加入队伍。一条带条件的 UPDATE：队伍存在、人数不足 4、玩家活着且还没有队伍。
+    """把玩家加入队伍。一条带条件的 UPDATE：队伍存在、人数没满、玩家活着且还没有队伍。
 
     以前是『先数人数、再无条件写 party_id』：并发时能超过 4 人；玩家已在别的队伍时会被悄悄带走（B67）。
     """
@@ -60,7 +60,7 @@ async def add_to_party(party_id: str, uid: str) -> bool:
         res = await session.execute(
             update(Player)
             .where(Player.discord_id == uid, Player.party_id.is_(None), Player.is_dead == False,  # noqa: E712
-                   exists().where(Party.party_id == party_id), members < MAX_PARTY_SIZE)
+                   exists().where(Party.party_id == party_id), members < rules.section("party")["max_size"])
             .values(party_id=party_id)
         )
         await session.commit()
@@ -107,7 +107,7 @@ async def accept_invite(inviter_id: str, target_id: str) -> dict:
             inv.party_id = party_id
         else:
             count = await session.scalar(select(func.count()).select_from(Player).where(Player.party_id == party_id))
-            if count >= MAX_PARTY_SIZE:
+            if count >= rules.section("party")["max_size"]:
                 return {"ok": False, "reason": "队伍已满，无法加入。"}
         tgt.party_id = party_id
         await session.commit()

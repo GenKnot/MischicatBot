@@ -171,10 +171,10 @@ def test_没有面板再自己写超时数字():
     """超时值统一由基类给。确实需要不同值的（拍卖竞价）走 timeout= 参数并写明理由。"""
     import re
 
-    allowed = {"None", "LOT_DURATION"}
+    allowed = {"None", "lot_duration()"}
     offenders = []
     for f, c, _b, body in _view_classes():
-        for m in re.finditer(r"super\(\)\.__init__\(timeout=([^)]+)\)", body):
+        for m in re.finditer(r"super\(\)\.__init__\(timeout=([\w.]+(?:\(\))?)", body):
             if m.group(1).strip() not in allowed:
                 offenders.append(f"{f}:{c} timeout={m.group(1)}")
     assert not offenders, f"这些面板硬写了超时值：{offenders}"

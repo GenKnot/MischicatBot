@@ -246,7 +246,7 @@ TRAVERSALS = {
     "utils/views/techniques.py": {INCLUDE_BOTS: 1},
     "utils/views/spirit_rain.py": {INCLUDE_BOTS: 1},
     "utils/views/leaderboard.py": {INCLUDE_BOTS: 6},
-    "web/main.py": {REAL_ONLY: 10, INCLUDE_BOTS: 9},
+    "web/main.py": {REAL_ONLY: 12, INCLUDE_BOTS: 8},      # /players、/stats 的「含机器人」开关写成参数化的 (? OR is_bot = 0)，城市下拉按开关各一条常量 SQL
 }
 _PATTERN = re.compile(r"FROM players\b|select\(Player\)", re.I)
 # 按主键取单行（WHERE discord_id = …）不算遍历

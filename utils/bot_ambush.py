@@ -84,6 +84,14 @@ def validate(cfg: dict, archetypes: list[str] | None = None) -> list[str]:
             errors.append(f"{k}: share 0~1，cap > 0")
     if not 0 <= cfg.get("flee", {}).get("min", -1) <= cfg.get("flee", {}).get("max", -1) <= 1:
         errors.append("flee: 0 ≤ min ≤ max ≤ 1")
+    sw = cfg.get("severity_weight", {})
+    if sw.get("base", -1) < 0 or sw.get("release_div", 0) <= 0 or cfg.get("buyout", {}).get("severity_div", 0) <= 0:
+        errors.append("severity_weight.base ≥ 0，severity_weight.release_div / buyout.severity_div > 0")
+    n = cfg.get("fight", {}).get("noise", [])
+    if not (isinstance(n, list) and len(n) == 2 and 0 < n[0] <= n[1]):
+        errors.append("fight.noise 应是 [最小, 最大]，0 < 最小 ≤ 最大")
+    if cfg.get("stuck_seconds", -1) < 0:
+        errors.append("stuck_seconds 不能为负")
     return errors
 
 
@@ -138,9 +146,9 @@ def outcome_weights(archetype: str, severity: int, grudge_kind: str, kindness: i
     sw = cfg["severity_weight"]
     for k in ("cripple", "kill"):
         if k in w:
-            w[k] *= (0.5 + severity / 100) * sw[k]
+            w[k] *= (sw["base"] + severity / 100) * sw[k]
     if "release" in w:
-        w["release"] *= max(sw["release_floor"], 1 - severity / 150)
+        w["release"] *= max(sw["release_floor"], 1 - severity / sw["release_div"])
     if grudge_kind == "kill" and "kill" in w:
         w["kill"] *= cfg["kill_grudge_bonus"]
     for k, f in bot_profile.captive_shift(kindness, profile, rng).items():
@@ -156,7 +164,7 @@ def outcome_weights(archetype: str, severity: int, grudge_kind: str, kindness: i
 
 def buyout_chance(archetype: str, severity: int, cfg: dict | None = None) -> float:
     cfg = cfg or load()
-    return max(0.0, cfg["buyout"]["accept"][archetype] * (1 - severity / 200))
+    return max(0.0, cfg["buyout"]["accept"][archetype] * (1 - severity / cfg["buyout"]["severity_div"]))
 
 
 # ---- 门槛 -------------------------------------------------------------------
@@ -435,8 +443,8 @@ async def choose_fight(enc_id: str, rng=None, now: float | None = None) -> dict:
     if player is None or leader is None or leader["is_dead"] or player["is_dead"]:
         await _finish(enc_id, "gone")
         return {"stage": "gone"}
-    mine = await calc_power(player) * (1 + (cfg["rescue"]["power_bonus"] if data["rescuer"] else 0)) * rng.uniform(0.85, 1.15)
-    theirs = (await calc_power(leader)) * (await power_multiplier(leader)) * companion_multiplier(len(data["companions"]), cfg) * rng.uniform(0.85, 1.15)
+    mine = await calc_power(player) * (1 + (cfg["rescue"]["power_bonus"] if data["rescuer"] else 0)) * rng.uniform(*cfg["fight"]["noise"])
+    theirs = (await calc_power(leader)) * (await power_multiplier(leader)) * companion_multiplier(len(data["companions"]), cfg) * rng.uniform(*cfg["fight"]["noise"])
     if mine > theirs:
         await _finish(enc_id, "won")
         return {"stage": "won", "mine": round(mine, 1), "theirs": round(theirs, 1), "leader": leader["discord_id"]}
@@ -602,9 +610,10 @@ async def process_expired(now: float | None = None, rng=None) -> list[dict]:
     return out
 
 
-async def sweep_stuck(now: float | None = None, older_than: float = 600) -> int:
+async def sweep_stuck(now: float | None = None, older_than: float | None = None) -> int:
     """卡在 resolving（处理到一半 bot 重启）超过 older_than 秒的遭遇直接结案，免得玩家一直被『有遭遇』挡着。"""
     now = now or time.time()
+    older_than = load()["stuck_seconds"] if older_than is None else older_than
     async with AsyncSessionLocal() as session:
         res = await session.execute(update(BotEncounter).where(BotEncounter.stage == "resolving", BotEncounter.expires_at < now - older_than)
                                     .values(stage="done", result="stuck"))

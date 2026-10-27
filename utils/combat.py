@@ -1,5 +1,6 @@
 import random
 import json
+from utils import rules
 from utils.realms import get_realm_index
 from utils.sects import calc_technique_stat_bonus
 
@@ -33,7 +34,7 @@ async def calc_power(player: dict, equipped: list[dict] | None = None) -> float:
     base += sum(stat_temp.values())
 
     realm_idx = get_realm_index(player.get("realm", "炼气期1层"))
-    realm_mult = 1.0 + realm_idx * 0.15
+    realm_mult = 1.0 + realm_idx * rules.section("combat")["realm_step"]
 
     techs = _parse_techniques(player.get("techniques", "[]"))
     bonus = calc_technique_stat_bonus(techs)
@@ -77,14 +78,16 @@ async def calc_escape_rate(player: dict) -> float:
     realm_idx = get_realm_index(player.get("realm", "炼气期1层"))
     extra = player.get("escape_rate", 0)
     escape_buff = get_escape_bonus(player)
-    rate = 0.30 + soul * 0.01 + realm_idx * 0.005 + extra / 100 + escape_buff
-    return min(0.90, max(0.05, rate))
+    e = rules.section("combat")["escape"]
+    rate = e["base"] + soul * e["per_soul"] + realm_idx * e["per_realm"] + extra / 100 + escape_buff
+    return min(e["max"], max(e["min"], rate))
 
 
 async def roll_combat(attacker: dict, defender: dict) -> tuple[bool, float, float]:
     from utils.bot_combat import power_multiplier              # 机器人按档位有虚拟功法装备加成；真人是 1
-    atk = (await calc_power(attacker)) * (await power_multiplier(attacker)) * random.uniform(0.85, 1.15)
-    dfn = (await calc_power(defender)) * (await power_multiplier(defender)) * random.uniform(0.85, 1.15)
+    noise = rules.section("combat")["noise"]
+    atk = (await calc_power(attacker)) * (await power_multiplier(attacker)) * random.uniform(*noise)
+    dfn = (await calc_power(defender)) * (await power_multiplier(defender)) * random.uniform(*noise)
     won = atk > dfn
     return won, round(atk, 1), round(dfn, 1)
 

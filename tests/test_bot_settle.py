@@ -738,7 +738,7 @@ async def test_补员失败只记日志(db, cfg, monkeypatch, caplog):
     async with D.AsyncSessionLocal() as s:
         await bot_world.set_state(s, "target", "50")
         await s.commit()
-    monkeypatch.setattr(bot_world, "MAX_BOTS", 1)                           # 已经满了：生成会被拒绝
+    monkeypatch.setattr(bot_world, "max_bots", lambda: 1)                           # 已经满了：生成会被拒绝
     with caplog.at_level(logging.WARNING):
         out = await run()
     assert out["refilled"] == 0 and "补员失败" in caplog.text

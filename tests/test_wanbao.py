@@ -10,10 +10,14 @@ import pytest
 
 from tests.conftest import make_player
 from utils.events.public import wanbao
-from utils.events.public.wanbao import (AUCTION_COMMISSION, LISTING_FEE,
-                                        MAX_PLAYER_LOTS, can_list_item,
+from utils import rules
+from utils.events.public.wanbao import (can_list_item,
                                         get_or_create_auction, list_item,
                                         place_bid, settle_lot)
+
+AUCTION_COMMISSION = rules.get("wanbao.commission")
+LISTING_FEE = rules.get("wanbao.listing_fee")
+MAX_PLAYER_LOTS = rules.get("wanbao.max_player_lots")
 
 
 @pytest.fixture

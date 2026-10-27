@@ -3,26 +3,14 @@ import uuid
 
 from sqlalchemy import select, update
 
+from utils import rules
 from utils.atomic import DEAD_REASON, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player, BankDeposit
 from utils.character import years_to_seconds, seconds_to_years
 
 BANK_CITIES = ["灵虚城", "丹阁", "落云城", "碧波城", "天工城"]
 
-DEMAND_RATE = 0.001
-
-TERM_OPTIONS = [
-    {"years": 10,  "rate": 0.01},
-    {"years": 15,  "rate": 0.0125},
-    {"years": 20,  "rate": 0.015},
-    {"years": 50,  "rate": 0.0175},
-    {"years": 100, "rate": 0.04},
-    {"years": 500, "rate": 0.05},
-]
-
-MIN_DEPOSIT = 20000
-TRANSFER_FEE_RATE = 0.02
-TRANSFER_MAX = 50000
+# 利率、最低存款、转账手续费等数值在 data/game_rules.json 的 bank（管理员可以 `cat!调参` 修改），用的时候读：rules.section("bank")
 
 
 def _bank_refusal(player) -> dict | None:
@@ -46,7 +34,7 @@ def _not_in_bank_city(player) -> dict | None:
 def calc_demand_interest(principal: int, deposited_at: float) -> int:
     now = time.time()
     years = seconds_to_years(now - deposited_at)
-    return int(principal * DEMAND_RATE * years)
+    return int(principal * rules.section("bank")["demand_rate"] * years)
 
 
 def calc_term_interest(principal: int, term_years: int, rate: float) -> int:
@@ -150,10 +138,11 @@ async def deposit_term(discord_id: str, amount: int, term_years: int) -> dict:
             return {"ok": False, "reason": "角色不存在。"}
         if (refused := _bank_refusal(player)):
             return refused
-        if amount < MIN_DEPOSIT:
-            return {"ok": False, "reason": f"定期存款每笔最低 {MIN_DEPOSIT:,} 灵石。"}
+        cfg = rules.section("bank")
+        if amount < cfg["min_deposit"]:
+            return {"ok": False, "reason": f"定期存款每笔最低 {cfg['min_deposit']:,} 灵石。"}
 
-        term = next((t for t in TERM_OPTIONS if t["years"] == term_years), None)
+        term = next((t for t in cfg["terms"] if t["years"] == term_years), None)
         if not term:
             return {"ok": False, "reason": "无效的存款期限。"}
 
@@ -233,9 +222,10 @@ async def transfer(sender_id: str, receiver_id: str, amount: int) -> dict:
             return refused
         if receiver.is_dead:
             return {"ok": False, "reason": "对方已坐化，无法收款。"}
-        if amount <= 0 or amount > TRANSFER_MAX:
-            return {"ok": False, "reason": f"单次转账上限 {TRANSFER_MAX:,} 灵石。"}
-        fee = max(1, int(amount * TRANSFER_FEE_RATE))
+        cfg = rules.section("bank")
+        if amount <= 0 or amount > cfg["transfer_max"]:
+            return {"ok": False, "reason": f"单次转账上限 {cfg['transfer_max']:,} 灵石。"}
+        fee = max(1, int(amount * cfg["transfer_fee_rate"]))
         total_cost = amount + fee
         if not await spend_stones(session, sender_id, total_cost):
             return {"ok": False, "reason": f"灵石不足（需 {total_cost:,}，含手续费 {fee:,}）。"}

@@ -1,16 +1,42 @@
 import json
-import os
 import random
 import time
+from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import or_, update
 
+from utils import settings_hub
 from utils.atomic import DEAD_REASON, grant_item, grant_stones
 from utils.db_async import AsyncSessionLocal, Player
 
-_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "checkin_config.json")
-with open(_config_path, encoding="utf-8") as _f:
-    CONFIG = json.load(_f)
+_PATH = Path(__file__).resolve().parent.parent / "data" / "checkin_config.json"
+CATEGORIES = ("spirit_stones", "material", "technique", "equipment")
+
+
+@lru_cache(maxsize=1)
+def _load() -> dict:
+    return settings_hub.read(_PATH)
+
+
+def cfg() -> dict:
+    """签到奖励配置（data/checkin_config.json，管理员可以 `cat!调参` 修改数字，只读）。"""
+    return _load()
+
+
+def validate(c: dict) -> list[str]:
+    errors = []
+    cw = c.get("category_weights", {})
+    if set(cw) != set(CATEGORIES) or any(v < 0 for v in cw.values()) or sum(cw.values()) <= 0:
+        errors.append(f"category_weights 需要 {CATEGORIES}，权重非负且总和 > 0")
+    for cat in CATEGORIES:
+        tiers = c.get(cat, {}).get("tiers", [])
+        if not tiers or any(t.get("weight", -1) < 0 for t in tiers) or sum(t.get("weight", 0) for t in tiers) <= 0:
+            errors.append(f"{cat}.tiers 至少一档，权重非负且总和 > 0")
+    for t in c.get("spirit_stones", {}).get("tiers", []):
+        if not 0 <= t.get("min", -1) <= t.get("max", -2):
+            errors.append(f"spirit_stones.tiers {t.get('label')}: 0 ≤ min ≤ max")
+    return errors
 
 
 def _weighted_choice(tiers: list[dict]) -> dict:
@@ -46,26 +72,26 @@ async def do_checkin(uid: str) -> dict:
         if claimed.rowcount != 1:
             return {"ok": False, "reason": "今日已签到，明日再来。"}
 
-        cats = CONFIG["category_weights"]
+        cats = cfg()["category_weights"]
         category = random.choices(list(cats.keys()), weights=list(cats.values()), k=1)[0]
         result = {"ok": True, "category": category}
 
         if category == "spirit_stones":
-            tier = _weighted_choice(CONFIG["spirit_stones"]["tiers"])
+            tier = _weighted_choice(cfg()["spirit_stones"]["tiers"])
             amount = random.randint(tier["min"], tier["max"])
             result["spirit_stones"] = amount
             result["tier_label"] = tier["label"]
             await grant_stones(session, uid, amount)
 
         elif category == "material":
-            tier = _weighted_choice(CONFIG["material"]["tiers"])
+            tier = _weighted_choice(cfg()["material"]["tiers"])
             item_name = random.choice(tier["pool"])
             result["item_name"] = item_name
             result["tier_label"] = tier["label"]
             await grant_item(session, uid, item_name, 1)
 
         elif category == "technique":
-            tier = _weighted_choice(CONFIG["technique"]["tiers"])
+            tier = _weighted_choice(cfg()["technique"]["tiers"])
             candidates = [name for name, info in TECHNIQUES.items() if info.get("grade") in tier["grades"]]
             if not candidates:
                 candidates = list(TECHNIQUES.keys())
@@ -80,7 +106,7 @@ async def do_checkin(uid: str) -> dict:
                 player.techniques = json.dumps(learned + [tech_name], ensure_ascii=False)
 
         elif category == "equipment":
-            tier = _weighted_choice(CONFIG["equipment"]["tiers"])
+            tier = _weighted_choice(cfg()["equipment"]["tiers"])
             eq = generate_equipment(quality=tier["quality"])
             session.add(new_equipment_row(uid, eq))
             result["equipment"] = eq

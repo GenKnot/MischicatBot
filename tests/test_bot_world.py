@@ -57,8 +57,8 @@ def test_词库合法():
 
 
 def test_档位配置合法():
-    assert set(bw.TIER_WEIGHTS) == set(bw.TIER_SPECS) and sum(bw.TIER_WEIGHTS.values()) == 100
-    for tier, spec in bw.TIER_SPECS.items():
+    assert set(bw.tier_weights()) == set(bw.tier_specs()) == set(bw.TIERS) and sum(bw.tier_weights().values()) == 100
+    for tier, spec in bw.tier_specs().items():
         lo, hi = spec["realms"]
         assert REALMS.index(lo) <= REALMS.index(hi), tier
         assert spec["stats"][0] <= spec["stats"][1] and spec["stones"][0] <= spec["stones"][1]
@@ -78,15 +78,15 @@ def test_道号不重名且词库抽干后加序号():
 
 def test_档位分布大致是六三五():
     rng = random.Random(7)
-    n = {t: 0 for t in bw.TIER_WEIGHTS}
+    n = {t: 0 for t in bw.TIERS}
     for _ in range(4000):
         n[bw.roll_tier(rng)] += 1
     assert 0.55 < n["炮灰"] / 4000 < 0.65 and 0.30 < n["正常"] / 4000 < 0.40 and 0.03 < n["天骄"] / 4000 < 0.07
 
 
-@pytest.mark.parametrize("tier", list(bw.TIER_SPECS))
+@pytest.mark.parametrize("tier", list(bw.TIERS))
 def test_生成的属性落在档位范围内(tier):
-    spec = bw.TIER_SPECS[tier]
+    spec = bw.tier_specs()[tier]
     allowed = REALMS[REALMS.index(spec["realms"][0]):REALMS.index(spec["realms"][1]) + 1]
     for seed in range(200):
         f = bw.roll_player_fields(random.Random(seed), tier, "bot_00001", "某", 0.0)
@@ -123,12 +123,12 @@ async def test_生成_编号接着排_道号不与真人重名(db):
 
 
 async def test_生成_数量与总量上限(db, monkeypatch):
-    for bad in (0, -1, bw.MAX_PER_BATCH + 1):
+    for bad in (0, -1, bw.max_per_batch() + 1):
         res = await bw.generate_bots(bad)
         assert res["ok"] is False and "1~" in res["reason"]
     assert await count(db, db["db_async"].Player) == 0
     await bw.generate_bots(10)
-    monkeypatch.setattr(bw, "MAX_BOTS", 12)
+    monkeypatch.setattr(bw, "max_bots", lambda: 12)
     res = await bw.generate_bots(5)
     assert res["ok"] is False and "最多还能生成 2" in res["reason"]
     assert len(await bots_of(db)) == 10
@@ -243,12 +243,12 @@ async def test_命令_生成_回报档位并留审计(db, caplog):
 
 async def test_命令_生成_默认两千个_超限提示(db):
     cog, c = make_cog(), FakeContext(user_id=1)
-    assert bw.DEFAULT_COUNT == 2000 and bw.MAX_BOTS == 20000
+    assert bw.default_count() == 2000 and bw.max_bots() == 20000
     await cog.spawn_bots.callback(cog, c, 30)
     assert len(await bots_of(db)) == 30
     c2 = FakeContext(user_id=1)
-    await cog.spawn_bots.callback(cog, c2, bw.MAX_PER_BATCH + 1)
-    assert c2.said(f"1~{bw.MAX_PER_BATCH}") and len(await bots_of(db)) == 30
+    await cog.spawn_bots.callback(cog, c2, bw.max_per_batch() + 1)
+    assert c2.said(f"1~{bw.max_per_batch()}") and len(await bots_of(db)) == 30
 
 
 async def test_命令_清除_必须确认(db, caplog):

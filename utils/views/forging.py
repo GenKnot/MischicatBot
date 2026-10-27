@@ -1,10 +1,10 @@
 import discord
 from utils.forging import (
     FORGING_CITIES, ORE_TIERS, ORE_TO_EQUIP_TIER,
-    SLOT_MAIN_ORE_QTY, AUX_WOOD_STAT_BIAS, AUX_HERB_STAT_BIAS,
-    DAILY_LIMIT, get_available_qualities, get_forging_level_label,
+    AUX_WOOD_STAT_BIAS, AUX_HERB_STAT_BIAS,
+    daily_limit, slot_ore_qty, get_available_qualities, get_forging_level_label,
     get_forging_mastery, attempt_forge, attempt_reforge,
-    FORGING_EXP_THRESHOLDS,
+    exp_thresholds, exam_cost, exam_materials, reforge_cost,
 )
 from utils.equipment import QUALITY_COLOR, QUALITY_ORDER, STAT_NAMES, TIER_NAMES, format_equipment
 from utils.db_async import AsyncSessionLocal
@@ -50,10 +50,10 @@ def _forging_main_embed(player: dict) -> discord.Embed:
         inline=False,
     )
     if forging_level > 0:
-        next_threshold = FORGING_EXP_THRESHOLDS[forging_level + 1] if forging_level < 9 else None
+        next_threshold = exp_thresholds()[forging_level + 1] if forging_level < 9 else None
         exp_str = f"{forging_exp}" if next_threshold is None else f"{forging_exp} / {next_threshold}"
         embed.add_field(name="炼器经验", value=exp_str, inline=True)
-    embed.add_field(name="今日锻造", value=f"{daily_count} / {DAILY_LIMIT}", inline=True)
+    embed.add_field(name="今日锻造", value=f"{daily_count} / {daily_limit()}", inline=True)
 
     if forging_level > 0:
         from utils.forging import get_max_quality_for_level
@@ -77,7 +77,7 @@ class ForgingMainView(TimedView):
 
     @discord.ui.button(label="📋 参加入门考核", style=discord.ButtonStyle.success, row=0)
     async def exam_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from utils.forging import start_forging_exam, EXAM_COST, EXAM_MATERIALS, FORGING_CITIES
+        from utils.forging import start_forging_exam, FORGING_CITIES
         uid = str(interaction.user.id)
         player = await _get_player(uid)
         if player.get("forging_level", 0) > 0:
@@ -98,11 +98,11 @@ class ForgingMainView(TimedView):
         if not result["ok"]:
             await interaction.response.send_message(result["reason"], ephemeral=True)
             return
-        mats_str = "、".join(f"{k}×{v}" for k, v in EXAM_MATERIALS.items())
+        mats_str = "、".join(f"{k}×{v}" for k, v in exam_materials().items())
         embed = discord.Embed(
             title="📋 炼器入门考核",
             description=(
-                f"已缴纳 **{EXAM_COST}** 灵石，获得考核材料：**{mats_str}**\n\n"
+                f"已缴纳 **{exam_cost()}** 灵石，获得考核材料：**{mats_str}**\n\n"
                 "前往技艺→锻造，用这批材料炼出第一件装备，即可获得1品炼器师资质。\n"
                 "材料用完可花 **300 灵石** 补充。"
             ),
@@ -180,7 +180,7 @@ class ForgeSlotSelectView(TimedView):
 def _forge_ore_embed(slot: str, inventory: dict) -> discord.Embed:
     embed = discord.Embed(
         title=f"⚙️ 锻造 · {slot} · 选择主材",
-        description=f"选择主矿石（需要 {SLOT_MAIN_ORE_QTY[slot]} 个），矿石品级决定装备境界要求。",
+        description=f"选择主矿石（需要 {slot_ore_qty()[slot]} 个），矿石品级决定装备境界要求。",
         color=discord.Color.dark_grey(),
     )
     lines = []
@@ -188,7 +188,7 @@ def _forge_ore_embed(slot: str, inventory: dict) -> discord.Embed:
         qty = inventory.get(ore, 0)
         tier = ORE_TO_EQUIP_TIER[ore]
         tier_name = TIER_NAMES[min(tier, len(TIER_NAMES) - 1)]
-        needed = SLOT_MAIN_ORE_QTY[slot]
+        needed = slot_ore_qty()[slot]
         status = f"✅ 持有 {qty}" if qty >= needed else f"❌ 持有 {qty}（需 {needed}）"
         lines.append(f"**{ore}** — {tier_name}期装备　{status}")
     embed.add_field(name="可用矿石", value="\n".join(lines), inline=False)
@@ -203,7 +203,7 @@ class ForgeOreSelectView(TimedView):
         self.inventory = inventory
         self.slot = slot
         self.cog = cog
-        needed = SLOT_MAIN_ORE_QTY[slot]
+        needed = slot_ore_qty()[slot]
         for ore in ORE_TIERS:
             qty = inventory.get(ore, 0)
             self.add_item(OreButton(ore, qty >= needed))
@@ -478,13 +478,13 @@ def _reforge_select_embed(equip_list: list[dict]) -> discord.Embed:
         description="消耗同品级矿石 + 灵石，重新随机装备词缀。",
         color=discord.Color.orange(),
     )
-    from utils.forging import ORE_TIERS, RELIQUARY_COST_MULTIPLIER, QUALITY_ORDER
+    from utils.forging import ORE_TIERS, QUALITY_ORDER
     lines = []
     for eq in equip_list[:10]:
         q = eq["quality"]
         ore_idx = min(QUALITY_ORDER.index(q), len(ORE_TIERS) - 1)
         ore_needed = ORE_TIERS[ore_idx]
-        cost = 200 * RELIQUARY_COST_MULTIPLIER[q]
+        cost = reforge_cost(q)
         lines.append(f"`{eq['equip_id']}` {QUALITY_COLOR[q]} **{eq['name']}** — 需 {ore_needed}×2 + {cost}灵石")
     embed.add_field(name="你的装备", value="\n".join(lines) if lines else "无", inline=False)
     return embed
@@ -523,7 +523,7 @@ class ReforgeEquipSelect(discord.ui.Select):
         player = await _get_player(uid)
         inventory = await _get_inventory(uid)
 
-        from utils.forging import ORE_TIERS, QUALITY_ORDER, RELIQUARY_COST_MULTIPLIER
+        from utils.forging import ORE_TIERS, QUALITY_ORDER
         from utils.equipment_db import get_equipment_by_id
         eq = await get_equipment_by_id(equip_id, uid)
         if not eq:

@@ -4,14 +4,17 @@ import json
 
 from sqlalchemy import delete, select, update
 
+from utils import rules
 from utils.atomic import DEAD_REASON, consume_item, grant_item, grant_stones, spend_stones
 from utils.equipment_db import new_equipment_row
 from utils.db_async import AsyncSessionLocal, Equipment, MarketListing, Player
 
 MARKET_CITIES = ["灵虚城", "丹阁", "落云城", "碧波城", "天工城"]
-MAX_LISTINGS = 5
-FEE_RATE = 0.08
-LISTING_TTL = 3 * 24 * 3600
+# 同时上架数、手续费率、上架时长在 data/game_rules.json 的 market（管理员可以调），用的时候读
+
+
+def _cfg() -> dict:
+    return rules.section("market")
 
 
 async def _not_in_market_city(session, discord_id: str) -> dict | None:
@@ -69,8 +72,8 @@ async def list_item(discord_id: str, item_id: str, quantity: int, price: int) ->
                 MarketListing.status == "active",
             )
         )
-        if len(active_result.scalars().all()) >= MAX_LISTINGS:
-            return {"ok": False, "reason": f"最多同时上架 {MAX_LISTINGS} 件。"}
+        if len(active_result.scalars().all()) >= _cfg()["max_listings"]:
+            return {"ok": False, "reason": f"最多同时上架 {_cfg()['max_listings']} 件。"}
 
         if price <= 0:
             return {"ok": False, "reason": "价格必须大于 0。"}
@@ -93,7 +96,7 @@ async def list_item(discord_id: str, item_id: str, quantity: int, price: int) ->
             quantity=quantity,
             price=price,
             listed_at=time.time(),
-            expires_at=time.time() + LISTING_TTL,
+            expires_at=time.time() + _cfg()["listing_ttl_hours"] * 3600,
             status="active",
             eq_data=None,
         ))
@@ -111,8 +114,8 @@ async def list_equipment(discord_id: str, equip_id: str, price: int) -> dict:
                 MarketListing.status == "active",
             )
         )
-        if len(active_result.scalars().all()) >= MAX_LISTINGS:
-            return {"ok": False, "reason": f"最多同时上架 {MAX_LISTINGS} 件。"}
+        if len(active_result.scalars().all()) >= _cfg()["max_listings"]:
+            return {"ok": False, "reason": f"最多同时上架 {_cfg()['max_listings']} 件。"}
 
         eq = await session.get(Equipment, equip_id)
         if not eq or eq.discord_id != discord_id:
@@ -143,7 +146,7 @@ async def list_equipment(discord_id: str, equip_id: str, price: int) -> dict:
             quantity=1,
             price=price,
             listed_at=time.time(),
-            expires_at=time.time() + LISTING_TTL,
+            expires_at=time.time() + _cfg()["listing_ttl_hours"] * 3600,
             status="active",
             eq_data=eq_data,
         ))
@@ -199,7 +202,7 @@ async def buy_listing(discord_id: str, listing_id: str) -> dict:
         price, seller_id = listing.price, listing.seller_id
         item_type, item_id, quantity = listing.item_type, listing.item_id, listing.quantity
         item_name, eq_data = listing.item_name, listing.eq_data
-        fee = max(1, int(price * FEE_RATE))
+        fee = max(1, int(price * _cfg()["fee_rate"]))
         seller_gets = price - fee
 
         if not await spend_stones(session, discord_id, price):

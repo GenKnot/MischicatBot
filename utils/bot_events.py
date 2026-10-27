@@ -20,13 +20,12 @@ import time
 from sqlalchemy import func, select, text, update
 
 from utils import bot_economy as be
-from utils import bot_chatter, bot_social, bot_ties
+from utils import bot_chatter, bot_social, bot_ties, rules
 from utils.db_async import AsyncSessionLocal, BotPersonality, Player
 
 log = logging.getLogger(__name__)
 
 RAIN_ACTIVITIES = ("crystal", "enlighten", "temper")
-MAX_RAIN_ACTIVITIES = 2                    # 和真人一样：每场最多 2 次非守城活动
 
 
 async def _alive_bots(session, *, in_city: str | None = None, not_in_city: str | None = None) -> list[Player]:
@@ -66,8 +65,8 @@ STAT_COLUMNS = ("comprehension", "physique", "fortune", "bone", "soul")
 def stat_cap(tier: str, cfg: dict) -> int:
     """机器人靠公共事件长属性点的上限：该档位生成时属性上限 + stat_cap_over_tier。
     灵雨每天一次，+1 属性点的机率累积下来会把机器人越养越强，破坏『用心真人对正常机器人战力比 ≥ 1.35』的校准。"""
-    from utils.bot_world import TIER_SPECS
-    return TIER_SPECS[tier]["stats"][1] + cfg["public_events"]["stat_cap_over_tier"]
+    from utils.bot_world import tier_specs
+    return tier_specs()[tier]["stats"][1] + cfg["public_events"]["stat_cap_over_tier"]
 
 
 async def _clamp_stats(uid: str, cap: int) -> None:
@@ -94,6 +93,7 @@ async def join_spirit_rain(event_id: str, city: str, beast_tide: bool, rng: rand
     rng, cfg = rng or random.Random(), be.load_config()["public_events"]
     out = {"joined": 0, "activities": 0, "defenders": 0, "stones": 0, "skipped_budget": 0}
     budget = cfg["activity_reward_budget_per_event"]
+    rain = rules.section("spirit_rain")
     now = time.time()
     present = []                                              # 这场活动里碰了面的机器人（共同经历，会互相认识）
     async with AsyncSessionLocal() as session:
@@ -105,8 +105,8 @@ async def join_spirit_rain(event_id: str, city: str, beast_tide: bool, rng: rand
         try:
             took_part = False
             if rng.random() < cfg["join_chance"]:
-                pool = [a for a in RAIN_ACTIVITIES if not (a == "temper" and bot["physique"] < 7)]
-                for n, activity in enumerate(rng.sample(pool, min(MAX_RAIN_ACTIVITIES, len(pool)))):
+                pool = [a for a in RAIN_ACTIVITIES if not (a == "temper" and bot["physique"] < rain["temper_min_physique"])]
+                for n, activity in enumerate(rng.sample(pool, min(rain["max_activities"], len(pool)))):
                     if activity == "crystal" and budget <= 0:
                         out["skipped_budget"] += 1
                         continue
@@ -129,7 +129,7 @@ async def join_spirit_rain(event_id: str, city: str, beast_tide: bool, rng: rand
                 present.append(uid)
         except Exception:
             log.exception("机器人参与灵雨失败：%s", uid)
-    await bot_ties.meet_group(present, "公共事件", rng, max_pairs=cfg.get("meet_pairs_per_event", 40))
+    await bot_ties.meet_group(present, "公共事件", rng, max_pairs=cfg["meet_pairs_per_event"])
     return out
 
 

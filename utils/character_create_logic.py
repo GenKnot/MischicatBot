@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from utils import bot_memory
 from utils import rumors
-from utils.character import REALM_LIFESPAN, calc_stats, roll_spirit_root
+from utils.character import calc_stats, realm_lifespan, roll_spirit_root
 from utils.death_rebirth_logic import calculate_rebirth_bonus
 from utils.db_async import AsyncSessionLocal, Player
 from utils.world import CITIES
@@ -28,7 +28,7 @@ async def commit_character(uid: str, name: str, gender: str, answers: dict) -> d
     """创建（或轮回重置）角色。成功返回结果摘要，玩家已存活则返回 None（什么都没写）。"""
     stats = calc_stats(dict(answers))
     spirit_root, root_type = roll_spirit_root()
-    lifespan = REALM_LIFESPAN["炼气期"]
+    lifespan = realm_lifespan("炼气期")
     now = time.time()
     city = random.choice(CITIES)["name"]
 

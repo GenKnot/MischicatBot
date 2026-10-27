@@ -22,7 +22,7 @@ from utils import bot_ambush, bot_chatter, bot_grudges, bot_profile, bot_ties, b
 from utils.bot_legends import make_legend
 from utils.bot_social import generate_personality
 from utils.bots import BOT_ID_PREFIX
-from utils.character import REALM_LIFESPAN, roll_spirit_root
+from utils.character import realm_lifespan, roll_spirit_root
 from utils.db_async import (AdventureProgress, AlchemyMastery, AsyncSessionLocal, BankAccount, BankDeposit,
                             BotMemory, BotPersonality, BotMissing, BotRelation, BotRequest, BotWorldState, Equipment, Inventory, KnownRecipe, MarketListing,
                             Player, PublicEventParticipant, Residence, WanbaoFrozen)
@@ -31,17 +31,7 @@ from utils.world import CITIES
 
 _NAMES = Path(__file__).resolve().parent.parent / "data" / "bot_names.json"
 
-MAX_PER_BATCH = 2000
-MAX_BOTS = 20000          # 目标上限；性能见 scripts/bench_bots.py 的压测结论（.gk/ISSUES.md）
-DEFAULT_COUNT = 2000
-
-TIER_WEIGHTS = {"炮灰": 60, "正常": 35, "天骄": 5}
-# 境界范围（含）、五项属性范围、随身灵石范围
-TIER_SPECS = {
-    "炮灰": {"realms": ("炼气期1层", "炼气期5层"), "stats": (3, 6), "stones": (0, 100)},
-    "正常": {"realms": ("炼气期4层", "筑基期3层"), "stats": (4, 8), "stones": (50, 400)},
-    "天骄": {"realms": ("筑基期3层", "结丹期初期"), "stats": (7, 11), "stones": (300, 1500)},
-}
+TIERS = ("炮灰", "正常", "天骄")           # 档位本身是结构（改了要连着改一堆表）；比例和出生范围在 data/bot_economy.json 的 world
 _STAT_COLUMNS = ("comprehension", "physique", "fortune", "bone", "soul")
 
 
@@ -76,19 +66,42 @@ def _realms_between(lo: str, hi: str) -> list[str]:
     return REALMS[REALMS.index(lo):REALMS.index(hi) + 1]
 
 
+def max_bots() -> int:
+    return be.world()["max_bots"]
+
+
+def max_per_batch() -> int:
+    return be.world()["max_per_batch"]
+
+
+def default_count() -> int:
+    """生成命令不写个数时的默认值（不超过一次最多生成数）。"""
+    return min(be.world()["default_count"], be.world()["max_per_batch"])
+
+
+def tier_weights() -> dict:
+    return be.world()["tier_weights"]
+
+
+def tier_specs() -> dict:
+    """档位 → {realms: [最低层, 最高层], stats: [最小, 最大], stones: [最小, 最大]}（只读）。"""
+    return be.world()["tiers"]
+
+
 def roll_tier(rng: random.Random) -> str:
-    return rng.choices(list(TIER_WEIGHTS), weights=list(TIER_WEIGHTS.values()))[0]
+    weights = tier_weights()
+    return rng.choices(list(weights), weights=list(weights.values()))[0]
 
 
 def roll_player_fields(rng: random.Random, tier: str, bot_id: str, name: str, now: float,
                        ceiling_idx: int | None = None) -> dict:
     """`ceiling_idx`：机器人不能超过的境界下标（最高真人所在大境的末层）；出生就不能高过它。"""
-    spec = TIER_SPECS[tier]
+    spec = tier_specs()[tier]
     realms = _realms_between(*spec["realms"])
     if ceiling_idx is not None:
         realms = be.realm_at_most(realms, ceiling_idx)
     realm = rng.choice(realms)
-    lifespan_max = REALM_LIFESPAN[major_realm(realm)]
+    lifespan_max = realm_lifespan(major_realm(realm))
     spirit_root, root_type = roll_spirit_root(rng)
     return {
         "discord_id": bot_id, "name": name, "gender": rng.choice(["男", "女"]),
@@ -125,25 +138,27 @@ async def bot_count(session) -> int:
 VACANCY_KEY = "tianjiao_vacancy"        # 离场的天骄数（死 / 被杀 / 飞升），补员时优先补新秀天骄
 
 
-async def generate_bots(count: int = DEFAULT_COUNT, rng: random.Random | None = None, *,
+async def generate_bots(count: int | None = None, rng: random.Random | None = None, *,
                         track_target: bool = True, fill_vacancies: bool = False) -> dict:
     """生成一批机器人。出生境界不超过当前天花板。`track_target`：把「目标人数」记成生成后的在世人数（补员用）；
     补员自己生成时传 False，不改目标。`fill_vacancies`（补员用）：先把离场天骄的空缺补成新秀天骄，并为每个天骄记「出世」传闻。
     天骄会得到称号和一句话背景（utils/bot_legends.py）。返回 {"ok", "created": [{id, name, tier, archetype, realm, city}], "by_tier": {...}} 或 {"ok": False, "reason"}。"""
-    if not 1 <= count <= MAX_PER_BATCH:
-        return {"ok": False, "reason": f"一次生成 1~{MAX_PER_BATCH} 个。"}
+    count = default_count() if count is None else count
+    if not 1 <= count <= max_per_batch():
+        return {"ok": False, "reason": f"一次生成 1~{max_per_batch()} 个。"}
     rng, names, now = rng or random.Random(), load_names(), time.time()
     async with AsyncSessionLocal() as session:
         # 先拿写锁：「查现有数量 → 编号 → 写入」不能被另一次生成打断，否则会抢到同一个编号
         await session.execute(update(Player).where(Player.discord_id == "").values(discord_id=""))
         existing = await bot_count(session)
-        if existing + count > MAX_BOTS:
-            return {"ok": False, "reason": f"机器人总数上限 {MAX_BOTS}，现有 {existing}，最多还能生成 {MAX_BOTS - existing} 个。"}
+        cap = max_bots()
+        if existing + count > cap:
+            return {"ok": False, "reason": f"机器人总数上限 {cap}，现有 {existing}，最多还能生成 {max(cap - existing, 0)} 个。"}
         ceiling_idx = await current_ceiling_index(session)
         taken = set((await session.execute(select(Player.name))).scalars())
         last = await session.scalar(select(func.max(Player.discord_id)).where(Player.is_bot == True))  # noqa: E712
         next_no = int(last[len(BOT_ID_PREFIX):]) + 1 if last else 1
-        created, by_tier = [], {t: 0 for t in TIER_WEIGHTS}
+        created, by_tier = [], {t: 0 for t in TIERS}
         vacancies = int(await get_state(session, VACANCY_KEY, "0") or 0) if fill_vacancies else 0
         titles_taken = set((await session.execute(select(BotPersonality.epithet).where(BotPersonality.epithet != ""))).scalars())
         for i in range(count):

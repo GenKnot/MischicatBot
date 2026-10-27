@@ -4,7 +4,7 @@ from sqlalchemy import func
 
 from sqlalchemy import update
 
-from utils import rumors
+from utils import rules, rumors
 from utils.atomic import (DEAD_REASON, refuse_if_dead, claim_daily_quota, consume_item, grant_item,
                           peek_daily_used, spend_stones)
 from utils.db_async import AsyncSessionLocal, Player
@@ -12,9 +12,39 @@ from utils.equipment import generate_equipment, QUALITY_ORDER
 
 FORGING_CITIES = ["铸剑城", "玄铁城", "北冥港", "落云城", "天工城"]
 
-FORGING_EXP_THRESHOLDS = [0, 0, 80, 200, 400, 700, 1100, 1600, 2300, 3200]
-FORGING_EXP_PER_CRAFT = 12
-DAILY_LIMIT = 5
+# 每日次数、经验门槛、各部位矿石数、熟练度、成功率、淬炼 / 考核费用等数值在 data/game_rules.json 的 forging（管理员可以调），用的时候读
+
+
+def cfg() -> dict:
+    return rules.section("forging")
+
+
+def daily_limit() -> int:
+    return cfg()["daily_limit"]
+
+
+def exp_thresholds() -> list[int]:
+    return cfg()["exp_thresholds"]
+
+
+def exp_per_craft() -> int:
+    return cfg()["exp_per_craft"]
+
+
+def slot_ore_qty() -> dict:
+    return cfg()["slot_ore_qty"]
+
+
+def exam_cost() -> int:
+    return cfg()["exam_cost"]
+
+
+def exam_materials() -> dict:
+    return cfg()["exam_materials"]
+
+
+def reforge_cost(quality: str) -> int:
+    return cfg()["reforge"]["base_cost"] * cfg()["reforge"]["cost_multiplier"][quality]
 
 ORE_TIERS = [
     "铜矿石",
@@ -48,12 +78,6 @@ FORGING_LEVEL_MAX_QUALITY = {
     9: "传说",
 }
 
-SLOT_MAIN_ORE_QTY = {
-    "武器": 3,
-    "防具": 3,
-    "饰品": 2,
-}
-
 AUX_WOOD_STAT_BIAS = {
     "铁桦木": ["physique", "bone"],
     "紫檀灵木": ["soul", "comprehension"],
@@ -77,27 +101,14 @@ AUX_HERB_STAT_BIAS = {
     "金丝草": ["comprehension", "bone"],
 }
 
-FORGING_MASTERY_STAGES = [
-    (0, "生疏", 0),
-    (10, "熟悉", 5),
-    (30, "精通", 12),
-    (100, "炉火纯青", 20),
-]
-
-RELIQUARY_COST_MULTIPLIER = {
-    "普通": 1,
-    "精良": 2,
-    "稀有": 4,
-    "史诗": 8,
-    "传说": 15,
-}
 
 
 def get_forging_mastery(count: int) -> tuple[str, int]:
-    label, bonus = "生疏", 0
-    for threshold, lbl, b in FORGING_MASTERY_STAGES:
-        if count >= threshold:
-            label, bonus = lbl, b
+    stages = cfg()["mastery_stages"]
+    label, bonus = stages[0]["label"], stages[0]["bonus"]
+    for stage in stages:
+        if count >= stage["crafts"]:
+            label, bonus = stage["label"], stage["bonus"]
     return label, bonus
 
 
@@ -107,12 +118,13 @@ def get_forging_level_label(level: int) -> str:
 
 def calc_forge_success_rate(forging_level: int, target_quality: str, bone: int, mastery_count: int) -> int:
     quality_idx = QUALITY_ORDER.index(target_quality)
-    base = 85 - quality_idx * 15
-    level_bonus = (forging_level - 1) * 5
-    bone_bonus = min(bone // 3, 10)
+    s = cfg()["success"]
+    base = s["base"] - quality_idx * s["per_quality"]
+    level_bonus = (forging_level - 1) * s["per_level"]
+    bone_bonus = min(bone // s["bone_div"], s["bone_cap"])
     _, mastery_bonus = get_forging_mastery(mastery_count)
     rate = base + level_bonus + bone_bonus + mastery_bonus
-    return max(5, min(95, rate))
+    return max(s["min"], min(s["max"], rate))
 
 
 def get_max_quality_for_level(forging_level: int) -> str:
@@ -127,11 +139,11 @@ def get_available_qualities(forging_level: int) -> list[str]:
 
 
 def roll_forge_failure() -> tuple[str, int]:
-    roll = random.random()
-    if roll < 0.80:
+    f = cfg()["failure"]
+    if random.random() < f["plain_p"]:
         return "普通失败", 0
     else:
-        return "走火", random.randint(1, 5)
+        return "走火", random.randint(*f["fire_loss"])
 
 
 async def get_forging_mastery_count(discord_id: str) -> int:
@@ -159,7 +171,7 @@ async def add_forging_exp(discord_id: str, exp: int) -> tuple[int, int, bool]:
         leveled_up = False
         if level < 9:
             nxt = level + 1
-            threshold = FORGING_EXP_THRESHOLDS[nxt] if nxt < len(FORGING_EXP_THRESHOLDS) else 999999
+            threshold = exp_thresholds()[nxt] if nxt < len(exp_thresholds()) else 999999
             if total >= threshold:
                 up = await session.execute(
                     update(Player).where(Player.discord_id == discord_id, Player.forging_level == level)
@@ -198,7 +210,7 @@ async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
     """占用今日一次锻造次数。返回 (是否成功, 占用后的今日次数)。"""
     async with AsyncSessionLocal() as session:
         used = await claim_daily_quota(
-            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, DAILY_LIMIT
+            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, daily_limit()
         )
         if used is None:
             return False, await peek_daily_used(
@@ -220,7 +232,7 @@ async def attempt_forge(
     forging_level: int,
 ) -> dict:
     # 先做不带副作用的校验：被拒的尝试不能烧掉今日次数（B41）
-    ore_qty_needed = SLOT_MAIN_ORE_QTY[slot]
+    ore_qty_needed = slot_ore_qty()[slot]
     if inventory.get(ore_name, 0) < ore_qty_needed:
         return {"ok": False, "reason": f"主材不足：「{ore_name}」需要 {ore_qty_needed} 个，当前只有 {inventory.get(ore_name, 0)} 个。"}
 
@@ -246,10 +258,10 @@ async def attempt_forge(
         if (refused := await refuse_if_dead(session, discord_id)):
             return refused
         daily_count = await claim_daily_quota(
-            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, DAILY_LIMIT
+            session, discord_id, Player.forging_daily_count, Player.forging_daily_reset, daily_limit()
         )
         if daily_count is None:
-            return {"ok": False, "reason": f"今日锻造次数已达上限（{DAILY_LIMIT}次），明日再来。"}
+            return {"ok": False, "reason": f"今日锻造次数已达上限（{daily_limit()}次），明日再来。"}
         for item_name, qty in consumed.items():
             if not await consume_item(session, discord_id, item_name, qty):
                 await session.rollback()
@@ -302,7 +314,7 @@ async def attempt_forge(
     if exam_passed:
         new_level, new_exp, leveled_up = 1, 0, True
     else:
-        new_level, new_exp, leveled_up = await add_forging_exp(discord_id, FORGING_EXP_PER_CRAFT)
+        new_level, new_exp, leveled_up = await add_forging_exp(discord_id, exp_per_craft())
 
     result = {
         "ok": True,
@@ -343,11 +355,11 @@ async def attempt_reforge(
     if ore_name != ore_needed:
         return {"ok": False, "reason": f"淬炼「{quality}」品质装备需要「{ore_needed}」。"}
 
-    ore_qty = 2
+    ore_qty = cfg()["reforge"]["ore_qty"]
     if inventory.get(ore_name, 0) < ore_qty:
         return {"ok": False, "reason": f"「{ore_name}」不足，需要 {ore_qty} 个。"}
 
-    stone_cost = 200 * RELIQUARY_COST_MULTIPLIER[quality]
+    stone_cost = reforge_cost(quality)
 
     # 矿石与灵石在同一事务里一起扣：原先先扣矿石、再另开事务扣灵石，
     # 中途失败会白吞矿石。
@@ -377,8 +389,6 @@ async def attempt_reforge(
     }
 
 
-EXAM_COST = 500
-EXAM_MATERIALS = {"铜矿石": 6, "铁矿石": 3}
 
 
 async def start_forging_exam(discord_id: str) -> dict:
@@ -409,11 +419,11 @@ async def start_forging_exam(discord_id: str) -> dict:
         if claimed.rowcount != 1:
             return {"ok": False, "reason": "你已缴过考核费，材料用完可花 300 灵石补充。"}
 
-        if not await spend_stones(session, discord_id, EXAM_COST):
+        if not await spend_stones(session, discord_id, exam_cost()):
             await session.rollback()          # 连带退回刚打上的缴费标记
-            return {"ok": False, "reason": f"灵石不足，考核需缴纳 {EXAM_COST} 灵石。"}
+            return {"ok": False, "reason": f"灵石不足，考核需缴纳 {exam_cost()} 灵石。"}
 
-        for item, qty in EXAM_MATERIALS.items():
+        for item, qty in exam_materials().items():
             await grant_item(session, discord_id, item, qty)
         await session.commit()
     return {"ok": True}

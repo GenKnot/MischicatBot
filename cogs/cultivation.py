@@ -6,7 +6,7 @@ from discord.ext import commands, tasks
 
 from utils.character import (
     calc_cultivation_gain, years_to_seconds, seconds_to_years,
-    get_cultivation_bonus, get_effective_lifespan_max, REALM_LIFESPAN,
+    get_cultivation_bonus, get_effective_lifespan_max, spirit_root_speed,
 )
 from utils.realms import cultivation_needed, lifespan_max_for_realm
 from utils.config import COMMAND_PREFIX
@@ -144,9 +144,9 @@ class CultivationCog(commands.Cog, name="Cultivation"):
         embed.add_field(name="逃跑成功率", value=f"{escape_pct:.1f}%", inline=True)
         alchemy_level = player.get("alchemy_level", 0)
         if alchemy_level > 0:
-            from utils.alchemy import ALCHEMY_EXP_THRESHOLDS
+            from utils.alchemy import exp_thresholds
             alchemy_exp = player.get("alchemy_exp", 0)
-            next_exp = ALCHEMY_EXP_THRESHOLDS[alchemy_level + 1] if alchemy_level < 9 and alchemy_level + 1 < len(ALCHEMY_EXP_THRESHOLDS) else None
+            next_exp = exp_thresholds()[alchemy_level + 1] if alchemy_level < 9 and alchemy_level + 1 < len(exp_thresholds()) else None
             exp_str = f"{alchemy_exp} / {next_exp}" if next_exp else f"{alchemy_exp}（满级）"
             embed.add_field(name=f"炼丹师 {alchemy_level} 品", value=f"经验 {exp_str}", inline=False)
         async with AsyncSessionLocal() as session:
@@ -198,9 +198,8 @@ class CultivationCog(commands.Cog, name="Cultivation"):
             return await interaction.followup.send(f"道友正在采集中，无法修炼。还剩约 **{remaining:.1f} 年**。")
         if await is_defending(uid):
             return await interaction.followup.send("守城期间无法修炼，专心守城！", ephemeral=True)
-        from utils.character import SPIRIT_ROOT_SPEED
         bonus = await get_cultivation_bonus(uid, player["current_city"], player.get("cave"))
-        root_mult = SPIRIT_ROOT_SPEED.get(player["spirit_root_type"], 1.0)
+        root_mult = spirit_root_speed(player["spirit_root_type"])
         root_label = {
             "单灵根": "极快", "双灵根": "较快", "三灵根": "普通",
             "四灵根": "较慢", "五灵根": "迟缓", "变异灵根": "特殊",

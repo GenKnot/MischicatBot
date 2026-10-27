@@ -1,5 +1,5 @@
 {
- "_说明": "机器人主动搭话（U1·江湖百态 P5）的配置。daily_cap：每个玩家每天最多收到几次『搭话事件』（一次事件里可以有很多人同时说话，合并成一条消息；用户定 3）；pair_cooldown_hours：同一个机器人对同一个玩家的搭话间隔；active_within_hours：玩家这么久内活跃过才会被搭话。arrive：到城时每个熟人各自掷骰，概率取『关系』和『好感档位』里较大的一个（很熟的几乎必来，陌生人很少主动）；congrats：认识你的人（按关系概率，基本都会来）+ 不认识的人（最多 stranger_max 个）；conflict：不限朋友人数（max_messages 为 null = 不限），劝架的最多 mediators_max 个；max_lines：一条消息里最多展示几行，多出来的写『另有 N 位』。台词本身在 data/bot_chatter/。null 表示不限。 hostile_favor：好感不高于它就算『有仇』；familiar_weight：熟人被挑中说话的权重 = 1 + 关系强度/strength_div + 好感/favor_div，有仇的乘 hostile_factor；mediator：谁有资格来劝架（善意或守序不低于这条线）；attitude.*_gap_other / covet_bonded_factor：态度公式里境界差 / 熟人的折扣。",
+ "_说明": "机器人主动搭话（U1·江湖百态 P5）的配置。daily_cap：每个玩家每天最多收到几次『搭话事件』（一次事件里可以有很多人同时说话，合并成一条消息；用户定 3）；pair_cooldown_hours：同一个机器人对同一个玩家的搭话间隔；active_within_hours：玩家这么久内活跃过才会被搭话。arrive：到城时每个熟人各自掷骰，概率取『关系』和『好感档位』里较大的一个（很熟的几乎必来，陌生人很少主动）；congrats：认识你的人（按关系概率，基本都会来）+ 不认识的人（最多 stranger_max 个）；conflict：不限朋友人数（max_messages 为 null = 不限），劝架的最多 mediators_max 个；max_lines：一条消息里最多展示几行，多出来的写『另有 N 位』。台词本身在 data/bot_chatter/。null 表示不限。 hostile_favor：好感不高于它就算『有仇』；familiar_weight：熟人被挑中说话的权重 = 1 + 关系强度/strength_div + 好感/favor_div，有仇的乘 hostile_factor；mediator：谁有资格来劝架（善意或守序不低于这条线）；attitude.*_gap_other / covet_bonded_factor：态度公式里境界差 / 熟人的折扣。 queue：claim_limit —— 每 30 秒最多发出几条到期的搭话；keep_days —— 已发出的搭话记录保留几天。",
  "daily_cap": 3,
  "pair_cooldown_hours": 4,
  "active_within_hours": 24,
@@ -92,5 +92,9 @@
   "kindness_min": 55,
   "lawful_min": 55,
   "extra_delay_seconds": 60
+ },
+ "queue": {
+  "claim_limit": 50,
+  "keep_days": 2
  }
 }

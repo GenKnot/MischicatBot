@@ -1,7 +1,8 @@
 {
-  "trigger_chance": {
-    "spirit_fox": 0.00035,
-    "ancient_tomb": 0.0003,
-    "wandering_sword": 0.0004
-  }
+ "_说明": "奇遇链（utils/adventure_chain.py）：trigger_chance 每条奇遇链每次探险的触发概率。",
+ "trigger_chance": {
+  "spirit_fox": 0.00035,
+  "ancient_tomb": 0.0003,
+  "wandering_sword": 0.0004
+ }
 }

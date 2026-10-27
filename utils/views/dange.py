@@ -1,12 +1,12 @@
 import discord
 from sqlalchemy import func, update
 
+from utils import rules
 from utils.atomic import spend_stones
 from utils.db_async import AsyncSessionLocal, Player, Inventory
 from utils.views.base import TimedView
 
-EXAM_COST = 500
-MATERIAL_COST = 300
+# 丹阁入门考核的费用和补材料的费用在 data/game_rules.json 的 alchemy.exam_cost / exam_refill_cost（管理员可以调）
 
 REALM_TIER = {
     "炼气": 0, "筑基": 1, "结丹": 2, "元婴": 3, "化神": 4,
@@ -94,6 +94,8 @@ class DangeView(TimedView):
         self.cog = cog
         self.player = player
         self.paid = paid
+        self.pay_btn.label = f"缴费参加考核（{rules.get('alchemy.exam_cost')}灵石）"
+        self.buy_btn.label = f"购买材料（{rules.get('alchemy.exam_refill_cost')}灵石）"
 
     @discord.ui.button(label="缴费参加考核（500灵石）", style=discord.ButtonStyle.success, row=0)
     async def pay_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -121,10 +123,10 @@ class DangeView(TimedView):
             # rollback 会让 ORM 对象过期，之后再读属性会触发同步 IO，
             # 所以先把要显示的余额取成普通变量
             stones_now = player.spirit_stones
-            if not await spend_stones(session, uid, EXAM_COST):
+            if not await spend_stones(session, uid, rules.get("alchemy.exam_cost")):
                 await session.rollback()      # 连带退回刚打上的缴费标记
                 return await interaction.response.send_message(
-                    f"*「灵石不够就别来凑热闹了，{EXAM_COST} 灵石，一个子儿都不能少。」*\n\n"
+                    f"*「灵石不够就别来凑热闹了，{rules.get('alchemy.exam_cost')} 灵石，一个子儿都不能少。」*\n\n"
                     f"当前灵石：**{stones_now}**",
                     ephemeral=True,
                 )
@@ -146,9 +148,9 @@ class DangeView(TimedView):
             player = await session.get(Player, uid)
             if not player:
                 return await interaction.response.send_message("角色不存在。", ephemeral=True)
-            if not await spend_stones(session, uid, MATERIAL_COST):
+            if not await spend_stones(session, uid, rules.get("alchemy.exam_refill_cost")):
                 return await interaction.response.send_message(
-                    f"*「{MATERIAL_COST} 灵石都拿不出来？」*\n\n当前灵石：**{player.spirit_stones}**",
+                    f"*「{rules.get('alchemy.exam_refill_cost')} 灵石都拿不出来？」*\n\n当前灵石：**{player.spirit_stones}**",
                     ephemeral=True,
                 )
             await _give_materials(uid, session)
@@ -167,9 +169,10 @@ class DangeView(TimedView):
     def set_paid(self, paid: bool):
         self.paid = paid
         self.pay_btn.disabled = paid
-        self.pay_btn.label = "已缴费" if paid else f"缴费参加考核（{EXAM_COST}灵石）"
+        self.pay_btn.label = "已缴费" if paid else f"缴费参加考核（{rules.get('alchemy.exam_cost')}灵石）"
         self.alchemy_btn.disabled = not paid
         self.buy_btn.disabled = not paid
+        self.buy_btn.label = f"购买材料（{rules.get('alchemy.exam_refill_cost')}灵石）"
 
 
 async def _go_to_alchemy(interaction, author, player, cog, msg: str):

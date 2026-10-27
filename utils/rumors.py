@@ -153,7 +153,7 @@ async def record_rumor(kind: str, subject_id: str, subject_name: str, *, target_
                         is_human=not is_bot_id(subject_id), negative=k["negative"], content=text,
                         city=str(values.get("city", "")), broadcast_at=0)
             session.add(row)
-            await fame.add_fame(subject_id, max(1, score // 2), session)        # 出了事迹就更出名（恶名也是名）
+            await fame.add_fame(subject_id, fame.gain(score), session)        # 出了事迹就更出名（恶名也是名）
             await session.commit()
             return row.id
     except Exception:

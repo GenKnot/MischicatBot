@@ -2,8 +2,8 @@ import time
 import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
+from utils import rules
 from utils.market import (
-    MAX_LISTINGS, FEE_RATE,
     get_active_listings, get_my_listings, get_expired_unclaimed,
     list_item, list_equipment, buy_listing, delist,
 )
@@ -46,7 +46,7 @@ def _listing_line(d: dict, show_seller: bool = True) -> str:
 def _market_main_embed(player: dict, listings: list[dict], page: int, filter_type: str) -> discord.Embed:
     embed = discord.Embed(
         title="🏪 交易坊",
-        description=f"灵石：**{player.get('spirit_stones', 0):,}**　手续费 {int(FEE_RATE*100)}%，上架3天自动下架",
+        description=f"灵石：**{player.get('spirit_stones', 0):,}**　手续费 {rules.get("market.fee_rate")*100:g}%，上架{rules.get("market.listing_ttl_hours")/24:g}天自动下架",
         color=discord.Color.orange(),
     )
     start = page * PAGE_SIZE
@@ -64,7 +64,7 @@ def _market_main_embed(player: dict, listings: list[dict], page: int, filter_typ
 def _my_listings_embed(player: dict, listings: list[dict], expired: list[dict]) -> discord.Embed:
     embed = discord.Embed(
         title="📦 我的摊位",
-        description=f"灵石：**{player.get('spirit_stones', 0):,}**　最多 {MAX_LISTINGS} 件同时在售",
+        description=f"灵石：**{player.get('spirit_stones', 0):,}**　最多 {rules.get("market.max_listings")} 件同时在售",
         color=discord.Color.orange(),
     )
     active = [d for d in listings if d["status"] == "active"]

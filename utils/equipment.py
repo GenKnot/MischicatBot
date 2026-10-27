@@ -1,6 +1,8 @@
 import random
 import uuid
 
+from utils import rules
+
 QUALITY_ORDER = ["普通", "精良", "稀有", "史诗", "传说"]
 
 QUALITY_COLOR = {
@@ -11,21 +13,12 @@ QUALITY_COLOR = {
     "传说": "🟨",
 }
 
-QUALITY_STAT_MULT = {
-    "普通": 1.0,
-    "精良": 1.5,
-    "稀有": 2.2,
-    "史诗": 3.5,
-    "传说": 6.0,
-}
+# 品质倍数、词缀数量、随机品质权重、属性随机范围等在 data/game_rules.json 的 equipment（管理员可以调），用的时候读
 
-QUALITY_AFFIX_COUNT = {
-    "普通": (0, 0),
-    "精良": (1, 1),
-    "稀有": (1, 2),
-    "史诗": (2, 2),
-    "传说": (2, 3),
-}
+
+def _cfg() -> dict:
+    return rules.section("equipment")
+
 
 SLOTS = ["武器", "防具", "饰品"]
 
@@ -330,7 +323,7 @@ def _pick_weighted(pool: list[dict]) -> dict:
 
 
 def _pick_affixes(slot: str, quality: str, tier: int) -> tuple[list[dict], dict | None]:
-    lo, hi = QUALITY_AFFIX_COUNT[quality]
+    lo, hi = _cfg()["affix_count"][quality]
     count = random.randint(lo, hi)
     if count == 0:
         return [], None
@@ -346,7 +339,7 @@ def _pick_affixes(slot: str, quality: str, tier: int) -> tuple[list[dict], dict 
 
     suffix = None
     if count >= 2:
-        if random.random() < 0.5:
+        if random.random() < _cfg()["second_prefix_p"]:
             candidates = [p for p in prefix_pool if p["name"] not in used_names]
             if candidates:
                 p = _pick_weighted(candidates)
@@ -373,33 +366,34 @@ def generate_equipment(tier: int = 0, quality: str = None, slot: str = None, sta
     if slot is None:
         slot = random.choice(SLOTS)
     if quality is None:
-        weights = [50, 30, 15, 4, 1]
-        quality = random.choices(QUALITY_ORDER, weights=weights)[0]
+        w = _cfg()["random_quality_weights"]
+        quality = random.choices(QUALITY_ORDER, weights=[w[q] for q in QUALITY_ORDER])[0]
 
     template = random.choice(EQUIP_TEMPLATES[slot])
     if stat_bias:
         biased = [t for t in EQUIP_TEMPLATES[slot] if any(s in t["stats"] for s in stat_bias)]
         if biased:
             template = random.choice(biased)
-    mult = QUALITY_STAT_MULT[quality]
-    base = 1 + tier // 2
+    c = _cfg()
+    mult = c["quality_mult"][quality]
+    base = 1 + tier // c["tier_div"]
 
     stats = {}
     for stat in template["stats"]:
-        val = max(1, int(base * mult * random.uniform(0.8, 1.2)))
+        val = max(1, int(base * mult * random.uniform(*c["noise"])))
         stats[stat] = stats.get(stat, 0) + val
 
     prefixes, suffix = _pick_affixes(slot, quality, tier)
-    affix_mult = max(1, base * 0.6)
+    affix_mult = max(1, base * c["affix_scale"])
 
     for pfx in prefixes:
         for stat, val in pfx["stats"].items():
-            bonus = max(1, int(val * affix_mult * random.uniform(0.8, 1.2)))
+            bonus = max(1, int(val * affix_mult * random.uniform(*c["noise"])))
             stats[stat] = stats.get(stat, 0) + bonus
 
     if suffix:
         for stat, val in suffix["stats"].items():
-            bonus = max(1, int(val * affix_mult * random.uniform(0.8, 1.2)))
+            bonus = max(1, int(val * affix_mult * random.uniform(*c["noise"])))
             stats[stat] = stats.get(stat, 0) + bonus
 
     tier_name = TIER_NAMES[min(tier, len(TIER_NAMES) - 1)]

@@ -312,3 +312,17 @@ async def test_重新读取时_库里被删掉的覆盖值恢复成默认(db):
         await s.commit()
     assert await hub.refresh() == 0
     assert bot_feuds.load()["kill"]["cap"] == hub.defaults("bot_feuds.json")["kill"]["cap"]
+
+
+async def test_命令_说明(db):
+    cog = make_cog()
+    c = ctx_with(1)
+    await cog.tune_note.callback(cog, c, "feuds")
+    assert c.said("bot_feuds.json 说明") and c.said("tie_chance")
+    c = ctx_with(1)
+    await cog.tune_note.callback(cog, c, "不存在")
+    assert c.said("没有这个配置文件")
+    c = ctx_with(5)
+    await cog.tune_note.callback(cog, c, "feuds")
+    assert c.said("只有服务器管理员")
+    assert all(hub.note(n) for n in hub.REGISTRY), "每个配置文件都应写说明"

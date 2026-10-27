@@ -7,7 +7,7 @@ from utils.views.base import TimedView
 from utils.events.public.wanbao import (
     get_active_auction, get_lots, get_current_lot,
     place_bid, list_item, can_list_item,
-    WANBAO_CITY, LISTING_FEE, MAX_PLAYER_LOTS, LOT_DURATION,
+    WANBAO_CITY, listing_fee, lot_duration, max_player_lots,
 )
 
 
@@ -209,7 +209,7 @@ class WanbaoMainView(TimedView):
 class PublicBidView(TimedView):
     public = True          # 拍卖会公开竞价，人人可出价
     def __init__(self, auction_id: str, lot_index: int, total: int):
-        super().__init__(timeout=LOT_DURATION)
+        super().__init__(timeout=lot_duration())
         self.auction_id = auction_id
         self.lot_index = lot_index
         self.total = total
@@ -280,7 +280,7 @@ class PublicBidView(TimedView):
 
 class BidView(TimedView):
     def __init__(self, author, auction_id: str, lot: dict, ends_at: float, lot_index: int, total: int, pe_cog=None):
-        super().__init__(timeout=LOT_DURATION)
+        super().__init__(timeout=lot_duration())
         self.author = author
         self.auction_id = auction_id
         self.lot = lot
@@ -365,7 +365,7 @@ class ListItemModal(discord.ui.Modal, title="上架拍品"):
         ok, msg = await list_item(self.auction_id, uid, self.item_name.value.strip(), qty, price)
         if ok:
             await interaction.response.send_message(
-                f"{msg}\n上架手续费 **{LISTING_FEE} 灵石** 已扣除。流拍时需额外支付 {LISTING_FEE} 灵石取回费。",
+                f"{msg}\n上架手续费 **{listing_fee()} 灵石** 已扣除。流拍时需额外支付 {listing_fee()} 灵石取回费。",
                 ephemeral=True
             )
         else:

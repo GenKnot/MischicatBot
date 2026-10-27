@@ -13,7 +13,11 @@ import pytest
 from tests.conftest import make_player
 from tests.discord_fakes import FakeInteraction, FakeUser
 from utils.views import dange as dange_mod
-from utils.views.dange import EXAM_COST, MATERIAL_COST, DangeView
+from utils import rules
+from utils.views.dange import DangeView
+
+EXAM_COST = rules.get("alchemy.exam_cost")
+MATERIAL_COST = rules.get("alchemy.exam_refill_cost")
 
 
 @pytest.fixture

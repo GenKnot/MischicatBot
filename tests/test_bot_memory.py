@@ -265,7 +265,7 @@ def test_久别重逢_隔了三天才算_带加成():
     far = mem(M("chat", extra="落云城", count=2, prev_at=NOW - 3 * DAY - 5, last_at=NOW))
     assert "recall_absence" not in names(near)
     (c,) = bm.candidates(far, "greet", "熟识", NOW)
-    assert c[0] == "recall_absence" and c[1] == {"days": 3, "city": "落云城"} and c[2] == bm.BOOST_P
+    assert c[0] == "recall_absence" and c[1] == {"days": 3, "city": "落云城"} and c[2] == bm.load()["recall"]["boost_p"]
 
 
 def test_第一次聊天没有上一次_不算久别():
@@ -282,7 +282,7 @@ def test_结仇_打劫和废修为合并计次_仇视或陌生时关键时刻():
     m = mem(M("robbed", count=2), M("crippled", count=1))
     for tier, boosted in (("仇视", True), ("陌生", True), ("熟识", False), ("至交", False)):
         (c,) = bm.candidates(m, "greet", tier, NOW)
-        assert c[0] == "recall_grudge" and c[1] == {"count": 3} and (c[2] == bm.BOOST_P) is boosted
+        assert c[0] == "recall_grudge" and c[1] == {"count": 3} and (c[2] == bm.load()["recall"]["boost_p"]) is boosted
 
 
 def test_一起行动_至少两次才提_次数是以前的():
@@ -316,8 +316,8 @@ def test_概率_按内向外向调整_普通场景():
 
 def test_概率_关键时刻用加成概率_不看内向外向():
     m = mem(M("robbed", count=1))
-    assert bm.pick_recall(m, "greet", "仇视", "内向", FixedRng(bm.BOOST_P - 0.01)) is not None
-    assert bm.pick_recall(m, "greet", "仇视", "内向", FixedRng(bm.BOOST_P + 0.01)) is None
+    assert bm.pick_recall(m, "greet", "仇视", "内向", FixedRng(bm.load()["recall"]["boost_p"] - 0.01)) is not None
+    assert bm.pick_recall(m, "greet", "仇视", "内向", FixedRng(bm.load()["recall"]["boost_p"] + 0.01)) is None
 
 
 def test_只在允许的场景追加():

@@ -1,30 +1,30 @@
 import random
 
+from utils import rules
+
 SPIRIT_ROOT_TYPES = ["金", "木", "水", "火", "土"]
 VARIANT_TYPES = ["雷", "冰", "风", "暗", "光"]
 
-SPIRIT_ROOT_SPEED = {
-    "单灵根": 2.0,
-    "双灵根": 1.5,
-    "三灵根": 1.2,
-    "四灵根": 0.9,
-    "五灵根": 0.7,
-    "变异灵根": 1.8,
-}
+HOURS_PER_YEAR = 2          # 1 游戏年 = 现实 2 小时（时间的基本刻度，写进了很多文案和刻度，不在调参里）
 
-REALM_LIFESPAN = {
-    "炼气期": 100,
-    "筑基期": 200,
-    "结丹期": 450,
-    "元婴期": 1000,
-    "化神期": 2000,
-    "炼虚期": 3000,
-    "合体期": 5000,
-    "大乘期": 10000,
-}
+# 灵根修炼速度 / 抽中概率、各境界寿元、修炼公式、置业价格等数值在 data/game_rules.json 的 character（管理员可以调），用的时候读
 
-HOURS_PER_YEAR = 2
-AUTO_CULTIVATE_THRESHOLD_YEARS = 2
+
+def cfg() -> dict:
+    return rules.section("character")
+
+
+def spirit_root_speed(root_type: str) -> float:
+    return cfg()["spirit_root_speed"].get(root_type, 1.0)
+
+
+def realm_lifespan(major: str) -> int:
+    """大境界（如「炼气期」）的寿元上限。"""
+    return cfg()["realm_lifespan"][major]
+
+
+def auto_cultivate_threshold_years() -> float:
+    return cfg()["cultivation"]["auto_threshold_years"]
 
 QUESTIONS = [
     {
@@ -109,42 +109,37 @@ QUESTIONS = [
     },
 ]
 
-BASE_STATS = {
-    "comprehension": 5,
-    "physique": 5,
-    "fortune": 5,
-    "bone": 5,
-    "soul": 5,
-    "spirit_stones": 50,
-}
+def base_stats() -> dict:
+    return dict(cfg()["base_stats"])
 
 
 def roll_spirit_root(rng=random):
     """`rng` 默认用全局 random；机器人生成传自己的 Random 以便复现。"""
-    roll = rng.random() * 100
-    if roll < 1:
-        root_type = "单灵根"
+    odds = cfg()["spirit_root_odds"]               # 相对权重（默认加起来 100）
+    roll, edge = rng.random() * sum(odds.values()), 0.0
+    root_type = "变异灵根"
+    for name, p in odds.items():            # 按单 / 双 / 三 / 四 / 五 / 变异的顺序累加概率
+        edge += p
+        if roll < edge:
+            root_type = name
+            break
+    if root_type == "单灵根":
         elements = [rng.choice(SPIRIT_ROOT_TYPES)]
-    elif roll < 10:
-        root_type = "双灵根"
+    elif root_type == "双灵根":
         elements = rng.sample(SPIRIT_ROOT_TYPES, 2)
-    elif roll < 30:
-        root_type = "三灵根"
+    elif root_type == "三灵根":
         elements = rng.sample(SPIRIT_ROOT_TYPES, 3)
-    elif roll < 65:
-        root_type = "四灵根"
+    elif root_type == "四灵根":
         elements = rng.sample(SPIRIT_ROOT_TYPES, 4)
-    elif roll < 95:
-        root_type = "五灵根"
+    elif root_type == "五灵根":
         elements = SPIRIT_ROOT_TYPES[:]
     else:
-        root_type = "变异灵根"
         elements = [rng.choice(VARIANT_TYPES)]
     return "·".join(elements), root_type
 
 
 def calc_stats(answers: dict) -> dict:
-    stats = dict(BASE_STATS)
+    stats = base_stats()
     for q_idx, choice in answers.items():
         _, bonuses = QUESTIONS[q_idx]["options"][choice]
         for key, val in bonuses.items():
@@ -153,9 +148,10 @@ def calc_stats(answers: dict) -> dict:
 
 
 def calc_cultivation_gain(years: int, comprehension: int, root_type: str) -> int:
-    base = years * 10
-    comp_bonus = 1 + (comprehension - 5) * 0.05
-    speed_bonus = SPIRIT_ROOT_SPEED.get(root_type, 1.0)
+    c = cfg()["cultivation"]
+    base = years * c["base_per_year"]
+    comp_bonus = 1 + (comprehension - c["comprehension_base"]) * c["comprehension_step"]
+    speed_bonus = spirit_root_speed(root_type)
     return int(base * comp_bonus * speed_bonus)
 
 
@@ -167,17 +163,7 @@ def seconds_to_years(seconds: float) -> float:
     return seconds / (HOURS_PER_YEAR * 3600)
 
 
-RESIDENCE_BONUS = 0.10
-CAVE_BONUS = 0.25
-CAVE_EXPLORE_BONUS = 3
-RESIDENCE_EXPLORE_BONUS = 2
-
-RESIDENCE_PRICE_NORMAL = 5000
-RESIDENCE_PRICE_CENTRAL = 10000
-CAVE_PRICE = 20000
-
-REPUTATION_RESIDENCE = 300
-REPUTATION_CAVE = 600
+# 置业 / 洞府的加成、价格、声望门槛：rules.section("character")["residence"] / ["cave"]
 
 
 def get_effective_lifespan_max(player: dict) -> int:
@@ -186,7 +172,7 @@ def get_effective_lifespan_max(player: dict) -> int:
     techniques_raw = player.get("techniques")
     if not techniques_raw:
         return base
-    from utils.sects import STAGE_PCT_MULTIPLIER, TECHNIQUES
+    from utils.sects import TECHNIQUES, pct_multiplier
     try:
         techs = json.loads(techniques_raw)
     except Exception:
@@ -201,7 +187,7 @@ def get_effective_lifespan_max(player: dict) -> int:
         lb = info.get("stat_bonus", {}).get("lifespan_bonus", 0)
         if lb:
             stage = t.get("stage", "入门")
-            mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
+            mult = pct_multiplier(stage)
             bonus += int(lb * mult)
     return base + bonus
 
@@ -217,9 +203,9 @@ async def get_cultivation_bonus(discord_id: str, current_city: str, cave: str) -
     import json
     bonus = 0.0
     if await has_residence(discord_id, current_city):
-        bonus += RESIDENCE_BONUS
+        bonus += cfg()["residence"]["bonus"]
     if cave:
-        bonus += CAVE_BONUS
+        bonus += cfg()["cave"]["bonus"]
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text("SELECT techniques FROM players WHERE discord_id = :uid"),
@@ -239,7 +225,7 @@ async def get_explore_limit_bonus(discord_id: str, current_city: str, cave: str)
     from utils.residence import has_residence
     bonus = 0
     if await has_residence(discord_id, current_city):
-        bonus += RESIDENCE_EXPLORE_BONUS
+        bonus += cfg()["residence"]["explore_bonus"]
     if cave:
-        bonus += CAVE_EXPLORE_BONUS
+        bonus += cfg()["cave"]["explore_bonus"]
     return bonus

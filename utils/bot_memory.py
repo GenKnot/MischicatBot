@@ -8,23 +8,51 @@
 所有写入都是旁路：出错只记 warning，不影响主流程（和传闻一样）。
 """
 
+import json
 import logging
 import random
 import time
+from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import delete, select
 
+from utils import settings_hub
 from utils.db_async import AsyncSessionLocal, BotMemory
 
 log = logging.getLogger(__name__)
 
-MAX_GIFTS = 8
+_PATH = Path(__file__).resolve().parent.parent / "data" / "bot_memory.json"
 DAY = 86400
-ABSENCE_DAYS = 3                 # 上次见面隔了几天算『好久不见』
-FAMILIAR_CHATS = 5               # 聊过几次算『聊得熟了』
-BASE_RECALL_P = 0.25
-LEVEL_FACTOR = {"内向": 0.5, "偏内向": 0.8, "中性": 1.0, "偏外向": 1.3, "外向": 1.6}
-BOOST_P = 0.6                    # 关键时刻（结仇后见面、久别重逢）的概率
+LEVELS = ("内向", "偏内向", "中性", "偏外向", "外向")
+
+
+@lru_cache(maxsize=1)
+def _load() -> dict:
+    return settings_hub.read(_PATH)
+
+
+def load() -> dict:
+    return _load()
+
+
+def reload() -> None:
+    _load.cache_clear()
+
+
+def validate(cfg: dict) -> list[str]:
+    errors = []
+    if cfg.get("max_gifts", 0) < 1 or cfg.get("absence_days", 0) < 1 or cfg.get("familiar_chats", 0) < 1 or cfg.get("shared_min", 0) < 1:
+        errors.append("max_gifts / absence_days / familiar_chats / shared_min 应 ≥ 1")
+    r = cfg.get("recall", {})
+    if not (0 <= r.get("base", -1) <= 1 and 0 <= r.get("cap", -1) <= 1 and 0 <= r.get("boost_p", -1) <= 1):
+        errors.append("recall: base / cap / boost_p 应在 0~1")
+    lf = r.get("level_factor", {})
+    if set(lf) != set(LEVELS) or any(v < 0 for v in lf.values()):
+        errors.append(f"recall.level_factor 需要 {LEVELS}，系数非负")
+    return errors
+
+
 # 哪些场景后面可以追加回忆；礼物场景不提『送过的礼物』（刚送的那件就是现在这件）
 RECALL_SCENES = {"greet", "chat_again", "gift_love", "gift_like", "gift_neutral", "gift_dislike", "gift_hate",
                  "gift_limit", "party_accept", "party_refuse", "dual_accept", "dual_refuse"}
@@ -46,11 +74,11 @@ async def remember(player_id: str, bot_id: str, kind: str, detail: str = "", ext
                 if extra:
                     row.extra = extra
             await session.flush()
-            if kind == "gift":                                # 礼物只留最近 MAX_GIFTS 件
+            if kind == "gift":                                # 礼物只留最近 max_gifts 件
                 keep = list((await session.execute(
                     select(BotMemory.detail).where(BotMemory.player_id == player_id, BotMemory.bot_id == bot_id,
                                                    BotMemory.kind == "gift").order_by(BotMemory.last_at.desc())
-                    .limit(MAX_GIFTS))).scalars())
+                    .limit(load()["max_gifts"]))).scalars())
                 await session.execute(delete(BotMemory).where(
                     BotMemory.player_id == player_id, BotMemory.bot_id == bot_id, BotMemory.kind == "gift",
                     BotMemory.detail.notin_(keep)))
@@ -90,7 +118,7 @@ def _days(ts: float, now: float) -> int:
 
 def candidates(memories: dict, scene: str, tier: str, now: float | None = None) -> list[tuple[str, dict, float]]:
     """此刻能追加的回忆 [(场景名, 填充变量, 概率加成)]，概率加成 None 表示用普通概率，数字表示『关键时刻』的概率。"""
-    now = now or time.time()
+    now, cfg = now or time.time(), load()
     out = []
     if "gift" in memories and not scene.startswith("gift_"):
         rows = sorted(memories["gift"], key=lambda r: r.last_at, reverse=True)
@@ -98,15 +126,15 @@ def candidates(memories: dict, scene: str, tier: str, now: float | None = None) 
         out.append(("recall_gift", {"item": best.detail, "count": len(rows)}, None))
     chat = (memories.get("chat") or [None])[0]
     if chat:
-        if chat.prev_at and _days(chat.prev_at, now) >= ABSENCE_DAYS:
-            out.append(("recall_absence", {"days": _days(chat.prev_at, now), "city": chat.extra or "此地"}, BOOST_P))
-        elif chat.count >= FAMILIAR_CHATS:
+        if chat.prev_at and _days(chat.prev_at, now) >= cfg["absence_days"]:
+            out.append(("recall_absence", {"days": _days(chat.prev_at, now), "city": chat.extra or "此地"}, cfg["recall"]["boost_p"]))
+        elif chat.count >= cfg["familiar_chats"]:
             out.append(("recall_chat", {"count": chat.count}, None))
     grudge = (memories.get("robbed") or []) + (memories.get("crippled") or [])
     if grudge:
-        out.append(("recall_grudge", {"count": sum(r.count for r in grudge)}, BOOST_P if tier in ("仇视", "陌生") else None))
+        out.append(("recall_grudge", {"count": sum(r.count for r in grudge)}, cfg["recall"]["boost_p"] if tier in ("仇视", "陌生") else None))
     together = (memories.get("party") or []) + (memories.get("dual") or [])
-    if together and sum(r.count for r in together) >= 2:                  # 记录发生在说话之前，≥2 才是『以前也一起过』
+    if together and sum(r.count for r in together) >= cfg["shared_min"]:   # 记录发生在说话之前，≥2 才是『以前也一起过』
         out.append(("recall_together", {"count": sum(r.count for r in together) - 1}, None))
     if memories.get("defeated"):
         row = memories["defeated"][0]
@@ -124,7 +152,8 @@ def pick_recall(memories: dict, scene: str, tier: str, level: str, rng: random.R
     if not options:
         return None
     name, fmt, boost = rng.choice(options)
-    p = boost if boost is not None else min(0.8, BASE_RECALL_P * LEVEL_FACTOR.get(level, 1.0))
+    r = load()["recall"]
+    p = boost if boost is not None else min(r["cap"], r["base"] * r["level_factor"].get(level, 1.0))
     return (name, fmt) if rng.random() < p else None
 
 

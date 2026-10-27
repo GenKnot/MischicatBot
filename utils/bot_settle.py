@@ -40,7 +40,6 @@ PILL_HANDLERS = {"筑基丹": handle_zhuji_breakthrough, "凝丹丹": handle_nin
                  "化婴丹": handle_huaying_breakthrough}
 SUMMARY_KEYS = ("bots", "settled", "skipped", "errors", "income", "upkeep", "pills", "materials_value",
                 "breakthroughs", "bt_failures", "gate_wait", "capped", "deaths", "ascended", "refilled", "wild_trips", "cleaned")
-RAID_KEEP_DAYS = 3                                           # 打劫 / 击杀次数的记录只留最近几天
 
 
 def today() -> str:
@@ -259,7 +258,7 @@ async def _cleanup(day: str) -> int:
     """被玩家击杀的机器人（标了坐化、但清理没做完）补清；顺手删掉过期的打劫次数记录。返回清走几个。"""
     async with AsyncSessionLocal() as session:
         ids = list((await session.execute(select(Player.discord_id).where(Player.is_bot == True, Player.is_dead == True))).scalars())  # noqa: E712
-        t = time.mktime(time.strptime(day, "%Y-%m-%d")) - RAID_KEEP_DAYS * 86400
+        t = time.mktime(time.strptime(day, "%Y-%m-%d")) - be.world()["raid_keep_days"] * 86400
         await session.execute(delete(BotRaid).where(BotRaid.day < time.strftime("%Y-%m-%d", time.localtime(t))))
         await session.commit()
     return (await bot_world.remove_bots(ids))["removed"] if ids else 0

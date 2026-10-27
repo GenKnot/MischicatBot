@@ -86,6 +86,9 @@ def validate(cfg: dict) -> list[str]:
         errors.append("hostile_favor 应 ≤ 0；familiar_weight 要有 strength_div / favor_div / hostile_factor")
     if set(cfg.get("mediator", {})) != {"kindness_min", "lawful_min", "extra_delay_seconds"}:
         errors.append("mediator 要有 kindness_min / lawful_min / extra_delay_seconds")
+    q = cfg.get("queue", {})
+    if q.get("claim_limit", 0) < 1 or q.get("keep_days", -1) < 0:
+        errors.append("queue.claim_limit 应 ≥ 1，keep_days 不能为负")
     if set(cfg.get("reply", {})) != set(REPLY_SCENES):
         errors.append(f"reply 应有 {sorted(REPLY_SCENES)}")
     return errors
@@ -480,14 +483,14 @@ async def _set_outcome(qids: list[str], outcome: str) -> None:
         await session.commit()
 
 
-async def claim_due(now: float | None = None, limit: int = 50, rng=None) -> list[dict]:
+async def claim_due(now: float | None = None, limit: int | None = None, rng=None) -> list[dict]:
     """取出到点的搭话（条件更新认领，不会重复发）。同一玩家、同一场景、同一个 group 的合并成一条消息（多个人一起说话）。
     被屏蔽 / 超上限 / 冷却中 / 台词挑不出的丢弃（记在 outcome 里）。每条消息算一次搭话事件（今日计数 +1）。
     返回 [{"queue_ids", "payload": group_payload 的结果, "scene"}]，由后台循环发到频道。"""
     now, cfg = now or time.time(), load()
     async with AsyncSessionLocal() as session:
         rows = (await session.execute(select(ChatterQueue).where(ChatterQueue.sent_at == 0, ChatterQueue.due_at <= now)
-                                      .order_by(ChatterQueue.due_at).limit(limit))).scalars().all()
+                                      .order_by(ChatterQueue.due_at).limit(cfg["queue"]["claim_limit"] if limit is None else limit))).scalars().all()
         todo = [(r.id, r.player_id, r.speaker_id, r.scene, json.loads(r.fmt or "{}")) for r in rows]
     groups: dict[tuple, list] = {}
     for qid, pid, sid, scene, fmt in todo:
@@ -518,10 +521,11 @@ async def claim_due(now: float | None = None, limit: int = 50, rng=None) -> list
     return out
 
 
-async def purge_old(now: float | None = None, keep_days: int = 2) -> int:
+async def purge_old(now: float | None = None, keep_days: float | None = None) -> int:
     """清掉已处理的旧队列记录。"""
     from sqlalchemy import delete
     now = now or time.time()
+    keep_days = load()["queue"]["keep_days"] if keep_days is None else keep_days
     async with AsyncSessionLocal() as session:
         res = await session.execute(delete(ChatterQueue).where(ChatterQueue.sent_at > 0, ChatterQueue.sent_at < now - keep_days * 86400))
         await session.commit()

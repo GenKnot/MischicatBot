@@ -50,14 +50,14 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await ctx.send("你当前品级没有可用丹方。")
             return
 
-        from utils.alchemy import get_known_recipes_with_choices, DAILY_LIMIT
+        from utils.alchemy import get_known_recipes_with_choices, daily_limit
         used_today = daily_used_today(player.alchemy_daily_count, player.alchemy_daily_reset)
         known_map = await get_known_recipes_with_choices(uid)
         view = AlchemyMainView(ctx.author, player_dict, has_yanhuo, set(known_map.keys()), cog=self, known_choices=known_map)
         await ctx.send(
             f"**炼丹台**\n"
             f"炼丹师品级：{player.alchemy_level} 品  |  "
-            f"今日剩余次数：{max(0, DAILY_LIMIT - used_today)}/{DAILY_LIMIT}\n"
+            f"今日剩余次数：{max(0, daily_limit() - used_today)}/{daily_limit()}\n"
             f"选择要炼制的丹药：",
             view=view,
         )
@@ -86,7 +86,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await ctx.send("你还没有角色。")
             return
 
-        from utils.alchemy import ALCHEMY_EXP_THRESHOLDS, DAILY_LIMIT
+        from utils.alchemy import exp_thresholds, daily_limit
         level = player.alchemy_level
         exp = player.alchemy_exp
         daily = daily_used_today(player.alchemy_daily_count, player.alchemy_daily_reset)
@@ -95,7 +95,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
             await ctx.send(f"你尚未入门炼丹，使用 `{COMMAND_PREFIX}学炼丹` 拜师入门。")
             return
 
-        next_exp = ALCHEMY_EXP_THRESHOLDS[level + 1] if level < 9 and level + 1 < len(ALCHEMY_EXP_THRESHOLDS) else None
+        next_exp = exp_thresholds()[level + 1] if level < 9 and level + 1 < len(exp_thresholds()) else None
         exp_str = f"{exp} / {next_exp}" if next_exp else f"{exp}（已满级）"
 
         available = list_available_recipes(level)
@@ -104,7 +104,7 @@ class AlchemyCog(commands.Cog, name="Alchemy"):
         embed = discord.Embed(title="炼丹信息", color=0xE8C97A)
         embed.add_field(name="炼丹师品级", value=f"{level} 品", inline=True)
         embed.add_field(name="炼丹经验", value=exp_str, inline=True)
-        embed.add_field(name="今日次数", value=f"{daily}/{DAILY_LIMIT}", inline=True)
+        embed.add_field(name="今日次数", value=f"{daily}/{daily_limit()}", inline=True)
         embed.add_field(
             name=f"可炼丹药（{len(pill_names)} 种）",
             value="、".join(pill_names) if pill_names else "无",

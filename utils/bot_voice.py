@@ -23,7 +23,11 @@ PREFIX_ENDINGS = ("，", "——", "…", "、")           # 以这些结尾的�
 MAX_STYLED_LEN = 100
 REMARK_SCENES = {"greet", "chat_again", "gift_neutral", "gift_like", "gift_love", "gift_limit",
                  "party_accept", "party_refuse", "dual_refuse"}
-REMARK_TIER_FACTOR = {"仇视": 0.0, "陌生": 0.4, "熟识": 1.0, "至交": 1.3}
+
+
+def _remark_factor(tier: str) -> float:
+    from utils import bot_social            # 延迟导入：bot_social 反过来用到对话库
+    return bot_social.favor_cfg()["remark_tier_factor"].get(tier, 0.0)
 
 
 def _on_text(text: str, fn) -> str:
@@ -96,7 +100,7 @@ def style(template: str, traits: dict | None, scene: str, tier: str, rng: random
         if phrase not in text:
             text = phrase + text if phrase.endswith(PREFIX_ENDINGS) else text + phrase
 
-    if scene in REMARK_SCENES and rng.random() < level.get("remark_p", 0.0) * REMARK_TIER_FACTOR.get(tier, 0.0):
+    if scene in REMARK_SCENES and rng.random() < level.get("remark_p", 0.0) * _remark_factor(tier):
         hobby = bt.pool("hobbies").get(traits.get("hobby"), {}).get("remarks", [])
         past = bt.pool("pasts").get(traits.get("past"), {}).get("remarks", [])
         remarks = hobby + past

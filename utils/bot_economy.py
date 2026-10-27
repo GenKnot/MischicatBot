@@ -40,12 +40,41 @@ def load_config() -> dict:
     return json.loads(json.dumps(_load()))
 
 
+def world() -> dict:
+    """`world` 一节（不拷贝，调用方不要改它）：生成数量、档位比例、出生范围……热路径用这个。"""
+    return _load()["world"]
+
+
+def _validate_world(w: dict) -> list[str]:
+    from utils.bot_world import TIERS
+    errors = []
+    if not all(isinstance(w.get(k), int) and w[k] >= 1 for k in ("max_bots", "max_per_batch", "default_count")):
+        errors.append("world: max_bots / max_per_batch / default_count 应是 ≥ 1 的整数")
+    tw = w.get("tier_weights", {})
+    if set(tw) != set(TIERS) or any(v < 0 for v in tw.values()) or sum(tw.values()) <= 0:
+        errors.append(f"world.tier_weights 需要 {TIERS}，权重非负且总和 > 0")
+    specs = w.get("tiers", {})
+    if set(specs) != set(TIERS):
+        errors.append(f"world.tiers 需要 {TIERS}")
+    for name, spec in specs.items():
+        realms = spec.get("realms", [])
+        if len(realms) != 2 or any(r not in REALMS for r in realms) or REALMS.index(realms[0]) > REALMS.index(realms[1]):
+            errors.append(f"world.tiers.{name}.realms 应是 [最低层, 最高层]（写具体层名，且先低后高）")
+        for key, lo_min in (("stats", 1), ("stones", 0)):
+            r = spec.get(key, [])
+            if not (len(r) == 2 and lo_min <= r[0] <= r[1]):
+                errors.append(f"world.tiers.{name}.{key} 应是 [最小, 最大]，最小 ≥ {lo_min}")
+    if w.get("raid_keep_days", 0) < 1:
+        errors.append("world.raid_keep_days 应 ≥ 1")
+    return errors
+
+
 def validate_config(cfg: dict) -> list[str]:
     """校验配置，返回错误列表（空 = 合法）。"""
     from utils.bot_social import load_archetypes
-    from utils.bot_world import TIER_WEIGHTS
-    errors = []
-    tiers = set(TIER_WEIGHTS)
+    from utils.bot_world import TIERS
+    errors = _validate_world(cfg.get("world", {}))
+    tiers = set(TIERS)
     for key in ("income", "speed"):
         if set(cfg.get(key, {})) != tiers:
             errors.append(f"{key} 的档位应为 {sorted(tiers)}")
@@ -110,6 +139,8 @@ def validate_config(cfg: dict) -> list[str]:
         errors.append("public_events.stat_cap_over_tier 应为非负整数")
     if pe.get("activity_reward_budget_per_event", -1) < 0:
         errors.append("public_events.activity_reward_budget_per_event 不能为负")
+    if pe.get("meet_pairs_per_event", -1) < 0:
+        errors.append("public_events.meet_pairs_per_event 不能为负")
     au = pe.get("auction", {})
     lo, hi = (au.get("bid_window") or [None, None])
     if not (au.get("bidders_per_lot", -1) >= 0 and au.get("max_bids_per_lot", 0) >= 1 and au.get("max_multiple", 0) >= 1

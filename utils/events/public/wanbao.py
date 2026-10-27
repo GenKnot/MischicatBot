@@ -3,29 +3,42 @@ import random
 import time
 import uuid
 
-from utils import rumors
+from utils import rules, rumors
 from utils.atomic import consume_item, grant_item, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 
 WANBAO_CITY = "万宝楼"
-AUCTION_COMMISSION = 0.08
-LISTING_FEE = 300
-MAX_LOTS = 20
-MAX_PLAYER_LOTS = 2
-LOT_DURATION = 120
-PREVIEW_BEFORE = 7200
+# 手续费、上架费、拍品数量、竞拍时长、起拍价、权重等数值在 data/game_rules.json 的 wanbao（管理员可以调），用的时候读
 
-GRADE_WEIGHTS = {
-    "黄级下品": 40, "黄级中品": 30, "黄级上品": 20,
-    "玄级下品": 6,  "玄级中品": 3,  "玄级上品": 1,
-    "地级下品": 0.4,"地级中品": 0.2,"地级上品": 0.1,
-    "天级下品": 0.05,"天级中品": 0.02,"天级上品": 0.01,
-}
 
-RARITY_WEIGHTS = {
-    "普通": 50, "稀有": 30, "珍贵": 15, "绝世": 5,
-}
+def cfg() -> dict:
+    return rules.section("wanbao")
+
+
+def commission_rate() -> float:
+    return cfg()["commission"]
+
+
+def listing_fee() -> int:
+    return cfg()["listing_fee"]
+
+
+def max_lots() -> int:
+    return cfg()["max_lots"]
+
+
+def max_player_lots() -> int:
+    return cfg()["max_player_lots"]
+
+
+def lot_duration() -> int:
+    """每件拍品的竞拍秒数。"""
+    return cfg()["lot_seconds"]
+
+
+def preview_before() -> int:
+    return cfg()["preview_before_seconds"]
 
 
 def _weighted_choice(pool: list, weight_fn) -> object:
@@ -48,21 +61,17 @@ def generate_house_lots() -> list[dict]:
 
     lots = []
 
+    c = cfg()
     techs = list(TECHNIQUES.items())
     chosen_techs = []
-    for _ in range(2):
+    for _ in range(min(c["official"]["techniques"], len(techs))):
         remaining = [t for t in techs if t[0] not in [x[0] for x in chosen_techs]]
-        t = _weighted_choice(remaining, lambda x: GRADE_WEIGHTS.get(x[1].get("grade", "黄级中品"), 1))
+        t = _weighted_choice(remaining, lambda x: c["grade_weights"].get(x[1].get("grade", "黄级中品"), 1))
         chosen_techs.append(t)
 
     for name, info in chosen_techs:
         grade = info.get("grade", "黄级中品")
-        base = {
-            "黄级下品": 500, "黄级中品": 1000, "黄级上品": 2000,
-            "玄级下品": 5000, "玄级中品": 10000, "玄级上品": 20000,
-            "地级下品": 50000, "地级中品": 100000, "地级上品": 200000,
-            "天级下品": 500000, "天级中品": 1000000, "天级上品": 2000000,
-        }.get(grade, 1000)
+        base = c["start_price"]["technique"].get(grade, 1000)
         lots.append({
             "lot_id": str(uuid.uuid4())[:8],
             "seller_id": None,
@@ -73,44 +82,44 @@ def generate_house_lots() -> list[dict]:
         })
 
     pills = [(k, v) for k, v in ITEMS.items() if v.get("type") == "pill"]
-    chosen_pills = random.sample(pills, min(2, len(pills)))
+    chosen_pills = random.sample(pills, min(c["official"]["pills"], len(pills)))
     for name, info in chosen_pills:
         rarity = info.get("rarity", "普通")
-        base = {"普通": 100, "稀有": 500, "珍贵": 2000, "绝世": 8000}.get(rarity, 100)
+        base = c["start_price"]["pill"].get(rarity, 100)
         lots.append({
             "lot_id": str(uuid.uuid4())[:8],
             "seller_id": None,
             "item_name": name,
-            "quantity": random.randint(1, 3),
+            "quantity": random.randint(*c["pill_qty"]),
             "item_type": "item",
             "start_price": base,
         })
 
     materials = [(k, v) for k, v in ITEMS.items() if v.get("type") in ("ore", "herb", "wood", "fish")]
     chosen_mats = []
-    for _ in range(2):
+    for _ in range(min(c["official"]["materials"], len(materials))):
         remaining = [m for m in materials if m[0] not in [x[0] for x in chosen_mats]]
-        m = _weighted_choice(remaining, lambda x: RARITY_WEIGHTS.get(x[1].get("rarity", "普通"), 10))
+        m = _weighted_choice(remaining, lambda x: c["rarity_weights"].get(x[1].get("rarity", "普通"), 10))
         chosen_mats.append(m)
     for name, info in chosen_mats:
         rarity = info.get("rarity", "普通")
-        base = {"普通": 50, "稀有": 300, "珍贵": 1200, "绝世": 5000}.get(rarity, 50)
+        base = c["start_price"]["material"].get(rarity, 50)
         lots.append({
             "lot_id": str(uuid.uuid4())[:8],
             "seller_id": None,
             "item_name": name,
-            "quantity": random.randint(1, 5),
+            "quantity": random.randint(*c["material_qty"]),
             "item_type": "item",
             "start_price": base,
         })
 
     from utils.equipment import generate_equipment, QUALITY_ORDER
-    eq_quality_weights = [40, 30, 20, 8, 2]
-    for _ in range(2):
-        tier = random.randint(1, 4)
+    eq_quality_weights = [c["equipment_quality_weights"][q] for q in QUALITY_ORDER]
+    for _ in range(c["official"]["equipment"]):
+        tier = random.randint(*c["equipment_tier"])
         quality = random.choices(QUALITY_ORDER, weights=eq_quality_weights)[0]
         eq = generate_equipment(tier=tier, quality=quality)
-        base = {"普通": 800, "精良": 2000, "稀有": 6000, "史诗": 20000, "传说": 80000}.get(quality, 1000)
+        base = c["start_price"]["equipment"].get(quality, 1000)
         lots.append({
             "lot_id": str(uuid.uuid4())[:8],
             "seller_id": None,
@@ -206,10 +215,10 @@ async def can_list_item(discord_id: str, auction_id: str) -> tuple[bool, str]:
             {"aid": auction_id}
         )
         total = r2.scalar()
-    if count >= MAX_PLAYER_LOTS:
-        return False, f"每位道友最多上架 {MAX_PLAYER_LOTS} 件拍品。"
-    if total >= MAX_LOTS:
-        return False, f"本次拍卖已满 {MAX_LOTS} 件，无法继续上架。"
+    if count >= max_player_lots():
+        return False, f"每位道友最多上架 {max_player_lots()} 件拍品。"
+    if total >= max_lots():
+        return False, f"本次拍卖已满 {max_lots()} 件，无法继续上架。"
     return True, ""
 
 
@@ -227,8 +236,8 @@ async def list_item(auction_id: str, discord_id: str, item_name: str, quantity: 
         player = pr.fetchone()
         if not player:
             return False, "角色不存在。"
-        if player._mapping["spirit_stones"] < LISTING_FEE:
-            return False, f"上架需支付 **{LISTING_FEE} 灵石** 手续费，当前灵石不足。"
+        if player._mapping["spirit_stones"] < listing_fee():
+            return False, f"上架需支付 **{listing_fee()} 灵石** 手续费，当前灵石不足。"
 
     item_info = ITEMS.get(item_name)
     if not item_info:
@@ -252,9 +261,9 @@ async def list_item(auction_id: str, discord_id: str, item_name: str, quantity: 
         if not await consume_item(session, discord_id, item_name, quantity):
             await session.rollback()
             return False, f"「{item_name}」数量不足。"
-        if not await spend_stones(session, discord_id, LISTING_FEE):
+        if not await spend_stones(session, discord_id, listing_fee()):
             await session.rollback()
-            return False, f"灵石不足，寄售需缴纳 {LISTING_FEE} 灵石手续费。"
+            return False, f"灵石不足，寄售需缴纳 {listing_fee()} 灵石手续费。"
         lot_id = str(uuid.uuid4())[:8]
         total_r = await session.execute(
             text("SELECT COUNT(*) FROM wanbao_lots WHERE auction_id = :aid"), {"aid": auction_id}
@@ -379,7 +388,7 @@ async def settle_lot(lot: dict) -> dict:
                 await session.execute(
                     text("UPDATE players SET spirit_stones = MAX(0, spirit_stones - :fee) "
                          "WHERE discord_id = :uid"),
-                    {"fee": LISTING_FEE, "uid": lot["seller_id"]}
+                    {"fee": listing_fee(), "uid": lot["seller_id"]}
                 )
                 # 取回费收了，物品要还回去：上架时物品已被扣走，流拍后曾经只收费、不退货（ISSUES.md B20）
                 await grant_item(session, lot["seller_id"], lot["item_name"], lot["quantity"])
@@ -388,7 +397,7 @@ async def settle_lot(lot: dict) -> dict:
 
         winner_id = lot["bidder_id"]
         final_price = lot["current_bid"]
-        commission = int(final_price * AUCTION_COMMISSION)
+        commission = int(final_price * commission_rate())
         seller_income = final_price - commission
 
         # 得标者的货款在出价时就已托管扣走（见 place_bid），这里不再扣
@@ -480,7 +489,7 @@ async def advance_lot(auction_id: str) -> dict | None:
         )
         await session.execute(
             text("UPDATE wanbao_auctions SET current_lot = :idx, ends_at = :ea WHERE auction_id = :aid"),
-            {"idx": next_idx, "ea": now + LOT_DURATION, "aid": auction_id}
+            {"idx": next_idx, "ea": now + lot_duration(), "aid": auction_id}
         )
         await session.commit()
     return dict(next_lot._mapping)
@@ -502,7 +511,7 @@ async def start_auction(auction_id: str) -> dict | None:
         )
         await session.execute(
             text("UPDATE wanbao_auctions SET status = 'active', started_at = :sa, ends_at = :ea, current_lot = 0 WHERE auction_id = :aid"),
-            {"sa": now, "ea": now + LOT_DURATION, "aid": auction_id}
+            {"sa": now, "ea": now + lot_duration(), "aid": auction_id}
         )
         await session.commit()
     return dict(first_lot._mapping)

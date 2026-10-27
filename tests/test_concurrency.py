@@ -119,7 +119,7 @@ async def test_并发上架同一批物品只成功一次(db):
 # --------------------------------------------------------------------------
 
 async def test_并发赌博不会超出每日上限(db):
-    limit = db["gamble"].DAILY_LIMIT
+    limit = db["gamble"].daily_limit()
     await _seed(db, ("u", 1_000_000))
 
     results = await asyncio.gather(*[
@@ -130,7 +130,7 @@ async def test_并发赌博不会超出每日上限(db):
 
 
 async def test_并发转盘不会超出每日上限(db):
-    limit = db["roulette"].DAILY_LIMIT
+    limit = db["roulette"].daily_limit()
     await _seed(db, ("u", 1_000_000))
 
     results = await asyncio.gather(*[

@@ -2,14 +2,19 @@ import time
 import discord
 from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal
+from utils import rules
 from utils.bank import (
-    BANK_CITIES, TERM_OPTIONS, MIN_DEPOSIT, TRANSFER_MAX, TRANSFER_FEE_RATE,
-    DEMAND_RATE, calc_demand_interest, calc_term_interest,
+    BANK_CITIES, calc_demand_interest, calc_term_interest,
     get_bank_account, get_term_deposits,
     deposit_demand, withdraw_demand, deposit_term, withdraw_term, transfer,
 )
 from utils.character import seconds_to_years
 from utils.views.base import TimedView
+
+
+def _cfg() -> dict:
+    """钱庄的数值（data/game_rules.json，管理员可以调），每次渲染时读。"""
+    return rules.section("bank")
 
 
 async def _get_player(uid: str) -> dict | None:
@@ -32,7 +37,7 @@ def _bank_main_embed(player: dict, account: dict, deposits: list[dict]) -> disco
     )
     embed.add_field(
         name="活期余额",
-        value=f"**{demand_bal:,}** 灵石（利息 +{demand_interest:,}，年利率 {DEMAND_RATE*100:.1f}%）",
+        value=f"**{demand_bal:,}** 灵石（利息 +{demand_interest:,}，年利率 {_cfg()['demand_rate']*100:.1f}%）",
         inline=False,
     )
 
@@ -50,8 +55,8 @@ def _bank_main_embed(player: dict, account: dict, deposits: list[dict]) -> disco
         embed.add_field(name="定期存款", value="暂无", inline=False)
 
     term_lines = "\n".join(
-        f"**{t['years']}年** — 年利率 {t['rate']*100:.2f}%，存{MIN_DEPOSIT:,}到期拿回 {MIN_DEPOSIT + calc_term_interest(MIN_DEPOSIT, t['years'], t['rate']):,}"
-        for t in TERM_OPTIONS
+        f"**{t['years']}年** — 年利率 {t['rate']*100:.2f}%，存{_cfg()['min_deposit']:,}到期拿回 {_cfg()['min_deposit'] + calc_term_interest(_cfg()['min_deposit'], t['years'], t['rate']):,}"
+        for t in _cfg()["terms"]
     )
     embed.add_field(name="定期利率表（单利）", value=term_lines, inline=False)
     return embed
@@ -149,7 +154,7 @@ class DemandWithdrawModal(discord.ui.Modal, title="取出活期"):
 
 class TransferModal(discord.ui.Modal, title="转账"):
     target_input = discord.ui.TextInput(label="对方 Discord ID", placeholder="输入数字ID", min_length=1, max_length=20)
-    amount_input = discord.ui.TextInput(label="转账金额（灵石）", placeholder=f"最多 {TRANSFER_MAX:,}", min_length=1, max_length=12)
+    amount_input = discord.ui.TextInput(label="转账金额（灵石）", placeholder=f"最多 {_cfg()['transfer_max']:,}", min_length=1, max_length=12)
 
     def __init__(self, author, cog):
         super().__init__()
@@ -176,14 +181,14 @@ class TransferModal(discord.ui.Modal, title="转账"):
 def _term_select_embed() -> discord.Embed:
     embed = discord.Embed(
         title="📅 定期存款 · 选择期限",
-        description=f"每笔最低 **{MIN_DEPOSIT:,}** 灵石，单利计息，到期自动结算。\n提前取出只退本金，利息全损。",
+        description=f"每笔最低 **{_cfg()['min_deposit']:,}** 灵石，单利计息，到期自动结算。\n提前取出只退本金，利息全损。",
         color=discord.Color.gold(),
     )
-    for t in TERM_OPTIONS:
-        interest = calc_term_interest(MIN_DEPOSIT, t["years"], t["rate"])
+    for t in _cfg()["terms"]:
+        interest = calc_term_interest(_cfg()["min_deposit"], t["years"], t["rate"])
         embed.add_field(
             name=f"{t['years']} 年期　年利率 {t['rate']*100:.2f}%",
-            value=f"存 {MIN_DEPOSIT:,} → 到期拿回 **{MIN_DEPOSIT + interest:,}**",
+            value=f"存 {_cfg()['min_deposit']:,} → 到期拿回 **{_cfg()['min_deposit'] + interest:,}**",
             inline=True,
         )
     return embed
@@ -197,10 +202,10 @@ class TermDepositSelectView(TimedView):
         options = [
             discord.SelectOption(
                 label=f"{t['years']} 年期",
-                description=f"年利率 {t['rate']*100:.2f}%，到期拿回 {MIN_DEPOSIT + calc_term_interest(MIN_DEPOSIT, t['years'], t['rate']):,}（以{MIN_DEPOSIT:,}为例）",
+                description=f"年利率 {t['rate']*100:.2f}%，到期拿回 {_cfg()['min_deposit'] + calc_term_interest(_cfg()['min_deposit'], t['years'], t['rate']):,}（以{_cfg()['min_deposit']:,}为例）",
                 value=str(t["years"]),
             )
-            for t in TERM_OPTIONS
+            for t in _cfg()["terms"]
         ]
         self.add_item(TermSelect(options))
         self.add_item(BackToBankButton())
@@ -216,7 +221,7 @@ class TermSelect(discord.ui.Select):
 
 
 class TermDepositModal(discord.ui.Modal, title="定期存款"):
-    amount_input = discord.ui.TextInput(label="存入金额（灵石）", placeholder=f"最低 {MIN_DEPOSIT:,}", min_length=1, max_length=12)
+    amount_input = discord.ui.TextInput(label="存入金额（灵石）", placeholder=f"最低 {_cfg()['min_deposit']:,}", min_length=1, max_length=12)
 
     def __init__(self, author, term_years: int, cog):
         super().__init__()

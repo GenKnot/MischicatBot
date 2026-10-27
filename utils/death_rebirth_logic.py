@@ -2,20 +2,17 @@ import random
 import time
 from sqlalchemy import select, update
 from utils.db_async import AsyncSessionLocal, Player
-from utils.character import REALM_LIFESPAN
+from utils import rules
+from utils.character import realm_lifespan
 from utils.world import CITIES
 
 
 def calculate_rebirth_bonus(player: dict) -> dict:
     rebirth_count = player.get("rebirth_count", 0)
-    mult = 1 + rebirth_count * 0.5
-    return {
-        "comprehension": max(0, int((player.get("comprehension", 5) - 5) * 0.3 * mult)),
-        "physique":      max(0, int((player.get("physique", 5) - 5) * 0.3 * mult)),
-        "fortune":       max(0, int((player.get("fortune", 5) - 5) * 0.3 * mult)),
-        "bone":          max(0, int((player.get("bone", 5) - 5) * 0.3 * mult)),
-        "soul":          max(0, int((player.get("soul", 5) - 5) * 0.3 * mult)),
-    }
+    c = rules.section("rebirth")
+    mult = 1 + rebirth_count * c["mult_step"]
+    return {stat: max(0, int((player.get(stat, 5) - 5) * c["stat_keep"] * mult))
+            for stat in ("comprehension", "physique", "fortune", "bone", "soul")}
 
 
 async def check_death(discord_id: str) -> tuple[bool, dict | None]:
@@ -35,7 +32,7 @@ async def check_death(discord_id: str) -> tuple[bool, dict | None]:
 async def handle_rebirth(discord_id: str, player_dict: dict) -> dict:
     bonus = calculate_rebirth_bonus(player_dict)
     new_rebirth = player_dict.get("rebirth_count", 0) + 1
-    lifespan = REALM_LIFESPAN["炼气期"]
+    lifespan = realm_lifespan("炼气期")
     now = time.time()
     starting_city = random.choice(CITIES)["name"]
     
@@ -48,7 +45,7 @@ async def handle_rebirth(discord_id: str, player_dict: dict) -> dict:
         player.cultivation = 0
         player.lifespan = lifespan
         player.lifespan_max = lifespan
-        player.spirit_stones = 500
+        player.spirit_stones = rules.section("rebirth")["start_stones"]
         player.is_dead = False
         player.is_virgin = True
         player.sect = None
@@ -119,7 +116,7 @@ async def can_rebirth(discord_id: str) -> tuple[bool, dict | None]:
 def should_trigger_yinyang(player_dict: dict) -> bool:
     if player_dict.get("has_bahongchen") or player_dict.get("rebirth_count", 0) > 0:
         return False
-    return random.random() <= 0.0003
+    return random.random() <= rules.section("rebirth")["yinyang_chance"]
 
 
 async def mark_yinyang_triggered(discord_id: str):

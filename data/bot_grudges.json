@@ -1,5 +1,5 @@
 {
- "_说明": "仇恨账本的配置（U1·江湖百态 P3）。kinds：每种冒犯的基础仇恨值（severity，累加，上限 100）和描述模板；relation：和受害者的关系越近，替他出头的分量越重；windows：蹲守窗口，按性格给游戏年数（1 年 = 现实 2 小时），结拜的 ×sworn_window_mult，少数『执着』的人再 ×stubborn.mult；renew：窗口到期后继续蹲的概率（按性格，用户说待定，这是我的默认）；reach_delay_years：受害者名望低时，朋友多久才得知 / 得知的概率；ready：谨慎的人要等自己的大境界不低于对方多少才动手；appease：化解仇怨的方式；ambush：拦路的全局冷却等（P4 用）。",
+ "_说明": "仇恨账本的配置（U1·江湖百态 P3）。kinds：每种冒犯的基础仇恨值（severity，累加，上限 100）和描述模板；relation：和受害者的关系越近，替他出头的分量越重；windows：蹲守窗口，按性格给游戏年数（1 年 = 现实 2 小时），结拜的 ×sworn_window_mult，少数『执着』的人再 ×stubborn.mult；renew：窗口到期后继续蹲的概率（按性格，用户说待定，这是我的默认）；reach_delay_years：受害者名望低时，朋友多久才得知 / 得知的概率；ready：谨慎的人要等自己的大境界不低于对方多少才动手；appease：化解仇怨的方式；ambush：拦路的全局冷却等（P4 用）。 formula：立仇公式里的系数 —— 持仇人的记仇度（自己受害）/ 义气（替朋友出头）按 stat_base + 数值/100 倍计入，和受害者的交情按 strength_base + 交情/100 倍计入，替朋友出头的概率不超过 third_cap，窗口到期后续期概率不超过 renew_cap；appease.apology.chance_cap：道歉成功概率上限。",
  "kinds": {
   "rob_fail": {
    "severity": 8,
@@ -96,11 +96,18 @@
    "vengeful_weight": 0.25,
    "reduce": 30,
    "backfire": 5,
-   "cooldown_hours": 12
+   "cooldown_hours": 12,
+   "chance_cap": 0.9
   }
  },
  "ambush": {
   "global_cooldown_years": 3,
   "per_target_years": 1
+ },
+ "formula": {
+  "stat_base": 0.5,
+  "strength_base": 0.5,
+  "third_cap": 0.95,
+  "renew_cap": 0.95
  }
 }

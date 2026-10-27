@@ -32,9 +32,9 @@ class AdminCog(commands.Cog, name="Admin"):
 
     @commands.command(name="生成机器人")
     @commands.is_owner()
-    async def spawn_bots(self, ctx, count: int = bot_world.DEFAULT_COUNT):
-        """往世界里放一批机器人修士（默认 2000 个，一次最多 2000 个，总数最多 20000 个）。"""
-        res = await bot_world.generate_bots(count)
+    async def spawn_bots(self, ctx, count: int = 0):
+        """往世界里放一批机器人修士（不写个数就用默认；一次最多、总数上限都在 `调参 列表 economy world` 里）。"""
+        res = await bot_world.generate_bots(count or None)
         if not res["ok"]:
             return await ctx.send(res["reason"])
         audit("spawn_bots", ctx.author, count=len(res["created"]), by_tier=res["by_tier"])

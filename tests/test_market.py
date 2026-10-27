@@ -15,9 +15,14 @@ import pytest
 
 from tests.conftest import make_player
 from utils import market
-from utils.market import (FEE_RATE, LISTING_TTL, MARKET_CITIES, MAX_LISTINGS, buy_listing, delist,
+from utils import rules
+from utils.market import (MARKET_CITIES, buy_listing, delist,
                           expire_old_listings, get_active_listings, get_expired_unclaimed, get_my_listings,
                           list_equipment, list_item)
+
+MAX_LISTINGS = rules.get("market.max_listings")
+FEE_RATE = rules.get("market.fee_rate")
+LISTING_TTL = rules.get("market.listing_ttl_hours") * 3600
 
 S, B = "1001", "1002"          # 卖家、买家
 HERB = "灵芝草"

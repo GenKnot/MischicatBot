@@ -9,7 +9,7 @@ from utils.db_async import AsyncSessionLocal
 from sqlalchemy import text
 from utils.player import get_player
 from utils.equipment_db import give_equipment
-from utils import rumors
+from utils import rules, rumors
 from utils.events import RARE_EVENTS, get_event_pool
 from utils.character import seconds_to_years, get_explore_limit_bonus
 from utils.adventure_chain import get_chain_progress, get_available_chains, get_trigger_chance
@@ -17,15 +17,14 @@ from utils.events.adventure_chains import ALL_CHAINS
 from utils.logging_setup import audit
 from utils.views.base import TimedView
 
-EXPLORE_LIMIT = 8
-EXPLORE_RESET_YEARS = 5
+# 每个窗口的探险次数、窗口多少游戏年重置，在 data/game_rules.json 的 explore（管理员可以调），用的时候读
 
 
 async def _get_explore_limit(player) -> int:
     bonus = await get_explore_limit_bonus(
         player["discord_id"], player["current_city"], player.get("cave")
     )
-    return EXPLORE_LIMIT + bonus
+    return rules.section("explore")["limit"] + bonus
 
 
 # 事件奖励里 `_apply_rewards` 认识的键。事件数据里出现别的键会被静默忽略（B71），
@@ -107,13 +106,14 @@ async def _check_explore_limit(player) -> tuple[bool, str]:
     count = player["explore_count"] or 0
     limit = await _get_explore_limit(player)
 
-    if now_years - reset_year >= EXPLORE_RESET_YEARS:
+    reset_years = rules.section("explore")["reset_years"]
+    if now_years - reset_year >= reset_years:
         return True, ""
 
     if count < limit:
         return True, ""
 
-    years_left = EXPLORE_RESET_YEARS - (now_years - reset_year)
+    years_left = reset_years - (now_years - reset_year)
     return False, f"探险次数已用尽（{limit}/{limit}），约 **{years_left:.1f} 游戏年**后刷新。"
 
 
@@ -124,7 +124,7 @@ async def _increment_explore(discord_id: str, player) -> bool:
     再把计数写成绝对值，两次点击几乎同时到达时都读到旧计数，都通过检查、写同一个值 ——
     两次探险只占一次次数，等于白送一次，上限形同虚设（CONVENTIONS #1）。
 
-    窗口过期（距上次重置满 EXPLORE_RESET_YEARS）时计数重置为 1。
+    窗口过期（距上次重置满 explore.reset_years）时计数重置为 1。
     SQLite 的 UPDATE 里右侧表达式读的都是更新前的行，所以 CASE 里引用旧值是安全的。
     """
     now_years = time.time() / (2 * 3600)
@@ -142,7 +142,7 @@ async def _increment_explore(discord_id: str, player) -> bool:
                 "  AND (:now - COALESCE(explore_reset_year, 0) >= :reset "
                 "       OR COALESCE(explore_count, 0) < :limit)"
             ),
-            {"now": now_years, "reset": EXPLORE_RESET_YEARS, "limit": limit, "uid": discord_id},
+            {"now": now_years, "reset": rules.section("explore")["reset_years"], "limit": limit, "uid": discord_id},
         )
         claimed = result.rowcount == 1
         await session.commit()

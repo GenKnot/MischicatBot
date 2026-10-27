@@ -19,7 +19,8 @@ import pytest
 from tests.conftest import make_player
 from tests.discord_fakes import FakeInteraction
 from utils import alchemy as al
-from utils.alchemy import DAILY_LIMIT, QUALITY_NAMES, RECIPES, get_recipe_by_id
+from utils import rules
+from utils.alchemy import QUALITY_NAMES, RECIPES, get_recipe_by_id
 from utils.views import alchemy as av
 from utils.views.alchemy import (AlchemyMainView, _AshView, _AuxSelect, _AuxSelectView, _BackToMainButton,
                                  _ConfirmFreeMixButton, _ConfirmView, _FailView, _FreeMixHerbSelect, _FreeMixQtyView,
@@ -32,6 +33,8 @@ U = "1001"
 EXAM = get_recipe_by_id("juqiwan_exam")
 JL1 = get_recipe_by_id("juling_1")               # 灵芝草×1 + (碧灵花 | 九节菖蒲)
 JL2 = get_recipe_by_id("juling_2")               # 灵芝草×2 + (碧灵花|九节菖蒲) + (甘草灵根|茯苓灵块)
+
+DAILY_LIMIT = rules.get("alchemy.daily_limit")
 
 
 async def _add(db, uid=U, items=None, level=1, **kw):
@@ -82,7 +85,7 @@ def lose(monkeypatch, consequence=("炉毁", 3)):
 def test_阶数与品质上限文案():
     assert _pill_tier_label(1) == "一阶" and _pill_tier_label(9) == "九阶" and _pill_tier_label(12) == "12阶"
     assert _quality_cap_label(11, True) == QUALITY_NAMES[11]
-    assert _quality_cap_label(11, False) == QUALITY_NAMES[al.NO_YANHUO_CAP]
+    assert _quality_cap_label(11, False) == QUALITY_NAMES[al.no_yanhuo_cap()]
     assert _quality_cap_label(3, False) == QUALITY_NAMES[3]
 
 
@@ -179,7 +182,7 @@ def test_结果卡片_失败():
 
 
 def test_B61_剩余次数用上限常量(monkeypatch):
-    monkeypatch.setattr(av, "DAILY_LIMIT", 10)
+    monkeypatch.setattr(av, "daily_limit", lambda: 10)
     e = _result_embed(success_result(daily_count=3), JL1, None)
     assert next(f.value for f in e.fields if f.name == "今日剩余次数") == "7/10"
 

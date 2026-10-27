@@ -1,5 +1,6 @@
 import discord
-from utils.jobs import JOBS, get_available_jobs, get_locked_jobs, _req_desc, JOB_DAILY_LIMIT
+from utils import rules
+from utils.jobs import JOBS, get_available_jobs, get_locked_jobs, _req_desc
 from utils.views.base import TimedView
 
 TIER_LABELS = {1: "入门", 2: "普通", 3: "进阶", 4: "高级", 5: "顶端"}
@@ -43,7 +44,7 @@ async def _jobs_overview_embed(player: dict) -> discord.Embed:
         color=discord.Color.teal(),
     )
 
-    status_lines = [f"今日已打工：**{daily_count}/{JOB_DAILY_LIMIT}**"]
+    status_lines = [f"今日已打工：**{daily_count}/{rules.section('jobs')['daily_limit']}**"]
     if on_cooldown:
         status_lines.append(f"冷却中：还需 **{remaining_cd // 60} 分 {remaining_cd % 60} 秒**")
     embed.add_field(name="状态", value="\n".join(status_lines), inline=False)

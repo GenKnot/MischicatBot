@@ -1,0 +1,33 @@
+{
+ "_说明": "机器人对真人的好感（utils/bot_social.py）。好感范围 -100~100，档位：≤ hostile_below 仇视，≥ required.dual 至交，≥ required.party 熟识，其余陌生。required：组队 / 双修要的基础好感，善意每偏离 50 个 kindness_div 点就 ∓1（善意高门槛低）。送礼：每个机器人每天最多收 max_gifts_per_day 份；靠送礼每天最多涨 gift_gain_daily_cap 点好感（跌不设限）；gift_delta 是各种反应的基础好感变化，稀有度再加 rarity_bonus（只加在心头好 / 喜欢 / 一般的反应上）。闲聊：每天第一次 chat_delta，健谈值 ≥ talkative_at 的机器人涨 chat_delta_talkative。 remark_tier_factor：机器人说话时顺口带一句『口头点评』的概率 = 性格特质自带概率 × 这个档位的系数（仇视不带、至交更爱说）。",
+ "hostile_below": -30,
+ "required": {
+  "party": 20,
+  "dual": 50
+ },
+ "kindness_div": 5,
+ "max_gifts_per_day": 3,
+ "gift_gain_daily_cap": 12,
+ "rarity_bonus": {
+  "普通": 0,
+  "稀有": 1,
+  "珍贵": 2,
+  "绝世": 3
+ },
+ "gift_delta": {
+  "love": 8,
+  "like": 4,
+  "neutral": 1,
+  "dislike": -3,
+  "hate": -8
+ },
+ "chat_delta": 1,
+ "chat_delta_talkative": 2,
+ "talkative_at": 60,
+ "remark_tier_factor": {
+  "仇视": 0.0,
+  "陌生": 0.4,
+  "熟识": 1.0,
+  "至交": 1.3
+ }
+}

@@ -10,26 +10,61 @@
 · 远近闻名（200~）：全服传闻。
 """
 
+import json
 import logging
+from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import update
 
+from utils import settings_hub
 from utils.db_async import AsyncSessionLocal, Player
 
 log = logging.getLogger(__name__)
 
-TIERS = ((3000, "名震天下"), (800, "名动一方"), (200, "远近闻名"), (50, "小有名气"), (0, "无名之辈"))
-CITY_FAME = 50                  # 起，同城议论
-SERVER_FAME = 200               # 起，全服传闻
+_PATH = Path(__file__).resolve().parent.parent / "data" / "bot_fame.json"
+
+
+@lru_cache(maxsize=1)
+def _load() -> dict:
+    return settings_hub.read(_PATH)
+
+
+def load() -> dict:
+    return _load()
+
+
+def reload() -> None:
+    _load.cache_clear()
+
+
+def validate(cfg: dict) -> list[str]:
+    errors = []
+    tiers = cfg.get("tiers", {})
+    if not tiers or min(tiers.values()) != 0 or any(v < 0 for v in tiers.values()):
+        errors.append("tiers: 至少一档，最低一档的起点必须是 0，起点不能为负")
+    if len(set(tiers.values())) != len(tiers):
+        errors.append("tiers: 各档起点不能相同")
+    if not 0 <= cfg.get("city_fame", -1) <= cfg.get("server_fame", -2):
+        errors.append("city_fame 应 ≥ 0 且不超过 server_fame")
+    if cfg.get("score_divisor", 0) < 1:
+        errors.append("score_divisor 应 ≥ 1")
+    return errors
 
 
 def tier(fame: int) -> str:
-    return next(name for floor, name in TIERS if fame >= floor)
+    return next(name for name, floor in sorted(load()["tiers"].items(), key=lambda kv: -kv[1]) if fame >= floor)
 
 
 def reach(fame: int) -> str:
     """事迹传多远：none / city / server。"""
-    return "server" if fame >= SERVER_FAME else "city" if fame >= CITY_FAME else "none"
+    cfg = load()
+    return "server" if fame >= cfg["server_fame"] else "city" if fame >= cfg["city_fame"] else "none"
+
+
+def gain(score: int) -> int:
+    """一条传闻让主角涨多少名望。"""
+    return max(1, score // load()["score_divisor"])
 
 
 async def add_fame(player_id: str, delta: int, session=None) -> None:

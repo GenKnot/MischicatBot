@@ -1,5 +1,5 @@
 import discord
-from utils.gamble import do_gamble, BET_OPTIONS, DAILY_LIMIT, OUTCOME_PROBS
+from utils.gamble import bet_options, daily_limit, do_gamble, outcome_probs
 from utils.views.base import TimedView
 
 
@@ -13,13 +13,13 @@ def _gamble_overview_embed(player: dict) -> discord.Embed:
     if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
         daily_count = 0
 
-    remaining = DAILY_LIMIT - daily_count
-    probs_str = " · ".join(f"{label} {p}%" for label, p in OUTCOME_PROBS)
+    remaining = daily_limit() - daily_count
+    probs_str = " · ".join(f"{label} {p}%" for label, p in outcome_probs())
     embed = discord.Embed(
         title="✦ 赌坊 · 押注台 ✦",
         description=(
             "财富与命运，皆在一掷之间。\n\n"
-            f"今日剩余次数：**{remaining} / {DAILY_LIMIT}**\n"
+            f"今日剩余次数：**{remaining} / {daily_limit()}**\n"
             f"当前灵石：**{player.get('spirit_stones', 0):,}**\n\n"
             f"**输赢概率：** {probs_str}\n"
             "大赢 ×3 · 赢 ×2 · 小赢 ×1.5 · 输 ×0\n\n"
@@ -45,9 +45,9 @@ class GambleView(TimedView):
         now_date = time.gmtime(now)
         if (now_date.tm_year, now_date.tm_yday) != (reset_date.tm_year, reset_date.tm_yday):
             daily_count = 0
-        exhausted = daily_count >= DAILY_LIMIT
+        exhausted = daily_count >= daily_limit()
 
-        for bet in BET_OPTIONS:
+        for bet in bet_options():
             btn = discord.ui.Button(
                 label=f"押注 {bet:,}",
                 style=discord.ButtonStyle.primary,

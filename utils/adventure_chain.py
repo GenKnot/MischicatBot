@@ -1,19 +1,37 @@
 import json
-import os
 import time
+from functools import lru_cache
+from pathlib import Path
+
 from sqlalchemy import text
+
+from utils import settings_hub
 from utils.db_async import AsyncSessionLocal
 
-_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "adventure_chains_config.json")
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "data" / "adventure_chains_config.json"
+
+
+@lru_cache(maxsize=4)
+def _load(path: str) -> dict:
+    return settings_hub.read(Path(path))
+
+
+def validate(cfg: dict) -> list[str]:
+    chances = cfg.get("trigger_chance", {})
+    if any(not 0 <= v <= 1 for v in chances.values()):
+        return ["trigger_chance 里每个概率应在 0~1"]
+    return []
+
 
 def _load_trigger_chances() -> dict:
     try:
-        with open(_CONFIG_PATH, encoding="utf-8") as f:
-            return json.load(f).get("trigger_chance", {})
+        return _load(str(_CONFIG_PATH)).get("trigger_chance", {})
     except Exception:
         return {}
 
+
 def get_trigger_chance(chain_id: str, default: float) -> float:
+    """奇遇链的触发概率（data/adventure_chains_config.json，管理员可以 `cat!调参` 修改）；配置里没有就用代码给的默认值。"""
     chances = _load_trigger_chances()
     return chances.get(chain_id, default)
 

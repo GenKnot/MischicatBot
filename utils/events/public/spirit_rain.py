@@ -3,7 +3,7 @@ import time
 
 import discord
 
-from utils import rumors
+from utils import rules, rumors
 from utils.combat import calc_power
 from utils.character import years_to_seconds
 from utils.equipment import generate_equipment
@@ -16,9 +16,11 @@ META = {
     "duration_real_mins": 60,
 }
 
-CULTIVATION_BONUS = 1.5
-BEAST_TIDE_CHANCE = 0.30
-BEAST_TIDE_DURATION_MINS = 30
+# 兽潮概率、守城奖励、各种活动的奖励等数值在 data/game_rules.json 的 spirit_rain（管理员可以调），用的时候读
+
+
+def cfg() -> dict:
+    return rules.section("spirit_rain")
 
 
 BOT_MARK = "🤖"
@@ -91,7 +93,7 @@ async def on_trigger(bot, channel, event_id: str, city: str):
     )
     embed.add_field(name="💎 灵雨结晶", value="收集落地灵晶，获得材料与灵石", inline=True)
     embed.add_field(name="🧘 灵雨感悟", value="打坐感悟，有概率获得属性点", inline=True)
-    embed.add_field(name="💪 灵雨淬体", value="以体魄承受灵雨（需体魄≥7）", inline=True)
+    embed.add_field(name="💪 灵雨淬体", value=f"以体魄承受灵雨（需体魄≥{cfg()['temper_min_physique']}）", inline=True)
     embed.set_footer(text=f"事件ID: {event_id} · 灵雨城市：{city} · 持续60分钟")
 
     # 没有公告频道时事件照常进行（玩家仍可通过「公共事件」面板参与），只是没有广播消息。
@@ -151,8 +153,9 @@ async def _settle_spirit_rain_only(channel, city: str, participants: list[dict])
     defender_ids = {p["discord_id"] for p in defenders}
     defense_lines = []
     for p in defenders:
-        stones = random.randint(100, 300)
-        rep = 5
+        base = cfg()["defense"]["base"]
+        stones = random.randint(*base["stones"])
+        rep = base["rep"]
         async with AsyncSessionLocal() as session:
             await session.execute(
                 text("UPDATE players SET spirit_stones = spirit_stones + :s, reputation = reputation + :r WHERE discord_id = :uid"),
@@ -195,15 +198,15 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
     medal = ["🥇", "🥈", "🥉"]
     result_lines = []
 
+    dcfg = cfg()["defense"]
     for i, p in enumerate(defenders):
         uid = p["discord_id"]
         if i == 0:
-            stones = random.randint(3000, 5000)
-            rep = 50
-            eq1 = generate_equipment(tier=_get_tier(p["realm"]), quality="稀有")
-            eq2 = generate_equipment(tier=_get_tier(p["realm"]), quality="稀有")
-            await give_equipment(uid, eq1)
-            await give_equipment(uid, eq2)
+            r1 = dcfg["rank1"]
+            stones = random.randint(*r1["stones"])
+            rep = r1["rep"]
+            for _ in range(r1["equipment"]):
+                await give_equipment(uid, generate_equipment(tier=_get_tier(p["realm"]), quality="稀有"))
             async with AsyncSessionLocal() as session:
                 await session.execute(
                     text("UPDATE players SET spirit_stones = spirit_stones + :s, reputation = reputation + :r WHERE discord_id = :uid"),
@@ -211,32 +214,33 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
                 )
                 await session.commit()
             await rumors.record_player_rumor("beast_tide_hero", uid, city=city)
-            result_lines.append(f"{medal[0]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 2件稀有装备")
+            result_lines.append(f"{medal[0]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 {r1['equipment']}件稀有装备")
         elif i in (1, 2):
-            stones = random.randint(1500, 2500)
-            rep = 30
-            eq = generate_equipment(tier=_get_tier(p["realm"]), quality="稀有")
-            await give_equipment(uid, eq)
+            r2 = dcfg["rank23"]
+            stones = random.randint(*r2["stones"])
+            rep = r2["rep"]
+            for _ in range(r2["equipment"]):
+                await give_equipment(uid, generate_equipment(tier=_get_tier(p["realm"]), quality="稀有"))
             async with AsyncSessionLocal() as session:
                 await session.execute(
                     text("UPDATE players SET spirit_stones = spirit_stones + :s, reputation = reputation + :r WHERE discord_id = :uid"),
                     {"s": stones, "r": rep, "uid": uid}
                 )
                 await session.commit()
-            result_lines.append(f"{medal[i]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 1件稀有装备")
+            result_lines.append(f"{medal[i]} {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}，获得 {r2['equipment']}件稀有装备")
         else:
-            stones = random.randint(300, 800)
-            rep = 10
+            stones = random.randint(*dcfg["rest"]["stones"])
+            rep = dcfg["rest"]["rep"]
             async with AsyncSessionLocal() as session:
                 await session.execute(
                     text("UPDATE players SET spirit_stones = spirit_stones + :s, reputation = reputation + :r WHERE discord_id = :uid"),
                     {"s": stones, "r": rep, "uid": uid}
                 )
                 await session.commit()
-            if i < 8:
+            if i < dcfg["list_max"]:
                 result_lines.append(f"· {_nm(p)}（贡献 {p['contribution']}）— 灵石 +{stones}，声望 +{rep}")
 
-    if len(defenders) > 8:
+    if len(defenders) > dcfg["list_max"]:
         result_lines.append(f"…共 {len(defenders)} 名修士坚守城池")
 
     fled = []
@@ -267,8 +271,8 @@ async def _settle_beast_tide(bot, channel, event_id: str, city: str, participant
 
     loss_list = []
     for p in idle_players:
-        if random.random() < 0.30:
-            loss = random.randint(5, 15)
+        if random.random() < cfg()["slacker"]["chance"]:
+            loss = random.randint(*cfg()["slacker"]["loss"])
             async with AsyncSessionLocal() as session:
                 await session.execute(
                     text("UPDATE players SET lifespan = MAX(1, lifespan - :loss) WHERE discord_id = :uid"),
@@ -369,19 +373,20 @@ async def grant_activity(uid: str, activity: str, player: dict, event_id: str) -
     msg = ""
 
     if activity == "crystal":
-        stones = random.randint(150, 400)
+        c = cfg()["crystal"]
+        stones = random.randint(*c["stones"])
         items_gained = []
         from utils.items import ITEMS
         from utils.inventory import add_item
-        if random.random() < 0.65:
-            rarity_weights = {"普通": 70, "稀有": 25, "珍贵": 4, "绝世": 1}
+        if random.random() < c["herb_chance"]:
+            rarity_weights = c["herb_weights"]
             herb_pool = [(k, v) for k, v in ITEMS.items() if v.get("type") == "herb"]
             weights = [rarity_weights.get(v.get("rarity", "普通"), 70) for k, v in herb_pool]
-            count = random.randint(1, 2)
+            count = random.randint(*c["herb_count"])
             picked = random.choices([k for k, v in herb_pool], weights=weights, k=count)
             picked = list(dict.fromkeys(picked))
             for item in picked:
-                qty = 1 if ITEMS[item].get("rarity") in ("珍贵", "绝世") else random.randint(1, 2)
+                qty = 1 if ITEMS[item].get("rarity") in ("珍贵", "绝世") else random.randint(*c["qty"])
                 await add_item(uid, item, qty)
                 items_gained.append(f"{item}×{qty}")
         async with AsyncSessionLocal() as session:
@@ -397,8 +402,9 @@ async def grant_activity(uid: str, activity: str, player: dict, event_id: str) -
     elif activity == "enlighten":
         stat = random.choice(["comprehension", "soul", "fortune"])
         stat_names = {"comprehension": "悟性", "soul": "神识", "fortune": "机缘"}
-        gain = 1 if random.random() < 0.15 else 0
-        cult_gain = random.randint(80, 200)
+        e = cfg()["enlighten"]
+        gain = 1 if random.random() < e["stat_chance"] else 0
+        cult_gain = random.randint(*e["cultivation"])
         async with AsyncSessionLocal() as session:
             if gain:
                 await session.execute(
@@ -417,9 +423,10 @@ async def grant_activity(uid: str, activity: str, player: dict, event_id: str) -
             msg = f"你在灵雨中打坐，修为 +{cult_gain}"
 
     elif activity == "temper":
-        physique_gain = 1 if random.random() < 0.12 else 0
-        bone_gain = 1 if random.random() < 0.08 else 0
-        cult_gain = random.randint(100, 250)
+        t = cfg()["temper"]
+        physique_gain = 1 if random.random() < t["physique_chance"] else 0
+        bone_gain = 1 if random.random() < t["bone_chance"] else 0
+        cult_gain = random.randint(*t["cultivation"])
         updates = [f"cultivation = cultivation + {cult_gain}"]
         if physique_gain:
             updates.append("physique = physique + 1")
@@ -440,7 +447,7 @@ async def grant_activity(uid: str, activity: str, player: dict, event_id: str) -
 
     elif activity == "defense":
         from utils.bot_combat import power_multiplier        # 机器人有按档位的战力加成，真人是 1
-        power = int(await calc_power(player) * (await power_multiplier(player)) * random.uniform(0.9, 1.1))
+        power = int(await calc_power(player) * (await power_multiplier(player)) * random.uniform(*cfg()["defense"]["power_noise"]))
         async with AsyncSessionLocal() as session:
             await session.execute(
                 text("UPDATE public_event_participants SET contribution = :p WHERE event_id = :eid AND discord_id = :uid AND activity = 'defense'"),
@@ -497,11 +504,11 @@ async def _handle_activity(interaction: discord.Interaction, event_id: str, city
             return await interaction.followup.send("你已参与守城，坚守阵地直到结束。", ephemeral=True)
     else:
         non_defense = [r for r in existing_activities if r["activity"] != "defense"]
-        if len(non_defense) >= 2:
-            return await interaction.followup.send("本次灵雨你已参与 2 次活动，已达上限。", ephemeral=True)
+        if len(non_defense) >= cfg()["max_activities"]:
+            return await interaction.followup.send(f"本次灵雨你已参与 {cfg()['max_activities']} 次活动，已达上限。", ephemeral=True)
         if non_defense:
             last_time = non_defense[0]["joined_at"]
-            cooldown = 600
+            cooldown = cfg()["activity_cooldown_seconds"]
             elapsed = now - last_time
             if elapsed < cooldown:
                 remaining_secs = int(cooldown - elapsed)
@@ -510,8 +517,8 @@ async def _handle_activity(interaction: discord.Interaction, event_id: str, city
                     ephemeral=True
                 )
 
-    if activity == "temper" and player.get("physique", 5) < 7:
-        return await interaction.followup.send("体魄不足（需≥7），无法承受灵雨淬体。", ephemeral=True)
+    if activity == "temper" and player.get("physique", 5) < cfg()["temper_min_physique"]:
+        return await interaction.followup.send(f"体魄不足（需≥{cfg()['temper_min_physique']}），无法承受灵雨淬体。", ephemeral=True)
 
     try:
         async with AsyncSessionLocal() as session:

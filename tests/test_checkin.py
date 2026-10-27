@@ -14,13 +14,15 @@ import pytest
 from tests.conftest import make_player
 from tests.discord_fakes import FakeInteraction
 from utils import checkin as ck
-from utils.checkin import CONFIG, do_checkin
+from utils.checkin import cfg, do_checkin
 from utils.items import ITEMS
 from utils.sects import TECHNIQUES
 from utils.views.checkin import CheckinView, _checkin_result_embed
 
 U = "1001"
 TODAY = lambda: time.strftime("%Y-%m-%d", time.gmtime())  # noqa: E731
+
+CONFIG = cfg()
 
 
 async def _add(db, uid=U, **kw):

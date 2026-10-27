@@ -14,7 +14,7 @@ import pytest
 
 from tests.conftest import make_player
 from utils import alchemy as al
-from utils import bank, checkin, forging, gamble, jobs, market, roulette
+from utils import bank, checkin, forging, gamble, jobs, market, roulette, rules
 from utils.events.public import wanbao as wb
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -77,7 +77,7 @@ CASES = {
     "炼器考核": lambda: forging.start_forging_exam(DEAD),
     "活期存入": lambda: bank.deposit_demand(DEAD, 100),
     "活期取出": lambda: bank.withdraw_demand(DEAD, 100),
-    "定期存入": lambda: bank.deposit_term(DEAD, bank.MIN_DEPOSIT, 10),
+    "定期存入": lambda: bank.deposit_term(DEAD, rules.get("bank.min_deposit"), 10),
     "定期取出": lambda: bank.withdraw_term(DEAD, "不存在"),
     "转账（付款人已坐化）": lambda: bank.transfer(DEAD, ALIVE, 100),
     "转账（收款人已坐化）": lambda: bank.transfer(ALIVE, DEAD, 100),

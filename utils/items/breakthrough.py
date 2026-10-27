@@ -1,39 +1,42 @@
-SPIRIT_ROOT_BASE_RATE = {
-    "单灵根": 90,
-    "双灵根": 75,
-    "三灵根": 60,
-    "变异灵根": 70,
-    "四灵根": 45,
-    "五灵根": 30,
-}
+from utils import rules
+
+# 各灵根的基础突破率、三道大关的公式系数、免丹门槛在 data/game_rules.json 的 gates（管理员可以调），用的时候读。
+
+
+def _base(player: dict) -> int:
+    g = rules.section("gates")
+    return g["root_base"].get(player.get("spirit_root_type", "五灵根"), g["default_root_base"])
 
 
 def calc_zhuji_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
-    base = SPIRIT_ROOT_BASE_RATE.get(player.get("spirit_root_type", "五灵根"), 30)
-    bonus = player.get("comprehension", 5) * 3 + player.get("fortune", 5) * 2
-    rate = base + bonus
+    g = rules.section("gates")
+    z = g["zhuji"]
+    bonus = player.get("comprehension", 5) * z["comprehension"] + player.get("fortune", 5) * z["fortune"]
+    rate = _base(player) + bonus
     if use_pill:
-        rate += 40
-    return min(95, rate)
+        rate += z["pill"]
+    return min(g["cap"], rate)
 
 
 def can_skip_pill(player: dict) -> bool:
-    return player.get("comprehension", 0) + player.get("fortune", 0) >= 20
+    return player.get("comprehension", 0) + player.get("fortune", 0) >= rules.section("gates")["skip_pill_min"]
 
 
 def calc_ningdan_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
-    base = SPIRIT_ROOT_BASE_RATE.get(player.get("spirit_root_type", "五灵根"), 30)
-    bonus = player.get("comprehension", 5) * 2 + player.get("bone", 5) * 2
-    rate = int(base * 0.8) + bonus
+    g = rules.section("gates")
+    n = g["ningdan"]
+    bonus = player.get("comprehension", 5) * n["comprehension"] + player.get("bone", 5) * n["bone"]
+    rate = int(_base(player) * n["base_factor"]) + bonus
     if use_pill:
-        rate += 35
-    return min(95, rate)
+        rate += n["pill"]
+    return min(g["cap"], rate)
 
 
 def calc_huaying_breakthrough_rate(player: dict, use_pill: bool = False) -> int:
-    base = SPIRIT_ROOT_BASE_RATE.get(player.get("spirit_root_type", "五灵根"), 30)
-    bonus = player.get("comprehension", 5) * 2 + player.get("soul", 5) * 2
-    rate = int(base * 0.6) + bonus
+    g = rules.section("gates")
+    h = g["huaying"]
+    bonus = player.get("comprehension", 5) * h["comprehension"] + player.get("soul", 5) * h["soul"]
+    rate = int(_base(player) * h["base_factor"]) + bonus
     if use_pill:
-        rate += 30
-    return min(95, rate)
+        rate += h["pill"]
+    return min(g["cap"], rate)

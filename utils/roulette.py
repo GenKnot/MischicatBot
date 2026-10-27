@@ -1,35 +1,43 @@
 import random
 
+from utils import rules
 from utils.atomic import DEAD_REASON, claim_daily_quota, grant_stones, spend_stones
 from utils.db_async import AsyncSessionLocal, Player
 
-BET = 500
-DAILY_LIMIT = 5
+# 下注额、每日次数、每格的倍率和格数在 data/game_rules.json 的 roulette（管理员可以调；校验保证期望倍率 ≤ 1，庄家不亏）。
+# 以前是 4/1/3/2/1/1，期望 1.875，每转平均净赚 437 灵石（B39）；默认 12 格，期望 = (0.5×3 + 1 + 2 + 5) / 12 ≈ 0.79。
+# count 为 0 的档位保留定义，但不上转盘、面板里也不展示。
 
-# 12 格，期望 = (0.5×3 + 1 + 2 + 5) / 12 ≈ 0.79：庄家占优，与赌坊（0.78）同量级。
-# 以前是 4/1/3/2/1/1，期望 1.875，每转平均净赚 437 灵石（B39）。改格数时同步改 tests/test_gamble_roulette.py 里的期望断言。
-# count 为 0 的档位保留定义（结算与展示的映射还在），但不上转盘、面板里也不展示。
-SLOTS = [
-    {"label": "× 0",   "multiplier": 0.0,  "emoji": "💀", "count": 6},
-    {"label": "× 0.5", "multiplier": 0.5,  "emoji": "🌑", "count": 3},
-    {"label": "× 1",   "multiplier": 1.0,  "emoji": "⚪", "count": 1},
-    {"label": "× 2",   "multiplier": 2.0,  "emoji": "🟡", "count": 1},
-    {"label": "× 5",   "multiplier": 5.0,  "emoji": "🔥", "count": 1},
-    {"label": "× 10",  "multiplier": 10.0, "emoji": "💎", "count": 0},
-]
 
-WHEEL: list[dict] = []
-for _s in SLOTS:
-    WHEEL.extend([_s] * _s["count"])
+def bet() -> int:
+    return rules.section("roulette")["bet"]
+
+
+def daily_limit() -> int:
+    return rules.section("roulette")["daily_limit"]
+
+
+def slots() -> list[dict]:
+    """每一格的定义 [{label, multiplier, emoji, count}]（label 由倍率生成）。"""
+    return [{"label": f"× {s['multiplier']:g}", **s} for s in rules.section("roulette")["slots"]]
+
+
+def wheel() -> list[dict]:
+    """转盘（每格一项，按定义顺序展开）。"""
+    out: list[dict] = []
+    for s in slots():
+        out.extend([s] * s["count"])
+    return out
 
 
 def spin_wheel() -> dict:
-    return random.choice(WHEEL)
+    return random.choice(wheel())
 
 
 def build_wheel_display(landed: dict) -> str:
-    emojis = [s["emoji"] for s in WHEEL]
-    landed_idx = next(i for i, s in enumerate(WHEEL) if s["label"] == landed["label"] and s["emoji"] == landed["emoji"])
+    cells = wheel()
+    emojis = [s["emoji"] for s in cells]
+    landed_idx = next(i for i, s in enumerate(cells) if s["label"] == landed["label"] and s["emoji"] == landed["emoji"])
     display = []
     for i, e in enumerate(emojis):
         if i == landed_idx:
@@ -49,18 +57,19 @@ async def do_roulette(uid: str) -> dict:
             return {"ok": False, "reason": DEAD_REASON}
 
         daily_count = await claim_daily_quota(
-            session, uid, Player.roulette_daily_count, Player.roulette_daily_reset, DAILY_LIMIT
+            session, uid, Player.roulette_daily_count, Player.roulette_daily_reset, daily_limit()
         )
         if daily_count is None:
-            return {"ok": False, "reason": f"今日轮转次数已达上限（{DAILY_LIMIT}次），明日再来。"}
+            return {"ok": False, "reason": f"今日轮转次数已达上限（{daily_limit()}次），明日再来。"}
 
-        if not await spend_stones(session, uid, BET):
+        if not await spend_stones(session, uid, bet()):
             await session.rollback()          # 连带退回刚占用的配额
-            return {"ok": False, "reason": f"灵石不足，轮转需要 **{BET}** 灵石。"}
+            return {"ok": False, "reason": f"灵石不足，轮转需要 **{bet()}** 灵石。"}
 
         result_slot = spin_wheel()
-        payout = int(BET * result_slot["multiplier"])
-        net = payout - BET
+        stake = bet()
+        payout = int(stake * result_slot["multiplier"])
+        net = payout - stake
 
         await grant_stones(session, uid, payout)
         await session.commit()
@@ -68,9 +77,9 @@ async def do_roulette(uid: str) -> dict:
     return {
         "ok": True,
         "slot": result_slot,
-        "bet": BET,
+        "bet": stake,
         "payout": payout,
         "net": net,
         "daily_count": daily_count,
-        "daily_limit": DAILY_LIMIT,
+        "daily_limit": daily_limit(),
     }

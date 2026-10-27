@@ -1,6 +1,6 @@
 import discord
 from utils.alchemy import (
-    PILLS, RECIPES, QUALITY_NAMES, NO_YANHUO_CAP, DAILY_LIMIT,
+    PILLS, RECIPES, QUALITY_NAMES, daily_limit, no_yanhuo_cap,
     get_recipe_by_id,
     get_mastery_count, get_mastery_label, calc_success_rate,
     get_known_recipes_with_choices,
@@ -30,7 +30,7 @@ def _pill_tier_label(tier: int) -> str:
 
 
 def _quality_cap_label(cap: int, has_yanhuo: bool) -> str:
-    effective = cap if has_yanhuo else min(cap, NO_YANHUO_CAP)
+    effective = cap if has_yanhuo else min(cap, no_yanhuo_cap())
     return QUALITY_NAMES[effective]
 
 
@@ -559,7 +559,7 @@ def _result_embed(result: dict, recipe: dict, inventory: dict = None) -> discord
         if lifespan_loss:
             desc += f"\n寿元损失 {lifespan_loss} 年。"
         embed = discord.Embed(title=f"炼丹失败 — {consequence}", description=desc, color=0x8B0000)
-        embed.add_field(name="今日剩余次数", value=f"{max(0, DAILY_LIMIT - result['daily_count'])}/{DAILY_LIMIT}", inline=True)
+        embed.add_field(name="今日剩余次数", value=f"{max(0, daily_limit() - result['daily_count'])}/{daily_limit()}", inline=True)
         if consumed_str:
             embed.add_field(name="消耗材料", value=consumed_str, inline=False)
         return embed
@@ -573,7 +573,7 @@ def _result_embed(result: dict, recipe: dict, inventory: dict = None) -> discord
         color=color,
     )
     embed.add_field(name="品质", value=quality, inline=True)
-    embed.add_field(name="今日剩余次数", value=f"{max(0, DAILY_LIMIT - result['daily_count'])}/{DAILY_LIMIT}", inline=True)
+    embed.add_field(name="今日剩余次数", value=f"{max(0, daily_limit() - result['daily_count'])}/{daily_limit()}", inline=True)
     embed.add_field(name="熟练度", value=f"{result['mastery_label']}（{result['mastery_count']}次）", inline=True)
     if consumed_str:
         embed.add_field(name="消耗材料", value=consumed_str, inline=False)

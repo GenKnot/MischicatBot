@@ -37,57 +37,57 @@ async def row(db, uid=U):
 
 
 def force_gamble(monkeypatch, label):
-    outcome = next(o for o in gamble.CONFIG["outcomes"] if o["label"] == label)
+    outcome = next(o for o in gamble.cfg()["outcomes"] if o["label"] == label)
     monkeypatch.setattr(gamble.random, "choices", lambda pop, weights=None, k=1: [outcome])
 
 
 def force_slot(monkeypatch, multiplier):
-    slot = next(s for s in roulette.SLOTS if s["multiplier"] == multiplier)
+    slot = next(s for s in roulette.slots() if s["multiplier"] == multiplier)
     monkeypatch.setattr(roulette, "spin_wheel", lambda: slot)
 
 
 # --- 配置 ---------------------------------------------------------------------
 
 def test_赌坊_概率合计100():
-    assert sum(p for _, p in gamble.OUTCOME_PROBS) == pytest.approx(100, abs=0.2)
-    assert [l for l, _ in gamble.OUTCOME_PROBS] == [o["label"] for o in gamble.CONFIG["outcomes"]]
+    assert sum(p for _, p in gamble.outcome_probs()) == pytest.approx(100, abs=0.2)
+    assert [l for l, _ in gamble.outcome_probs()] == [o["label"] for o in gamble.cfg()["outcomes"]]
 
 
 def test_赌坊_期望收益小于1_庄家有优势():
-    total = sum(o["weight"] for o in gamble.CONFIG["outcomes"])
-    ev = sum(o["weight"] * o["multiplier"] for o in gamble.CONFIG["outcomes"]) / total
+    total = sum(o["weight"] for o in gamble.cfg()["outcomes"])
+    ev = sum(o["weight"] * o["multiplier"] for o in gamble.cfg()["outcomes"]) / total
     assert ev < 1, ev
 
 
 def test_赌坊_每个结局都有文案_倍率非负():
-    for o in gamble.CONFIG["outcomes"]:
+    for o in gamble.cfg()["outcomes"]:
         assert o["messages"] and o["multiplier"] >= 0 and o["weight"] > 0
 
 
 def test_赌坊_面板上写死的倍率文案与配置一致():
     """面板里『大赢 ×3 · 赢 ×2 · 小赢 ×1.5 · 输 ×0』是手写的，配置一改就和真实结算对不上。"""
     desc = gv._gamble_overview_embed({"spirit_stones": 0}).description
-    for o in gamble.CONFIG["outcomes"]:
+    for o in gamble.cfg()["outcomes"]:
         m = o["multiplier"]
         mult = f"{m:g}"
         assert f"{o['label']} ×{mult}" in desc, o
 
 
 def test_轮转_转盘12格_与文案一致():
-    assert len(roulette.WHEEL) == 12 and sum(s["count"] for s in roulette.SLOTS) == 12
+    assert len(roulette.wheel()) == 12 and sum(s["count"] for s in roulette.slots()) == 12
 
 
 def test_轮转_期望收益是小亏_B39():
     """BALANCE：改配置时同步改这条。庄家必须占优，且与赌坊同量级。"""
-    ev = sum(s["count"] * s["multiplier"] for s in roulette.SLOTS) / len(roulette.WHEEL)
+    ev = sum(s["count"] * s["multiplier"] for s in roulette.slots()) / len(roulette.wheel())
     assert ev == pytest.approx(9.5 / 12) and 0.7 < ev < 0.85
-    gamble_total = sum(o["weight"] for o in gamble.CONFIG["outcomes"])
-    gamble_ev = sum(o["weight"] * o["multiplier"] for o in gamble.CONFIG["outcomes"]) / gamble_total
+    gamble_total = sum(o["weight"] for o in gamble.cfg()["outcomes"])
+    gamble_ev = sum(o["weight"] * o["multiplier"] for o in gamble.cfg()["outcomes"]) / gamble_total
     assert abs(ev - gamble_ev) < 0.1
 
 
 def test_轮转_各档格数():
-    counts = {s["multiplier"]: s["count"] for s in roulette.SLOTS}
+    counts = {s["multiplier"]: s["count"] for s in roulette.slots()}
     assert counts == {0.0: 6, 0.5: 3, 1.0: 1, 2.0: 1, 5.0: 1, 10.0: 0}
 
 
@@ -101,7 +101,7 @@ def test_轮转_长期回报低于押注():
 
 
 def test_轮转_落点展示恰好一个括号():
-    for slot in (s for s in roulette.SLOTS if s["count"] > 0):                 # 0 格的档位不会落点
+    for slot in (s for s in roulette.slots() if s["count"] > 0):                 # 0 格的档位不会落点
         text = roulette.build_wheel_display(slot)
         assert text.count("[") == 1 and f"[{slot['emoji']}]" in text and len(text.split()) == 12
 
@@ -134,7 +134,7 @@ async def test_赌坊_各结局结算(db, monkeypatch, label, mult):
     r = await gamble.do_gamble(U, 1000)
     assert r["ok"] and r["label"] == label and r["payout"] == int(1000 * mult) and r["net"] == int(1000 * mult) - 1000
     assert (await row(db)).spirit_stones == 10_000 - 1000 + int(1000 * mult)
-    assert r["message"] in next(o for o in gamble.CONFIG["outcomes"] if o["label"] == label)["messages"]
+    assert r["message"] in next(o for o in gamble.cfg()["outcomes"] if o["label"] == label)["messages"]
 
 
 async def test_赌坊_小数倍率向下取整(db, monkeypatch):
@@ -147,7 +147,7 @@ async def test_赌坊_小数倍率向下取整(db, monkeypatch):
 async def test_赌坊_每日次数上限(db, monkeypatch):
     await _add(db)
     force_gamble(monkeypatch, "输")
-    for n in range(1, gamble.DAILY_LIMIT + 1):
+    for n in range(1, gamble.daily_limit() + 1):
         r = await gamble.do_gamble(U, 100)
         assert r["ok"] and r["daily_count"] == n
     stones = (await row(db)).spirit_stones
@@ -156,7 +156,7 @@ async def test_赌坊_每日次数上限(db, monkeypatch):
 
 
 async def test_赌坊_隔天次数归零(db, monkeypatch):
-    await _add(db, gamble_daily_count=gamble.DAILY_LIMIT, gamble_daily_reset=time.time() - 2 * DAY)
+    await _add(db, gamble_daily_count=gamble.daily_limit(), gamble_daily_reset=time.time() - 2 * DAY)
     force_gamble(monkeypatch, "输")
     r = await gamble.do_gamble(U, 100)
     assert r["ok"] and r["daily_count"] == 1
@@ -165,9 +165,9 @@ async def test_赌坊_隔天次数归零(db, monkeypatch):
 async def test_赌坊_并发不超次数也不多扣(db, monkeypatch):
     await _add(db)
     force_gamble(monkeypatch, "输")
-    results = await asyncio.gather(*[gamble.do_gamble(U, 100) for _ in range(gamble.DAILY_LIMIT + 6)])
+    results = await asyncio.gather(*[gamble.do_gamble(U, 100) for _ in range(gamble.daily_limit() + 6)])
     ok = [r for r in results if r["ok"]]
-    assert len(ok) == gamble.DAILY_LIMIT and (await row(db)).spirit_stones == 100_000 - 100 * len(ok)
+    assert len(ok) == gamble.daily_limit() and (await row(db)).spirit_stones == 100_000 - 100 * len(ok)
 
 
 async def test_赌坊_长期统计_庄家占优(db):
@@ -188,27 +188,27 @@ async def test_赌坊_长期统计_庄家占优(db):
 
 async def test_轮转_没有角色_灵石不足(db):
     assert (await roulette.do_roulette(U))["reason"] == "角色不存在。"
-    await _add(db, stones=roulette.BET - 1)
+    await _add(db, stones=roulette.bet() - 1)
     r = await roulette.do_roulette(U)
     assert "灵石不足" in r["reason"]
     p = await row(db)
-    assert p.spirit_stones == roulette.BET - 1 and not p.roulette_daily_count
+    assert p.spirit_stones == roulette.bet() - 1 and not p.roulette_daily_count
 
 
-@pytest.mark.parametrize("mult", [s["multiplier"] for s in roulette.SLOTS])
+@pytest.mark.parametrize("mult", [s["multiplier"] for s in roulette.slots()])
 async def test_轮转_各格结算(db, monkeypatch, mult):
     await _add(db, stones=10_000)
     force_slot(monkeypatch, mult)
     r = await roulette.do_roulette(U)
-    payout = int(roulette.BET * mult)
-    assert r["ok"] and r["payout"] == payout and r["net"] == payout - roulette.BET and r["bet"] == roulette.BET
-    assert (await row(db)).spirit_stones == 10_000 - roulette.BET + payout
+    payout = int(roulette.bet() * mult)
+    assert r["ok"] and r["payout"] == payout and r["net"] == payout - roulette.bet() and r["bet"] == roulette.bet()
+    assert (await row(db)).spirit_stones == 10_000 - roulette.bet() + payout
 
 
 async def test_轮转_每日次数与隔天归零(db, monkeypatch):
     await _add(db)
     force_slot(monkeypatch, 0.0)
-    for n in range(1, roulette.DAILY_LIMIT + 1):
+    for n in range(1, roulette.daily_limit() + 1):
         assert (await roulette.do_roulette(U))["daily_count"] == n
     assert "已达上限" in (await roulette.do_roulette(U))["reason"]
     from sqlalchemy import update
@@ -225,9 +225,9 @@ def _sess(db):
 async def test_轮转_并发不超次数(db, monkeypatch):
     await _add(db)
     force_slot(monkeypatch, 0.0)
-    results = await asyncio.gather(*[roulette.do_roulette(U) for _ in range(roulette.DAILY_LIMIT + 5)])
-    assert len([r for r in results if r["ok"]]) == roulette.DAILY_LIMIT
-    assert (await row(db)).spirit_stones == 100_000 - roulette.BET * roulette.DAILY_LIMIT
+    results = await asyncio.gather(*[roulette.do_roulette(U) for _ in range(roulette.daily_limit() + 5)])
+    assert len([r for r in results if r["ok"]]) == roulette.daily_limit()
+    assert (await row(db)).spirit_stones == 100_000 - roulette.bet() * roulette.daily_limit()
 
 
 # --- 面板：赌坊 ---------------------------------------------------------------
@@ -245,9 +245,9 @@ def player(**kw):
 
 def test_赌坊面板_剩余次数_隔天按满额显示():
     e = gv._gamble_overview_embed(player(gamble_daily_count=3))
-    assert f"{gamble.DAILY_LIMIT - 3} / {gamble.DAILY_LIMIT}" in e.description
+    assert f"{gamble.daily_limit() - 3} / {gamble.daily_limit()}" in e.description
     e = gv._gamble_overview_embed(player(gamble_daily_count=3, gamble_daily_reset=time.time() - 2 * DAY))
-    assert f"{gamble.DAILY_LIMIT} / {gamble.DAILY_LIMIT}" in e.description
+    assert f"{gamble.daily_limit()} / {gamble.daily_limit()}" in e.description
     assert "100,000" in e.description and "输 " in e.description
     assert gv._gamble_overview_embed({}).description
 
@@ -256,9 +256,9 @@ def test_赌坊面板_按钮按灵石和次数禁用():
     v = gv.GambleView(inter().user, player(spirit_stones=600), None)
     bets = [b for b in v.children if b.custom_id in ("100", "500", "1000", "5000")]
     assert [(b.custom_id, b.disabled) for b in bets] == [("100", False), ("500", False), ("1000", True), ("5000", True)]
-    v = gv.GambleView(inter().user, player(gamble_daily_count=gamble.DAILY_LIMIT), None)
+    v = gv.GambleView(inter().user, player(gamble_daily_count=gamble.daily_limit()), None)
     assert all(b.disabled for b in v.children if b.custom_id in ("100", "500", "1000", "5000"))
-    v = gv.GambleView(inter().user, player(gamble_daily_count=gamble.DAILY_LIMIT, gamble_daily_reset=time.time() - 2 * DAY), None)
+    v = gv.GambleView(inter().user, player(gamble_daily_count=gamble.daily_limit(), gamble_daily_reset=time.time() - 2 * DAY), None)
     assert not any(b.disabled for b in v.children if b.custom_id in ("100", "500", "1000", "5000"))
 
 
@@ -318,13 +318,13 @@ async def test_赌坊面板_返回城市(db):
 
 def test_轮转面板_文案与禁用():
     e = rv._wheel_overview_embed(player(roulette_daily_count=2))
-    assert f"{roulette.DAILY_LIMIT - 2} / {roulette.DAILY_LIMIT}" in e.description and "12 格" in e.description
+    assert f"{roulette.daily_limit() - 2} / {roulette.daily_limit()}" in e.description and "12 格" in e.description
     assert "50%" in e.description and "25%" in e.description and "8%" in e.description     # × 0 占 6/12，× 0.5 占 3/12，其余各 1/12
     assert "× 10" not in e.description                                              # 0 格的档位不展示
     e = rv._wheel_overview_embed(player(roulette_daily_count=2, roulette_daily_reset=time.time() - 2 * DAY))
-    assert f"{roulette.DAILY_LIMIT} / {roulette.DAILY_LIMIT}" in e.description
+    assert f"{roulette.daily_limit()} / {roulette.daily_limit()}" in e.description
     assert rv.RouletteView(inter().user, player(spirit_stones=499), None).spin_btn.disabled
-    assert rv.RouletteView(inter().user, player(roulette_daily_count=roulette.DAILY_LIMIT), None).spin_btn.disabled
+    assert rv.RouletteView(inter().user, player(roulette_daily_count=roulette.daily_limit()), None).spin_btn.disabled
     assert not rv.RouletteView(inter().user, player(), None).spin_btn.disabled
     assert not rv.RouletteView(inter().user, player(roulette_daily_count=99, roulette_daily_reset=0), None).spin_btn.disabled
 

@@ -11,7 +11,7 @@ from utils.db_async import AsyncSessionLocal, Player
 from utils.quests import get_tavern_quests, get_quest
 from utils.combat import calc_power
 from utils.character import years_to_seconds, seconds_to_years
-from utils import quest_logic
+from utils import quest_logic, rules
 from utils.logging_setup import audit
 from utils.bots import send_dm
 from utils.tasks import loop_guard
@@ -61,8 +61,13 @@ TIER_COLOR = {
 }
 
 TIER_EMOJI = {"普通": "📋", "精英": "⚔️", "传说": "🌟"}
-QUEST_DURATION = {"普通": 1, "精英": 1, "传说": 1}
-GATHER_DURATION = {"普通": 2, "精英": 2, "传说": 2}
+# 任务耗时（游戏年）在 data/game_rules.json 的 tavern.quest_years / gather_years（管理员可以调），用的时候读
+
+
+def _years_text(kind: str) -> str:
+    """面板脚注里的耗时：各品阶一样就写一个数，不一样写范围。"""
+    values = sorted(rules.section("tavern")[kind].values())
+    return f"{values[0]:g}年" if values[0] == values[-1] else f"{values[0]:g}~{values[-1]:g}年"
 
 
 class TavernCog(commands.Cog, name="Tavern"):
@@ -185,11 +190,11 @@ class TavernCog(commands.Cog, name="Tavern"):
                 if tier == "_locked":
                     embed.add_field(name="🔒 未解锁", value="\n".join(quest_list), inline=False)
                     continue
-                dur = GATHER_DURATION[tier]
+                dur = rules.section("tavern")["gather_years"][tier]
                 lines = []
                 for q in quest_list:
                     reward_preview = "、".join(_reward_lines(q["rewards"])[:2])
-                    time_cost = dur if q["type"] == "gather" else QUEST_DURATION[tier]
+                    time_cost = dur if q["type"] == "gather" else rules.section("tavern")["quest_years"][tier]
                     lines.append(
                         f"{TIER_EMOJI[tier]} **{q['title']}**（耗时 {time_cost} 游戏年）\n"
                         f"　{q['desc'][:28]}…\n"
@@ -197,7 +202,7 @@ class TavernCog(commands.Cog, name="Tavern"):
                     )
                 embed.add_field(name=f"── {tier}任务 ──", value="\n\n".join(lines), inline=False)
 
-            embed.set_footer(text=f"战斗任务耗时1年 · 采集任务耗时2年 · 任务期间无法闭关 · {COMMAND_PREFIX}传闻 听听江湖消息")
+            embed.set_footer(text=f"战斗任务耗时{_years_text('quest_years')} · 采集任务耗时{_years_text('gather_years')} · 任务期间无法闭关 · {COMMAND_PREFIX}传闻 听听江湖消息")
             await ctx.send(embed=embed, view=TavernView(ctx.author, quests, self))
 
     @commands.hybrid_command(name="交任务", aliases=["jrw"], description="在茶馆结算当前进行中的任务")
@@ -378,7 +383,7 @@ class QuestButton(discord.ui.Button):
                 return await interaction.followup.send("角色状态异常。", ephemeral=True)
 
             q = self.quest
-            duration = GATHER_DURATION[self.tier] if q["type"] == "gather" else QUEST_DURATION[self.tier]
+            duration = rules.section("tavern")["gather_years" if q["type"] == "gather" else "quest_years"][self.tier]
             reward_lines = _reward_lines(q["rewards"])
 
             embed = discord.Embed(

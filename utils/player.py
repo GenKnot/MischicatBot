@@ -3,7 +3,7 @@ from sqlalchemy import text
 from utils.db_async import AsyncSessionLocal, Player
 from utils.character import (
     seconds_to_years, calc_cultivation_gain,
-    AUTO_CULTIVATE_THRESHOLD_YEARS, get_cultivation_bonus,
+    auto_cultivate_threshold_years, get_cultivation_bonus,
 )
 from utils.realms import cultivation_needed
 
@@ -35,7 +35,7 @@ async def settle_time(player: dict):
     new_lifespan = max(0, player["lifespan"] - int(elapsed_years))
     updates = {"lifespan": new_lifespan, "last_active": now, "cultivation": player["cultivation"]}
     cultivating = player["cultivating_until"] and now < player["cultivating_until"]
-    if not cultivating and elapsed_years >= AUTO_CULTIVATE_THRESHOLD_YEARS:
+    if not cultivating and elapsed_years >= auto_cultivate_threshold_years():
         bonus = await get_cultivation_bonus(player["discord_id"], player["current_city"], player.get("cave"))
         gain = calc_cultivation_gain(int(elapsed_years), player["comprehension"], player["spirit_root_type"])
         from utils.buffs import get_cultivation_speed_bonus

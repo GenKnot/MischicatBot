@@ -5,7 +5,7 @@ import random
 from sqlalchemy import select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from utils import rumors
+from utils import rules, rumors
 from utils.atomic import claim_daily_quota, consume_item, peek_daily_used, refuse_if_dead
 from utils.db_async import AsyncSessionLocal, AlchemyMastery, Player, KnownRecipe
 
@@ -17,21 +17,28 @@ log = logging.getLogger(__name__)
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
 QUALITY_NAMES = ["常规", "一纹", "二纹", "三纹", "四纹", "五纹", "六纹", "七纹", "八纹", "九纹", "十纹", "无暇"]
-DAILY_LIMIT = 6
-NO_YANHUO_CAP = 8
 
-QUALITY_MULTIPLIERS = [1.0, 1.1, 1.2, 1.35, 1.5, 2.0, 2.5, 3.2, 4.2, 5.5, 7.5, 12.0]
+# 每日次数、品质倍率、经验门槛、熟练度阶段、成功率 / 失败后果等数值在 data/game_rules.json 的 alchemy（管理员可以调），用的时候读
 
-ALCHEMY_EXP_THRESHOLDS = [0, 0, 50, 150, 300, 500, 800, 1200, 1800, 2500]
 
-MASTERY_STAGES = [
-    (0, 0),
-    (10, 1),
-    (30, 2),
-    (100, 3),
-]
+def cfg() -> dict:
+    return rules.section("alchemy")
 
-ALCHEMY_EXP_PER_CRAFT = 10
+
+def daily_limit() -> int:
+    return cfg()["daily_limit"]
+
+
+def no_yanhuo_cap() -> int:
+    return cfg()["no_yanhuo_cap"]
+
+
+def quality_multipliers() -> list[float]:
+    return cfg()["quality_multipliers"]
+
+
+def exp_thresholds() -> list[int]:
+    return cfg()["exp_thresholds"]
 
 
 def _load_pills() -> dict:
@@ -67,59 +74,56 @@ def list_available_recipes(alchemy_level: int) -> list[dict]:
 
 
 def get_mastery_bonus(count: int) -> tuple[int, bool]:
-    bonus = 0
-    master = False
-    for threshold, b in reversed(MASTERY_STAGES):
-        if count >= threshold:
-            bonus = b
-            master = (threshold == 100)
+    stages = cfg()["mastery_stages"]
+    bonus, master = 0, False
+    for i in range(len(stages) - 1, -1, -1):
+        if count >= stages[i]["crafts"]:
+            bonus, master = stages[i]["bonus"], i == len(stages) - 1          # 最后一档是『炉火纯青』
             break
     return bonus, master
 
 
 def get_mastery_label(count: int) -> str:
-    if count >= 100:
-        return "炉火纯青"
-    if count >= 30:
-        return "精通"
-    if count >= 10:
-        return "熟悉"
-    return "生疏"
+    stages = cfg()["mastery_stages"]
+    return next(s["label"] for s in reversed(stages) if count >= s["crafts"])
 
 
 def calc_quality(recipe: dict, player_soul: int, alchemy_level: int, aux_quality_bonus: int, mastery_count: int, has_yanhuo: bool = False) -> int:
     mastery_bonus, _ = get_mastery_bonus(mastery_count)
     level_bonus = max(0, alchemy_level - recipe["pill_tier"])
-    soul_bonus = int(player_soul * 0.5)
+    q = cfg()["quality"]
+    soul_bonus = int(player_soul * q["soul_factor"])
     quality_score = level_bonus + soul_bonus + aux_quality_bonus + mastery_bonus
-    base = random.randint(0, 6)
+    base = random.randint(0, q["roll_max"])
     result = base + quality_score
     cap = recipe["max_quality"]
     if not has_yanhuo:
-        cap = min(cap, NO_YANHUO_CAP)
+        cap = min(cap, no_yanhuo_cap())
     result = max(0, min(result, cap))
     return result
 
 
 def calc_success_rate(recipe: dict, alchemy_level: int, mastery_count: int, free_mix: bool = False) -> int:
     _, is_master = get_mastery_bonus(mastery_count)
+    s = cfg()["success"]
     rate = recipe["base_success_rate"]
     if is_master:
-        rate += 15
+        rate += s["master_bonus"]
     if free_mix:
-        rate = int(rate * 0.7)
-    rate = min(95, max(5, rate))
+        rate = int(rate * s["free_mix_factor"])
+    rate = min(s["max"], max(s["min"], rate))
     return rate
 
 
 def roll_failure_consequence() -> tuple[str, int]:
+    f = cfg()["failure"]
     roll = random.random()
-    if roll < 0.70:
+    if roll < f["plain_p"]:
         return "普通失败", 0
-    elif roll < 0.90:
-        return "炉毁", random.randint(1, 5)
+    elif roll < f["plain_p"] + f["ruin_p"]:
+        return "炉毁", random.randint(*f["ruin_loss"])
     else:
-        return "丹毒反噬", random.randint(5, 15)
+        return "丹毒反噬", random.randint(*f["poison_loss"])
 
 
 async def get_mastery_count(discord_id: str, pill_name: str) -> int:
@@ -181,7 +185,7 @@ async def check_and_consume_daily(discord_id: str) -> tuple[bool, int]:
     """占用今日一次炼丹次数。返回 (是否成功, 占用后的今日次数)。"""
     async with AsyncSessionLocal() as session:
         used = await claim_daily_quota(
-            session, discord_id, Player.alchemy_daily_count, Player.alchemy_daily_reset, DAILY_LIMIT
+            session, discord_id, Player.alchemy_daily_count, Player.alchemy_daily_reset, daily_limit()
         )
         if used is None:
             return False, await peek_daily_used(
@@ -207,7 +211,7 @@ async def add_alchemy_exp(discord_id: str, exp: int) -> tuple[int, int, bool]:
         leveled_up = False
         if level < 9:
             nxt = level + 1
-            threshold = ALCHEMY_EXP_THRESHOLDS[nxt] if nxt < len(ALCHEMY_EXP_THRESHOLDS) else 999999
+            threshold = exp_thresholds()[nxt] if nxt < len(exp_thresholds()) else 999999
             if total >= threshold:
                 up = await session.execute(
                     update(Player).where(Player.discord_id == discord_id, Player.alchemy_level == level)
@@ -259,13 +263,13 @@ async def attempt_alchemy(
                 return {"ok": False, "reason": f"药材不足：「{item_id}」需要 {qty} 个。"}
         count = await claim_daily_quota(
             session, discord_id,
-            Player.alchemy_daily_count, Player.alchemy_daily_reset, DAILY_LIMIT,
+            Player.alchemy_daily_count, Player.alchemy_daily_reset, daily_limit(),
         )
         if count is None:
             await session.rollback()          # 连带退回刚扣的药材
             return {"ok": False,
-                    "reason": f"今日炼丹次数已达上限（{DAILY_LIMIT}次），明日再来。",
-                    "daily_count": DAILY_LIMIT}
+                    "reason": f"今日炼丹次数已达上限（{daily_limit()}次），明日再来。",
+                    "daily_count": daily_limit()}
         await session.commit()
 
     mastery_count = await get_mastery_count(discord_id, recipe["pill"])
@@ -291,7 +295,7 @@ async def attempt_alchemy(
     quality_idx = calc_quality(recipe, player_soul, alchemy_level, aux_quality_bonus, mastery_count, has_yanhuo)
     quality_name = QUALITY_NAMES[quality_idx]
     new_count = await increment_mastery(discord_id, recipe["pill"])
-    new_level, new_exp, leveled_up = await add_alchemy_exp(discord_id, ALCHEMY_EXP_PER_CRAFT)
+    new_level, new_exp, leveled_up = await add_alchemy_exp(discord_id, cfg()["exp_per_craft"])
     known_before = await get_known_recipes(discord_id)
     first_unlock = recipe["recipe_id"] not in known_before
     await unlock_recipe(discord_id, recipe["recipe_id"], aux_choices)

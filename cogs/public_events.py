@@ -15,12 +15,12 @@ from utils.db_async import AsyncSessionLocal
 from utils.character import years_to_seconds, seconds_to_years
 from utils.events.public import PUBLIC_EVENTS
 from utils.views.spirit_rain import TravelToEventView, _get_active_event, _get_pending_event, _today_trigger_ts
-from utils.views.wanbao_public import _WanbaoTravelButton, WANBAO_DESC
+from utils.views.wanbao_public import _WanbaoTravelButton, wanbao_desc
 from utils.views.public_event_overview import PublicEventOverviewView
 
 import logging
 from utils.config import is_master
-from utils import bot_events
+from utils import bot_events, rules
 from utils.tasks import loop_guard, spawn
 
 log = logging.getLogger(__name__)
@@ -218,7 +218,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
                 )
                 await session.commit()
 
-        has_beast_tide = random.random() < 0.30
+        has_beast_tide = random.random() < rules.section("spirit_rain")["beast_tide_chance"]
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 text("SELECT data FROM public_events WHERE event_id = :event_id"),
@@ -268,7 +268,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
                             f"两个时辰后，万宝楼将举办本期大型拍卖会。\n\n"
                             f"本次共有 **{len(lots)}** 件拍品，包含功法、丹药与灵材。\n"
                             f"想参与的道友请在 **北美东部时间 {WANBAO_TRIGGER_HOUR}:00** 前抵达 **万宝楼**。\n\n"
-                            f"可上架物品（每人最多2件），流拍需支付取回费。"
+                            f"可上架物品（每人最多{rules.get('wanbao.max_player_lots')}件），流拍需支付取回费。"
                         ),
                         color=discord.Color.gold(),
                     )
@@ -484,7 +484,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
         if not auction or auction["status"] == "ended":
             embed = discord.Embed(
                 title="✦ 万宝楼大型拍卖会 ✦",
-                description=WANBAO_DESC,
+                description=wanbao_desc(),
                 color=discord.Color.gold(),
             )
             embed.add_field(
@@ -534,7 +534,7 @@ class PublicEventsCog(commands.Cog, name="PublicEvents"):
             )
             embed.add_field(
                 name="提示",
-                value="拍卖开始前可上架物品（每人最多2件），开始后无法继续上架。",
+                value=f"拍卖开始前可上架物品（每人最多{rules.get('wanbao.max_player_lots')}件），开始后无法继续上架。",
                 inline=False,
             )
         view = WanbaoMainView(ctx.author, self)

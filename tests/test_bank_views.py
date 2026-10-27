@@ -7,7 +7,7 @@ import pytest
 from tests.conftest import make_player
 from tests.discord_fakes import FakeInteraction
 from utils import bank
-from utils.bank import MIN_DEPOSIT, TERM_OPTIONS
+from utils import rules
 from utils.views import bank as bv
 from utils.views.bank import (BackToBankButton, BankMainView, DemandDepositModal, DemandWithdrawModal,
                               TermDepositModal, TermDepositSelectView, TermSelect, TermWithdrawSelect,
@@ -16,6 +16,9 @@ from utils.views.bank import (BackToBankButton, BankMainView, DemandDepositModal
 
 U = "1001"
 YEAR = 7200
+
+MIN_DEPOSIT = rules.get("bank.min_deposit")
+TERM_OPTIONS = rules.get("bank.terms")
 
 
 async def _add(db, uid=U, stones=100_000, city="灵虚城"):

@@ -137,7 +137,7 @@ async def test_送礼_具体喜欢的物品(db):
     await world(db)
     await give(db, "筑基丹")
     res = await bs.give_gift(HUMAN, BOT, "筑基丹")
-    bonus = bs.RARITY_BONUS[ITEMS["筑基丹"]["rarity"]]
+    bonus = bs.favor_cfg()["rarity_bonus"][ITEMS["筑基丹"]["rarity"]]
     assert res["ok"] and res["reaction"] == "love" and res["delta"] == 8 + bonus and res["favor"] == 8 + bonus
     inv = db["inventory"]
     assert await inv.get_inventory(HUMAN) == {} and await inv.get_inventory(BOT) == {"筑基丹": 1}
@@ -199,7 +199,7 @@ async def test_送礼_每天涨幅封顶_跌不封顶(db, set_day):
     last = None
     for _ in range(3):
         last = await bs.give_gift(HUMAN, BOT, "筑基丹")
-    assert last["favor"] == bs.GIFT_GAIN_DAILY_CAP, "三份心头好也只涨到当日上限"
+    assert last["favor"] == bs.favor_cfg()["gift_gain_daily_cap"], "三份心头好也只涨到当日上限"
     await give(db, "黄泉铁")
     set_day("明天")
     res = await bs.give_gift(HUMAN, BOT, "黄泉铁")

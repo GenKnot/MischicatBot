@@ -241,10 +241,10 @@ class SectCog(commands.Cog, name="Sect"):
             tech_info = TECHNIQUES.get(name, {})
             lifespan_bonus = tech_info.get("stat_bonus", {}).get("lifespan_bonus", 0)
             if lifespan_bonus > 0:
-                from utils.sects import STAGE_PCT_MULTIPLIER
+                from utils.sects import pct_multiplier
                 from utils.character import get_effective_lifespan_max
                 stage = target.get("stage", "入门")
-                mult = STAGE_PCT_MULTIPLIER.get(stage, 1)
+                mult = pct_multiplier(stage)
                 actual_bonus = int(lifespan_bonus * mult)
                 max_after_unequip = get_effective_lifespan_max(player) - actual_bonus
                 if player["lifespan"] > max_after_unequip:
